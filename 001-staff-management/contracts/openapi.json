@@ -1,0 +1,898 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Staff Management API",
+    "description": "API for managing staff members with RBAC across multiple branches",
+    "version": "1.0.0",
+    "contact": {
+      "name": "Doha Roastery Dev Team"
+    }
+  },
+  "servers": [
+    {
+      "url": "https://{project}.supabase.co/rest/v1",
+      "description": "Supabase REST API",
+      "variables": {
+        "project": {
+          "default": "your-project"
+        }
+      }
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "paths": {
+    "/staff": {
+      "get": {
+        "summary": "List staff members",
+        "description": "Retrieve a list of staff members based on user's role and branch permissions. Supports filtering and pagination.",
+        "operationId": "listStaff",
+        "tags": ["Staff"],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "description": "Filter by role name",
+            "schema": {
+              "type": "string",
+              "enum": ["OWNER", "ADMIN", "MANAGER", "CASHIER", "ROASTER", "WAREHOUSE_STAFF", "AUDITOR"]
+            }
+          },
+          {
+            "name": "is_active",
+            "in": "query",
+            "description": "Filter by active status",
+            "schema": {
+              "type": "boolean",
+              "default": true
+            }
+          },
+          {
+            "name": "branch_id",
+            "in": "query",
+            "description": "Filter by branch assignment",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Number of results to return",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 20
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Number of results to skip",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of staff members",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create staff member",
+        "description": "Create a new staff member with role and branch assignment. Requires ADMIN or OWNER role.",
+        "operationId": "createStaff",
+        "tags": ["Staff"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateStaffRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Staff member created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "409": {
+            "$ref": "#/components/responses/ConflictError"
+          }
+        }
+      }
+    },
+    "/staff/{id}": {
+      "get": {
+        "summary": "Get staff member",
+        "description": "Retrieve details of a specific staff member",
+        "operationId": "getStaff",
+        "tags": ["Staff"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Staff member ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Staff member details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update staff member",
+        "description": "Update staff member details. Requires appropriate permissions based on role hierarchy.",
+        "operationId": "updateStaff",
+        "tags": ["Staff"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Staff member ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateStaffRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Staff member updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          },
+          "409": {
+            "description": "Optimistic locking conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConflictResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Deactivate staff member",
+        "description": "Soft delete (deactivate) a staff member. Hard delete is not allowed if audit history exists.",
+        "operationId": "deactivateStaff",
+        "tags": ["Staff"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Staff member ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Staff member deactivated successfully"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/staff/{id}/branches": {
+      "get": {
+        "summary": "List staff branch assignments",
+        "description": "Get all branch assignments for a staff member",
+        "operationId": "listStaffBranches",
+        "tags": ["Staff Branches"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Staff member ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of branch assignments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/StaffBranchResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      },
+      "post": {
+        "summary": "Assign branch to staff",
+        "description": "Add a branch assignment for a staff member",
+        "operationId": "assignBranch",
+        "tags": ["Staff Branches"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Staff member ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssignBranchRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Branch assigned successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StaffBranchResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/staff/{id}/branches/{branchId}": {
+      "delete": {
+        "summary": "Remove branch assignment",
+        "description": "Remove a branch assignment from a staff member. Cannot remove primary branch without reassigning.",
+        "operationId": "removeBranchAssignment",
+        "tags": ["Staff Branches"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Staff member ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "branchId",
+            "in": "path",
+            "required": true,
+            "description": "Branch ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Branch assignment removed"
+          },
+          "400": {
+            "description": "Cannot remove primary branch without reassignment",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFoundError"
+          }
+        }
+      }
+    },
+    "/audit-logs": {
+      "get": {
+        "summary": "List audit logs",
+        "description": "Query audit logs with filters. Requires ADMIN, OWNER, or AUDITOR role.",
+        "operationId": "listAuditLogs",
+        "tags": ["Audit"],
+        "parameters": [
+          {
+            "name": "actor_id",
+            "in": "query",
+            "description": "Filter by actor (who performed the action)",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "action",
+            "in": "query",
+            "description": "Filter by action type",
+            "schema": {
+              "type": "string",
+              "enum": ["CREATE", "UPDATE", "DELETE", "VIEW"]
+            }
+          },
+          {
+            "name": "table_name",
+            "in": "query",
+            "description": "Filter by affected table",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "record_id",
+            "in": "query",
+            "description": "Filter by affected record ID",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "from_date",
+            "in": "query",
+            "description": "Start date for range filter",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "to_date",
+            "in": "query",
+            "description": "End date for range filter",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "default": 50
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of audit log entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditLogResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          },
+          "403": {
+            "$ref": "#/components/responses/ForbiddenError"
+          }
+        }
+      }
+    },
+    "/roles": {
+      "get": {
+        "summary": "List roles",
+        "description": "Get all available roles in the system",
+        "operationId": "listRoles",
+        "tags": ["Roles"],
+        "responses": {
+          "200": {
+            "description": "List of roles",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/RoleResponse"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/UnauthorizedError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "StaffResponse": {
+        "type": "object",
+        "required": ["id", "name", "phone", "role", "is_active", "version", "created_at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "phone": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": ["OWNER", "ADMIN", "MANAGER", "CASHIER", "ROASTER", "WAREHOUSE_STAFF", "AUDITOR"]
+          },
+          "primary_branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BranchAssignment"
+            }
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deactivated_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        }
+      },
+      "CreateStaffRequest": {
+        "type": "object",
+        "required": ["name", "phone", "role", "primary_branch_id"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{1,14}$",
+            "description": "E.164 formatted phone number"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": ["OWNER", "ADMIN", "MANAGER", "CASHIER", "ROASTER", "WAREHOUSE_STAFF", "AUDITOR"]
+          },
+          "primary_branch_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        }
+      },
+      "UpdateStaffRequest": {
+        "type": "object",
+        "required": ["version"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "phone": {
+            "type": "string",
+            "pattern": "^\\+[1-9]\\d{1,14}$"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "role": {
+            "type": "string",
+            "enum": ["OWNER", "ADMIN", "MANAGER", "CASHIER", "ROASTER", "WAREHOUSE_STAFF", "AUDITOR"]
+          },
+          "primary_branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_active": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "integer",
+            "description": "Current version for optimistic locking"
+          }
+        }
+      },
+      "StaffBranchResponse": {
+        "type": "object",
+        "required": ["branch_id", "is_primary", "created_at"],
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "branch_name": {
+            "type": "string"
+          },
+          "is_primary": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "AssignBranchRequest": {
+        "type": "object",
+        "required": ["branch_id"],
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_primary": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "BranchAssignment": {
+        "type": "object",
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "is_primary": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AuditLogResponse": {
+        "type": "object",
+        "required": ["id", "actor_id", "action", "table_name", "record_id", "created_at"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actor_name": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["CREATE", "UPDATE", "DELETE", "VIEW"]
+          },
+          "table_name": {
+            "type": "string"
+          },
+          "record_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "old_data": {
+            "type": "object"
+          },
+          "new_data": {
+            "type": "object"
+          },
+          "metadata": {
+            "type": "object"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "RoleResponse": {
+        "type": "object",
+        "required": ["id", "name", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      },
+      "Error": {
+        "type": "object",
+        "required": ["error", "message"],
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "details": {
+            "type": "object"
+          }
+        }
+      },
+      "ConflictResponse": {
+        "type": "object",
+        "required": ["error", "message", "current_version", "current_data"],
+        "properties": {
+          "error": {
+            "type": "string",
+            "example": "CONFLICT"
+          },
+          "message": {
+            "type": "string",
+            "example": "Record was modified by another user"
+          },
+          "current_version": {
+            "type": "integer"
+          },
+          "current_data": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "responses": {
+      "UnauthorizedError": {
+        "description": "Authentication required",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "UNAUTHORIZED",
+              "message": "Authentication required"
+            }
+          }
+        }
+      },
+      "ForbiddenError": {
+        "description": "Insufficient permissions",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "FORBIDDEN",
+              "message": "You do not have permission to perform this action"
+            }
+          }
+        }
+      },
+      "NotFoundError": {
+        "description": "Resource not found",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "NOT_FOUND",
+              "message": "Staff member not found"
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Validation failed",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "VALIDATION_ERROR",
+              "message": "Validation failed",
+              "details": {
+                "phone": ["Invalid phone number format"],
+                "role": ["Role is required"]
+              }
+            }
+          }
+        }
+      },
+      "ConflictError": {
+        "description": "Resource conflict",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": "CONFLICT",
+              "message": "Phone number already in use"
+            }
+          }
+        }
+      }
+    }
+  }
+}
