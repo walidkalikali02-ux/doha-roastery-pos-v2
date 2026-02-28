@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useLanguage, useTheme } from '../App';
 import { useAuth } from '../contexts/AuthContext';
+import { LoginCredentials } from '../types';
 
 interface LoginViewProps {
   onLogin: (role: string) => void;
@@ -67,7 +68,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const onLoginSubmit = async (values: LoginFormValues) => {
     setApiError('');
     try {
-      await login(values);
+      const credentials: LoginCredentials = {
+        identifier: values.identifier || '',
+        password: values.password || '',
+        rememberMe: values.rememberMe
+      };
+      await login(credentials);
       onLogin('redirecting'); 
     } catch (err: any) {
       setApiError(getLoginErrorMessage(err?.message || err?.error_description));
