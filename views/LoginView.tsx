@@ -15,29 +15,24 @@ interface LoginViewProps {
   onLogin: (role: string) => void;
 }
 
-type LoginFormValues = {
-  identifier: string;
-  password: string;
-  rememberMe: boolean;
-};
-
-type ForgotPasswordFormValues = {
-  email: string;
-};
-
 const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   const { lang, setLang, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { login, forgotPassword } = useAuth();
+
   const loginSchema = useMemo(() => z.object({
-    identifier: z.string().min(3, { message: t.usernameRequired }),
-    password: z.string().min(8, { message: t.passwordMinLength }),
-    rememberMe: z.boolean().default(false),
+    identifier: z.string().min(1, { message: t.usernameRequired }),
+    password: z.string().min(1, { message: t.passwordMinLength }),
+    rememberMe: z.boolean().optional(),
   }), [t]);
+
   const forgotPasswordSchema = useMemo(() => z.object({
-    email: z.string().email({ message: t.invalidEmail }),
+    email: z.string().min(1, { message: t.invalidEmail }).email(),
   }), [t]);
-  
+
+  type LoginFormValues = z.infer<typeof loginSchema>;
+  type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
+
   const [viewMode, setViewMode] = useState<'login' | 'forgotPassword'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [apiError, setApiError] = useState('');
