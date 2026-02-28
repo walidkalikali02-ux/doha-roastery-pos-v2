@@ -50,7 +50,7 @@ const AppContent: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, isAuthenticated, isLoading, logout, sessionExpiresAt, refreshSession, error } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'staff' | 'roasting' | 'inventory' | 'pos' | 'reports' | 'ai' | 'configuration'>(() => (localStorage.getItem('activeTab') as any) || 'dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'staff' | 'roasting' | 'inventory' | 'pos' | 'reports' | 'branchPerformance' | 'branchFinancials' | 'crm' | 'ai' | 'configuration'>(() => (localStorage.getItem('activeTab') as any) || 'dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
