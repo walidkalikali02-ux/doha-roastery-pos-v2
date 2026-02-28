@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
-import { LayoutDashboard, Flame, Package, ClipboardList, ShoppingCart, BarChart3, Menu, X, Coffee, BrainCircuit, Languages, Sun, Moon, Keyboard, ChevronRight, ChevronLeft, Zap, UserCircle, LogOut, Clock, AlertTriangle, Settings, Loader2, Users } from 'lucide-react';
+import { LayoutDashboard, Flame, Package, ClipboardList, ShoppingCart, BarChart3, Menu, X, Coffee, BrainCircuit, Languages, Sun, Moon, Keyboard, ChevronRight, ChevronLeft, Zap, UserCircle, LogOut, Clock, AlertTriangle, Settings, Loader2, Users, DollarSign, TrendingUp } from 'lucide-react';
 import DashboardView from './views/DashboardView';
 import RoastingView from './views/RoastingView';
 import InventoryView from './views/InventoryView';
@@ -10,6 +10,9 @@ import AIInsights from './views/AIInsights';
 import LoginView from './views/LoginView';
 import ConfigurationView from './views/ConfigurationView';
 import StaffView from './views/StaffView';
+import BranchPerformanceView from './views/BranchPerformanceView';
+import BranchFinancialsView from './views/BranchFinancialsView';
+import CRMView from './views/CRMView';
 import { translations, Language } from './translations';
 import { UserRole } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -62,6 +65,9 @@ const AppContent: React.FC = () => {
     { id: 'inventory', label: t.inventory, icon: ClipboardList, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER, UserRole.CASHIER, UserRole.WAREHOUSE_STAFF] },
     { id: 'pos', label: t.pos, icon: ShoppingCart, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.CASHIER] },
     { id: 'reports', label: t.reports, icon: BarChart3, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR] },
+    { id: 'branchPerformance', label: t.branchPerformance || 'Branch Performance', icon: TrendingUp, roles: [UserRole.ADMIN, UserRole.MANAGER] },
+    { id: 'branchFinancials', label: t.branchFinancials || 'Branch Financials', icon: DollarSign, roles: [UserRole.ADMIN, UserRole.MANAGER] },
+    { id: 'crm', label: t.crm || 'CRM', icon: Users, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.CASHIER] },
     { id: 'ai', label: t.ai, icon: BrainCircuit, roles: [UserRole.ADMIN, UserRole.MANAGER] },
     { id: 'configuration', label: t.configuration, icon: Settings, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER, UserRole.CASHIER, UserRole.WAREHOUSE_STAFF] },
   ];
@@ -359,6 +365,9 @@ const AppContent: React.FC = () => {
             {activeTab === 'inventory' && <InventoryView />}
             {activeTab === 'pos' && <POSView />}
             {activeTab === 'reports' && <ReportsView />}
+            {activeTab === 'branchPerformance' && <BranchPerformanceView />}
+            {activeTab === 'branchFinancials' && <BranchFinancialsView />}
+            {activeTab === 'crm' && <CRMView />}
             {activeTab === 'ai' && <AIInsights />}
             {activeTab === 'configuration' && <ConfigurationView />}
           </div>
