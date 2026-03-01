@@ -675,12 +675,14 @@ const POSView: React.FC = () => {
         timestamp: now.toISOString()
       };
 
-      await supabase.from('transactions').insert([transactionData]);
+      const { error: txInsertError } = await supabase.from('transactions').insert([transactionData]);
+      if (txInsertError) throw txInsertError;
 
-      const { data: allInv } = await supabase
+      const { data: allInv, error: allInvError } = await supabase
         .from('inventory_items')
         .select('*')
         .eq('location_id', selectedLocationId);
+      if (allInvError) throw allInvError;
       const invById = new Map((allInv || []).map(inv => [inv.id, inv]));
       const invByProductId = new Map((allInv || []).map((inv: any) => [inv.product_id || inv.productId, inv]));
       const invByName = new Map((allInv || []).map(inv => [inv.name, inv]));
