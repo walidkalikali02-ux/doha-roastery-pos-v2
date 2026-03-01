@@ -312,8 +312,13 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
         alert(t.insufficientStock);
         return;
       }
-      await supabase.from('roasting_batches').insert([payload]);
-      await supabase.from('green_beans').update({ quantity: (freshBean.quantity || 0) - pre }).eq('id', selectedBean.id);
+      const { error: insertBatchError } = await supabase.from('roasting_batches').insert([payload]);
+      if (insertBatchError) throw insertBatchError;
+      const { error: updateBeanError } = await supabase
+        .from('green_beans')
+        .update({ quantity: (freshBean.quantity || 0) - pre })
+        .eq('id', selectedBean.id);
+      if (updateBeanError) throw updateBeanError;
       const { error: movementError } = await supabase.from('green_bean_movements').insert({
         bean_id: selectedBean.id,
         batch_reference: batchCode,
@@ -347,10 +352,11 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
       details: t.batchOutputRecorded.replace('{weight}', post.toString()).replace('{waste}', waste.toFixed(2)) 
     };
     try {
-      await supabase.from('roasting_batches').update({
+      const { error: finishBatchError } = await supabase.from('roasting_batches').update({
         post_weight: post, waste_percentage: parseFloat(waste.toFixed(2)), status: BatchStatus.COMPLETED,
         history: [...batch.history, historyEntry]
       }).eq('id', batchId);
+      if (finishBatchError) throw finishBatchError;
       fetchData();
       setFinishingBatchId(null);
       setPostWeightInput('');
@@ -376,22 +382,25 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
         .eq('id', batch.beanId)
         .single();
       if (beanError || !freshBean) throw beanError;
-      await supabase.from('green_beans')
+      const { error: restoreBeanError } = await supabase.from('green_beans')
         .update({ quantity: (freshBean.quantity || 0) + batch.preWeight })
         .eq('id', batch.beanId);
-      await supabase.from('green_bean_movements')
+      if (restoreBeanError) throw restoreBeanError;
+      const { error: removeMovementError } = await supabase.from('green_bean_movements')
         .delete()
         .eq('batch_reference', batch.id);
+      if (removeMovementError) throw removeMovementError;
       const historyEntry = {
         timestamp: new Date().toLocaleString(),
         action: 'DELETE',
         operator: user?.name || 'System',
         details: `Batch cancelled. Restored ${batch.preWeight}kg to green beans`
       };
-      await supabase.from('roasting_batches').update({
+      const { error: cancelBatchError } = await supabase.from('roasting_batches').update({
         status: BatchStatus.DELETED,
         history: [...batch.history, historyEntry]
       }).eq('id', batch.id);
+      if (cancelBatchError) throw cancelBatchError;
       fetchData();
       setShowSuccess(true);
       setSuccessMsg(t.batchCancelled);

@@ -675,7 +675,8 @@ const POSView: React.FC = () => {
         timestamp: now.toISOString()
       };
 
-      await supabase.from('transactions').insert([transactionData]);
+      const { error: txInsertError } = await supabase.from('transactions').insert([transactionData]);
+      if (txInsertError) throw txInsertError;
 
       const { data: allInv } = await supabase
         .from('inventory_items')
