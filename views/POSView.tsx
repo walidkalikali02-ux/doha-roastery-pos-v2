@@ -625,6 +625,10 @@ const POSView: React.FC = () => {
 
   const handleCheckout = async (paymentMethod: PaymentMethod, breakdown?: PaymentBreakdown, receivedAmount?: number) => {
     if (cart.length === 0 || isProcessing) return;
+    if (!selectedLocationId) {
+      alert(t.selectLocation || 'Please select a location before checkout.');
+      return;
+    }
     setIsProcessing(true);
 
     try {
