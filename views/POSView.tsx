@@ -437,6 +437,10 @@ const POSView: React.FC = () => {
   };
 
   const openCustomization = (item: InventoryItem) => {
+    if (item.type !== 'BEVERAGE' && getAvailableStock(item) <= 0) {
+      alert(t.insufficientStock || 'Insufficient stock');
+      return;
+    }
     if (item.type === 'BEVERAGE') {
       setCustomizingItem(item);
       setTempCustoms({ size: 'M', milkType: 'Full Fat', sugarLevel: 'Normal', selectedAddOns: [] });
@@ -1924,14 +1928,25 @@ const POSView: React.FC = () => {
                   <div key={i} className="bg-white  rounded-[32px] aspect-[4/5] animate-pulse"></div>
                 ))
               ) : filteredItems.map(item => (
+                (() => {
+                  const isOutOfStock = item.type !== 'BEVERAGE' && getAvailableStock(item) <= 0;
+                  return (
                 <button
                   key={item.id}
                   onClick={() => openCustomization(item)}
+                  disabled={isOutOfStock}
                   className="group bg-white  p-3 rounded-[32px] border border-orange-100  shadow-sm hover:shadow-xl hover/10 transition-all flex flex-col h-full active:scale-95 relative overflow-hidden"
                 >
                   <div className="aspect-square rounded-[24px] overflow-hidden mb-3 bg-white relative">
                     <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.name} />
                     <div className="absolute inset-0 bg-white/0 group-hover/5 transition-colors" />
+                    {isOutOfStock && (
+                      <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                        <span className="px-3 py-1 rounded-full bg-red-100 text-red-700 text-[10px] font-black uppercase">
+                          {t.lowStockWarning || 'Out of stock'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <div className="flex-1 flex flex-col px-1">
                     <h4 className="font-bold text-black  text-sm line-clamp-2 mb-2 leading-tight text-center h-10">{item.name}</h4>
@@ -1946,6 +1961,8 @@ const POSView: React.FC = () => {
                     </div>
                   </div>
                 </button>
+                  );
+                })()
               ))}
             </div>
           )}
