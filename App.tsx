@@ -28,6 +28,35 @@ interface ThemeContextType {
   toggleTheme: () => void;
 }
 
+type TabId =
+  | 'dashboard'
+  | 'staff'
+  | 'roasting'
+  | 'inventory'
+  | 'pos'
+  | 'reports'
+  | 'branchPerformance'
+  | 'branchFinancials'
+  | 'crm'
+  | 'ai'
+  | 'configuration';
+
+const TAB_IDS: TabId[] = [
+  'dashboard',
+  'staff',
+  'roasting',
+  'inventory',
+  'pos',
+  'reports',
+  'branchPerformance',
+  'branchFinancials',
+  'crm',
+  'ai',
+  'configuration'
+];
+
+const isTabId = (value: string): value is TabId => TAB_IDS.includes(value as TabId);
+
 export const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 export const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
@@ -50,7 +79,10 @@ const AppContent: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, isAuthenticated, isLoading, logout, sessionExpiresAt, refreshSession, error } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'staff' | 'roasting' | 'inventory' | 'pos' | 'reports' | 'branchPerformance' | 'branchFinancials' | 'crm' | 'ai' | 'configuration'>(() => (localStorage.getItem('activeTab') as any) || 'dashboard');
+  const [activeTab, setActiveTab] = useState<TabId>(() => {
+    const saved = localStorage.getItem('activeTab');
+    return saved && isTabId(saved) ? saved : 'dashboard';
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -118,7 +150,7 @@ const AppContent: React.FC = () => {
 
   useEffect(() => { localStorage.setItem('sidebarOpen', isSidebarOpen.toString()); }, [isSidebarOpen]);
 
-  const handleTabChange = useCallback((id: any) => {
+  const handleTabChange = useCallback((id: TabId) => {
     const isAllowed = allMenuItems.find(item => item.id === id)?.roles.includes(userRole);
     if (!isAllowed) return;
     
