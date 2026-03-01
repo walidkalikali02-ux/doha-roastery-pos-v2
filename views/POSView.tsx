@@ -675,12 +675,14 @@ const POSView: React.FC = () => {
         timestamp: now.toISOString()
       };
 
-      await supabase.from('transactions').insert([transactionData]);
+      const { error: txInsertError } = await supabase.from('transactions').insert([transactionData]);
+      if (txInsertError) throw txInsertError;
 
-      const { data: allInv } = await supabase
+      const { data: allInv, error: allInvError } = await supabase
         .from('inventory_items')
         .select('*')
         .eq('location_id', selectedLocationId);
+      if (allInvError) throw allInvError;
       const invById = new Map((allInv || []).map(inv => [inv.id, inv]));
       const invByProductId = new Map((allInv || []).map((inv: any) => [inv.product_id || inv.productId, inv]));
       const invByName = new Map((allInv || []).map(inv => [inv.name, inv]));
@@ -962,10 +964,11 @@ const POSView: React.FC = () => {
 
       if (approved) {
         const returnLocationId = request.items[0]?.locationId || selectedLocationId;
-        const { data: locInv } = await supabase
+        const { data: locInv, error: locInvError } = await supabase
           .from('inventory_items')
           .select('*')
           .eq('location_id', returnLocationId);
+        if (locInvError) throw locInvError;
         const invById = new Map((locInv || []).map(inv => [inv.id, inv]));
         const invByProductId = new Map((locInv || []).map(inv => [inv.productId, inv]));
         const invByName = new Map((locInv || []).map(inv => [inv.name, inv]));
