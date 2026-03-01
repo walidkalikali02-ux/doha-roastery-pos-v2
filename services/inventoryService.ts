@@ -52,17 +52,23 @@ export const fetchGreenBeanInventory = async (params: InventoryQueryParams) => {
     .select('*', { count: 'exact' });
 
   // 1. Search Requirement: Case-insensitive partial match
-  if (searchTerm) {
-    const searchPattern = `%${searchTerm}%`;
+  const normalizedSearchTerm = searchTerm.trim();
+  if (normalizedSearchTerm) {
+    const escaped = normalizedSearchTerm.replace(/[%_]/g, '\\$&');
+    const searchPattern = `%${escaped}%`;
     query = query.or(`bean_name.ilike.${searchPattern},supplier.ilike.${searchPattern},batch_number.ilike.${searchPattern}`);
   }
 
   // 2. Advanced Filtering
-  if (origin) {
-    query = query.ilike('origin', `%${origin}%`);
+  const normalizedOrigin = origin.trim();
+  if (normalizedOrigin) {
+    const escapedOrigin = normalizedOrigin.replace(/[%_]/g, '\\$&');
+    query = query.ilike('origin', `%${escapedOrigin}%`);
   }
-  if (supplierFilter) {
-    query = query.ilike('supplier', `%${supplierFilter}%`);
+  const normalizedSupplier = supplierFilter.trim();
+  if (normalizedSupplier) {
+    const escapedSupplier = normalizedSupplier.replace(/[%_]/g, '\\$&');
+    query = query.ilike('supplier', `%${escapedSupplier}%`);
   }
   if (qualityGrade !== 'ALL') {
     query = query.eq('quality_grade', qualityGrade);
