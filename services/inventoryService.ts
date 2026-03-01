@@ -95,18 +95,31 @@ export const fetchGreenBeanInventory = async (params: InventoryQueryParams) => {
   }
 
   // 4. Sorting
-  const dbSortField = sortField === 'purchaseDate' ? 'purchase_date' : 
+  const dbSortFieldCandidate = sortField === 'purchaseDate' ? 'purchase_date' : 
                      sortField === 'costPerKg' ? 'cost_per_kg' : 
                      sortField === 'qualityGrade' ? 'quality_grade' : 
                      sortField === 'beanName' ? 'bean_name' :
                      sortField === 'batchNumber' ? 'batch_number' :
                      sortField === 'harvestDate' ? 'harvest_date' : sortField;
-                     
+  const allowedSortFields = new Set([
+    'purchase_date',
+    'cost_per_kg',
+    'quality_grade',
+    'bean_name',
+    'batch_number',
+    'harvest_date',
+    'origin',
+    'supplier',
+    'quantity'
+  ]);
+  const dbSortField = allowedSortFields.has(dbSortFieldCandidate) ? dbSortFieldCandidate : 'purchase_date';
   query = query.order(dbSortField, { ascending: sortDirection === 'asc' });
 
   // 5. Pagination
-  const from = (page - 1) * pageSize;
-  const to = from + pageSize - 1;
+  const safePage = Number.isFinite(page) && page > 0 ? Math.floor(page) : 1;
+  const safePageSize = Number.isFinite(pageSize) && pageSize > 0 ? Math.min(Math.floor(pageSize), 200) : 10;
+  const from = (safePage - 1) * safePageSize;
+  const to = from + safePageSize - 1;
   query = query.range(from, to);
 
   const { data, error, count } = await query;

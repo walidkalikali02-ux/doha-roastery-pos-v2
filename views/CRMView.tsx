@@ -125,7 +125,10 @@ const CRMView: React.FC<CRMViewProps> = () => {
     if (!confirm(t.confirmDelete || 'Are you sure you want to delete this customer?')) return;
     
     try {
-      const { error } = await supabase.from('customers').delete().eq('id', id);
+      const { error } = await supabase
+        .from('customers')
+        .update({ is_active: false })
+        .eq('id', id);
       if (error) throw error;
       fetchCustomers();
     } catch (error) {
