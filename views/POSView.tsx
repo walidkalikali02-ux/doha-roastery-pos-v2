@@ -317,40 +317,48 @@ const POSView: React.FC = () => {
         const damaged = item.damaged_stock || 0;
         return Math.max(0, (item.stock || 0) - reserved - damaged);
       };
-      const invById = new Map(invItems.map(i => [i.id, i]));
-      const invByName = new Map(invItems.map(i => [i.name, i]));
-      if (invItems.length > 0) {
-        invItems.filter(i => i.type !== 'INGREDIENT' && getAvailableStock(i) > 0).forEach(item => {
-          const productId = (item as any).product_id || item.productId;
-          const product = productId ? productMap.get(productId) : null;
-          if (product && getProductStatus(product) !== 'ACTIVE') return;
-          allItems.push({
-            ...item,
-            price: toNumber((item as any).price),
-            stock: toNumber((item as any).stock),
-            reserved_stock: toNumber((item as any).reserved_stock),
-            damaged_stock: toNumber((item as any).damaged_stock),
-            productId,
-            bom: product?.bom || [],
-            category: item.type === 'PACKAGED_COFFEE' ? 'PACKAGED' : 'OTHER'
-          });
-        });
-      }
+      const invByProductId = new Map<string, any[]>();
+      invItems.forEach((item: any) => {
+        const pid = item.product_id || item.productId;
+        if (!pid) return;
+        if (!invByProductId.has(pid)) invByProductId.set(pid, []);
+        invByProductId.get(pid)!.push(item);
+      });
 
       if (prodRes.data) {
-        prodRes.data.filter(p => p.type === 'BEVERAGE' && getProductStatus(p) === 'ACTIVE').forEach(p => {
-          const hasIngredients = (p.recipe?.ingredients || []).every((ing: any) => {
-            const item = ing.ingredient_id ? invById.get(ing.ingredient_id) : invByName.get(ing.name);
-            return item && getAvailableStock(item) > 0;
+        prodRes.data
+          .filter(p => getProductStatus(p) === 'ACTIVE')
+          .forEach(p => {
+            const linkedInv = invByProductId.get(p.id) || [];
+            const stock = linkedInv.length > 0
+              ? linkedInv.reduce((sum: number, row: any) => sum + toNumber(row.stock), 0)
+              : (p.type === 'BEVERAGE' ? 999 : 0);
+            const reserved = linkedInv.reduce((sum: number, row: any) => sum + toNumber(row.reserved_stock), 0);
+            const damaged = linkedInv.reduce((sum: number, row: any) => sum + toNumber(row.damaged_stock), 0);
+            const firstInv = linkedInv[0];
+            const variantText = [p.variant_label, p.variant_size, p.variant_flavor].filter(Boolean).join(' • ');
+
+            allItems.push({
+              id: p.id,
+              productId: p.id,
+              name: variantText ? `${p.name} (${variantText})` : p.name,
+              description: p.description,
+              category: p.type === 'PACKAGED_COFFEE' ? 'PACKAGED' : (p.type === 'BEVERAGE' ? 'DRINKS' : 'OTHER'),
+              type: p.type,
+              price: toNumber(p.selling_price ?? p.base_price),
+              stock: toNumber(stock),
+              reserved_stock: toNumber(reserved),
+              damaged_stock: toNumber(damaged),
+              image: p.image || firstInv?.image || 'https://images.unsplash.com/photo-1541167760496-162955ed8a9f?q=80&w=300&h=300&auto=format&fit=crop',
+              recipe: p.recipe,
+              bom: p.bom || [],
+              add_ons: p.add_ons || [],
+              roast_date: firstInv?.roast_date || null,
+              bean_origin: firstInv?.bean_origin || null,
+              bean_variety: firstInv?.bean_variety || null,
+              roast_level: firstInv?.roast_level || p.roast_level || null
+            } as any);
           });
-          if (!hasIngredients) return;
-          const variantText = [p.variant_label, p.variant_size, p.variant_flavor].filter(Boolean).join(' • ');
-          allItems.push({
-            id: p.id, name: variantText ? `${p.name} (${variantText})` : p.name, description: p.description, category: 'DRINKS', type: 'BEVERAGE',
-            price: toNumber(p.selling_price ?? p.base_price), stock: 999, image: p.image || 'https://images.unsplash.com/photo-1541167760496-162955ed8a9f?q=80&w=300&h=300&auto=format&fit=crop',
-            recipe: p.recipe, bom: p.bom || [], add_ons: p.add_ons || []
-          } as any);
-        });
       }
       setInventoryItems(allItems);
     } catch (error) { console.error(error); } finally { setIsLoading(false); }
@@ -674,6 +682,7 @@ const POSView: React.FC = () => {
         .select('*')
         .eq('location_id', selectedLocationId);
       const invById = new Map((allInv || []).map(inv => [inv.id, inv]));
+      const invByProductId = new Map((allInv || []).map((inv: any) => [inv.product_id || inv.productId, inv]));
       const invByName = new Map((allInv || []).map(inv => [inv.name, inv]));
       const deductions = new Map<string, number>();
       const addDeduction = (itemId: string | undefined, qty: number) => {
@@ -682,6 +691,7 @@ const POSView: React.FC = () => {
       };
       const findInventoryItem = (id?: string, name?: string) => {
         if (id && invById.has(id)) return invById.get(id);
+        if (id && invByProductId.has(id)) return invByProductId.get(id);
         if (name && invByName.has(name)) return invByName.get(name);
         return undefined;
       };
