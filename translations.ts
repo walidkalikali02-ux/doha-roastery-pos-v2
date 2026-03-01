@@ -976,6 +976,11 @@ export const translations = {
     totalCustomers: 'إجمالي العملاء',
     avgSpent: 'متوسط الإنفاق',
     noCustomers: 'لا يوجد عملاء',
+    totalTransactions: 'إجمالي المعاملات',
+    sales: 'المبيعات',
+    transactions: 'المعاملات',
+    avgValue: 'القيمة المتوسطة',
+    growth: 'النمو',
   },
   en: {
     dir: 'ltr',
@@ -1950,5 +1955,10 @@ export const translations = {
     totalCustomers: 'Total Customers',
     avgSpent: 'Avg. Spent',
     noCustomers: 'No customers found',
+    totalTransactions: 'Total Transactions',
+    sales: 'Sales',
+    transactions: 'Transactions',
+    avgValue: 'Avg. Value',
+    growth: 'Growth',
   },
 };
