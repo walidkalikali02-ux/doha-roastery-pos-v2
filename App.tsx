@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
-import { LayoutDashboard, Flame, Package, ClipboardList, ShoppingCart, BarChart3, Menu, X, Coffee, BrainCircuit, Languages, Sun, Moon, Keyboard, ChevronRight, ChevronLeft, Zap, UserCircle, LogOut, Clock, AlertTriangle, Settings, Loader2, Users, DollarSign, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Flame, ClipboardList, ShoppingCart, BarChart3, Menu, X, Coffee, BrainCircuit, Languages, Keyboard, ChevronRight, ChevronLeft, Zap, UserCircle, LogOut, Clock, AlertTriangle, Settings, Loader2, Users, DollarSign, TrendingUp } from 'lucide-react';
 import DashboardView from './views/DashboardView';
 import RoastingView from './views/RoastingView';
 import InventoryView from './views/InventoryView';
