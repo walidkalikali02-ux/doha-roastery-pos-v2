@@ -70,11 +70,17 @@ const CRMView: React.FC<CRMViewProps> = () => {
 
   const handleSaveCustomer = async () => {
     try {
+      const trimmedName = (formData.name || '').trim();
+      if (!trimmedName) {
+        alert(t.fieldRequired || 'Name is required');
+        return;
+      }
+
       if (editingCustomer) {
         const { error } = await supabase
           .from('customers')
           .update({
-            full_name: formData.name,
+            full_name: trimmedName,
             phone: formData.phone,
             email: formData.email,
             notes: formData.notes,
@@ -87,7 +93,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
         const { error } = await supabase
           .from('customers')
           .insert([{
-            full_name: formData.name,
+            full_name: trimmedName,
             phone: formData.phone,
             email: formData.email,
             notes: formData.notes,
