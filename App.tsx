@@ -1,21 +1,22 @@
 
-import React, { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
+import React, { useState, useEffect, createContext, useContext, useCallback, useRef, Suspense, lazy } from 'react';
 import { LayoutDashboard, Flame, Package, ClipboardList, ShoppingCart, BarChart3, Menu, X, Coffee, BrainCircuit, Languages, Sun, Moon, Keyboard, ChevronRight, ChevronLeft, Zap, UserCircle, LogOut, Clock, AlertTriangle, Settings, Loader2, Users, DollarSign, TrendingUp } from 'lucide-react';
-import DashboardView from './views/DashboardView';
-import RoastingView from './views/RoastingView';
-import InventoryView from './views/InventoryView';
-import POSView from './views/POSView';
-import ReportsView from './views/ReportsView';
-import AIInsights from './views/AIInsights';
 import LoginView from './views/LoginView';
-import ConfigurationView from './views/ConfigurationView';
-import StaffView from './views/StaffView';
-import BranchPerformanceView from './views/BranchPerformanceView';
-import BranchFinancialsView from './views/BranchFinancialsView';
-import CRMView from './views/CRMView';
 import { translations, Language } from './translations';
 import { UserRole } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+
+const DashboardView = lazy(() => import('./views/DashboardView'));
+const RoastingView = lazy(() => import('./views/RoastingView'));
+const InventoryView = lazy(() => import('./views/InventoryView'));
+const POSView = lazy(() => import('./views/POSView'));
+const ReportsView = lazy(() => import('./views/ReportsView'));
+const AIInsights = lazy(() => import('./views/AIInsights'));
+const ConfigurationView = lazy(() => import('./views/ConfigurationView'));
+const StaffView = lazy(() => import('./views/StaffView'));
+const BranchPerformanceView = lazy(() => import('./views/BranchPerformanceView'));
+const BranchFinancialsView = lazy(() => import('./views/BranchFinancialsView'));
+const CRMView = lazy(() => import('./views/CRMView'));
 
 interface LanguageContextType {
   lang: Language;
@@ -44,6 +45,12 @@ export const useTheme = () => {
 };
 
 const WARNING_THRESHOLD = 5 * 60 * 1000; // 5 minutes before expiration
+
+const ViewLoadingFallback: React.FC = () => (
+  <div className="h-[40vh] w-full flex items-center justify-center">
+    <Loader2 className="w-10 h-10 text-orange-600 animate-spin" />
+  </div>
+);
 
 const AppContent: React.FC = () => {
   const { lang, setLang, t } = useLanguage();
@@ -359,17 +366,19 @@ const AppContent: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
             <Breadcrumbs />
-            {activeTab === 'dashboard' && <DashboardView />}
-            {activeTab === 'staff' && <StaffView />}
-            {activeTab === 'roasting' && <RoastingView onDetailOpen={setActiveDetailId} />}
-            {activeTab === 'inventory' && <InventoryView />}
-            {activeTab === 'pos' && <POSView />}
-            {activeTab === 'reports' && <ReportsView />}
-            {activeTab === 'branchPerformance' && <BranchPerformanceView />}
-            {activeTab === 'branchFinancials' && <BranchFinancialsView />}
-            {activeTab === 'crm' && <CRMView />}
-            {activeTab === 'ai' && <AIInsights />}
-            {activeTab === 'configuration' && <ConfigurationView />}
+            <Suspense fallback={<ViewLoadingFallback />}>
+              {activeTab === 'dashboard' && <DashboardView />}
+              {activeTab === 'staff' && <StaffView />}
+              {activeTab === 'roasting' && <RoastingView onDetailOpen={setActiveDetailId} />}
+              {activeTab === 'inventory' && <InventoryView />}
+              {activeTab === 'pos' && <POSView />}
+              {activeTab === 'reports' && <ReportsView />}
+              {activeTab === 'branchPerformance' && <BranchPerformanceView />}
+              {activeTab === 'branchFinancials' && <BranchFinancialsView />}
+              {activeTab === 'crm' && <CRMView />}
+              {activeTab === 'ai' && <AIInsights />}
+              {activeTab === 'configuration' && <ConfigurationView />}
+            </Suspense>
           </div>
         </div>
       </main>
