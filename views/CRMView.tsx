@@ -6,14 +6,14 @@ import { Users, Search, Plus, Phone, Mail, Star, ShoppingCart, TrendingUp, Edit,
 interface Customer {
   id: string;
   name: string;
-  phone: string;
-  email: string;
-  loyalty_points: number;
-  total_spent: number;
-  visit_count: number;
-  last_visit: string;
-  created_at: string;
-  notes: string;
+  phone?: string;
+  email?: string;
+  loyalty_points?: number;
+  total_spent?: number;
+  visit_count?: number;
+  last_visit?: string;
+  created_at?: string;
+  notes?: string;
   tier: 'bronze' | 'silver' | 'gold' | 'platinum';
 }
 
@@ -38,6 +38,19 @@ const CRMView: React.FC<CRMViewProps> = () => {
     fetchCustomers();
   }, []);
 
+  const normalizeCustomer = (row: any): Customer => ({
+    ...row,
+    name: row?.full_name || row?.name || '',
+    phone: row?.phone || '',
+    email: row?.email || '',
+    loyalty_points: Number(row?.loyalty_points) || 0,
+    total_spent: Number(row?.total_spent) || 0,
+    visit_count: Number(row?.visit_count) || 0,
+    last_visit: row?.last_visit_date || row?.last_visit || '',
+    notes: row?.notes || '',
+    tier: (row?.tier || 'bronze') as Customer['tier']
+  });
+
   const fetchCustomers = async () => {
     setIsLoading(true);
     try {
@@ -47,7 +60,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setCustomers(data || []);
+      setCustomers((data || []).map(normalizeCustomer));
     } catch (error) {
       console.error('Error fetching customers:', error);
     } finally {
@@ -61,7 +74,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
         const { error } = await supabase
           .from('customers')
           .update({
-            name: formData.name,
+            full_name: formData.name,
             phone: formData.phone,
             email: formData.email,
             notes: formData.notes,
@@ -74,7 +87,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
         const { error } = await supabase
           .from('customers')
           .insert([{
-            name: formData.name,
+            full_name: formData.name,
             phone: formData.phone,
             email: formData.email,
             notes: formData.notes,
@@ -121,11 +134,14 @@ const CRMView: React.FC<CRMViewProps> = () => {
   };
 
   const filteredCustomers = customers.filter(customer => {
-    const search = searchQuery.toLowerCase();
+    const search = (searchQuery || '').toLowerCase();
+    const name = (customer.name || '').toLowerCase();
+    const phone = (customer.phone || '').toLowerCase();
+    const email = (customer.email || '').toLowerCase();
     return (
-      customer.name.toLowerCase().includes(search) ||
-      customer.phone?.toLowerCase().includes(search) ||
-      customer.email?.toLowerCase().includes(search)
+      name.includes(search) ||
+      phone.includes(search) ||
+      email.includes(search)
     );
   });
 
@@ -267,9 +283,9 @@ const CRMView: React.FC<CRMViewProps> = () => {
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center font-bold text-purple-600">
-                          {customer.name.charAt(0).toUpperCase()}
+                          {(customer.name || '?').charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-bold text-black">{customer.name}</span>
+                        <span className="font-bold text-black">{customer.name || '-'}</span>
                       </div>
                     </td>
                     <td className="p-4">

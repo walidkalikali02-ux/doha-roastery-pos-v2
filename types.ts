@@ -2,13 +2,18 @@
 export enum RoastingLevel {
   LIGHT = 'Light',
   MEDIUM = 'Medium',
+  MEDIUM_DARK = 'Medium Dark',
   DARK = 'Dark'
 }
 
 export enum BatchStatus {
-  IN_PROGRESS = 'In Progress',
+  PREPARATION = 'Preparation',
+  ROASTING = 'Roasting',
+  COOLING = 'Cooling',
+  INSPECTION = 'Inspection',
+  PACKAGING = 'Packaging',
   COMPLETED = 'Completed',
-  READY_FOR_PACKAGING = 'Ready for Packaging',
+  REJECTED = 'QC Rejected',
   DELETED = 'DELETED'
 }
 
@@ -29,7 +34,7 @@ export type ShiftTemplate = 'Morning' | 'Evening' | 'Night' | 'Split';
 export interface Employee {
   id: string;
   employee_id: string; // DR-XXXX
-  
+
   // Personal
   first_name_en: string;
   last_name_en: string;
@@ -40,13 +45,13 @@ export interface Employee {
   dob?: string;
   gender?: Gender;
   marital_status?: string;
-  
+
   // Contact
   phone: string;
   email: string;
   emergency_contact_name?: string;
   emergency_contact_phone?: string;
-  
+
   // Employment
   hire_date: string;
   department?: string;
@@ -63,22 +68,22 @@ export interface Employee {
   employee_pin?: string;
   is_on_leave?: boolean;
   location_id?: string;
-  
+
   // Qatar Specifics
   qid?: string;
   visa_status?: string;
   visa_expiry?: string;
   health_card_expiry?: string;
-  
+
   // Media
   photo_url?: string;
-  
+
   // Financials
   salary_base?: number;
   salary_allowances?: number;
   bank_name?: string;
   iban?: string;
-  
+
   // Audit
   created_at: string;
   updated_at: string;
@@ -92,6 +97,7 @@ export interface User {
   role: UserRole;
   permissions: string[];
   avatar?: string;
+  location_id?: string;
 }
 
 export interface Ingredient {
@@ -103,7 +109,7 @@ export interface Ingredient {
 }
 
 export interface RecipeIngredient {
-  ingredient_id: string; 
+  ingredient_id: string;
   name: string;
   amount: number;
   unit: string;
@@ -136,8 +142,9 @@ export type ProductStatus = 'ACTIVE' | 'DISABLED' | 'DISCONTINUED';
 export interface ProductDefinition {
   id: string;
   name: string;
-  description?: string; 
+  description?: string;
   category: string;
+  beanId?: string;
   mainCategory?: string;
   subCategory?: string;
   variantOf?: string;
@@ -158,9 +165,9 @@ export interface ProductDefinition {
   image?: string;
   sku?: string;
   supplier?: string;
-  laborCost?: number; 
-  roastingOverhead?: number; 
-  estimatedGreenBeanCost?: number; 
+  laborCost?: number;
+  roastingOverhead?: number;
+  estimatedGreenBeanCost?: number;
   type: 'PACKAGED_COFFEE' | 'BEVERAGE' | 'ACCESSORY' | 'RAW_MATERIAL';
   recipe?: Recipe;
   bom?: RecipeIngredient[];
@@ -186,6 +193,9 @@ export interface InventoryItem {
   skuPrefix?: string;
   productId?: string;
   location_id?: string;
+  bean_origin?: string;
+  roast_level?: string;
+  roast_date?: string;
   expiry_date?: string;
   last_movement_at?: string;
   cost_per_unit?: number;
@@ -228,6 +238,23 @@ export interface Transaction {
   created_at?: string;
   is_returned?: boolean;
   return_id?: string;
+  customer_id?: string;
+  customer_name?: string;
+}
+
+export interface Customer {
+  id: string;
+  full_name: string;
+  phone: string;
+  email?: string;
+  loyalty_points: number;
+  total_spent: number;
+  last_visit_date?: string;
+  notes?: string;
+  metadata?: any;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export type RefundStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
@@ -276,19 +303,66 @@ export interface PackagingUnit {
   sku: string;
 }
 
+export interface RoastProfile {
+  id: string;
+  name: string;
+  description?: string;
+  profile?: Record<string, unknown>;
+  bean_ids?: string[];
+  parent_profile_id?: string | null;
+  is_active?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface RoastingBatch {
   id: string;
   beanId: string;
+  roastProfileId?: string;
   roastDate: string;
-  roastTime: string;
+  roastTime?: string;
   level: RoastingLevel;
   preWeight: number;
   postWeight: number;
   wastePercentage: number;
   status: BatchStatus;
+  operatorId?: string;
+  productionOrderId?: string;
+  greenQcMoisture?: number;
+  greenQcDefects?: number;
+  greenQcColor?: string;
+  postQcColor?: string;
+  postQcAroma?: string;
+  postQcCupping?: string;
+  postQcDefects?: string;
+  postQcAcidity?: number;
+  postQcBody?: number;
+  postQcSweetness?: number;
+  postQcCleanliness?: number;
+  postQcBalance?: number;
+  qualityScore?: number;
+  qcStatus?: 'PASSED' | 'FAILED' | 'PENDING';
+  qcRejectReason?: string;
+  qcCheckedAt?: string;
+  qcCheckedBy?: string;
+  qcCheckedByName?: string;
+  roastTempCharge?: number;
+  roastTempTurningPoint?: number;
+  roastTempFirstCrack?: number;
+  roastTempSecondCrack?: number;
+  preparationStartedAt?: string;
+  preparationEndedAt?: string;
+  roastingStartedAt?: string;
+  roastingEndedAt?: string;
+  coolingStartedAt?: string;
+  coolingEndedAt?: string;
+  inspectionStartedAt?: string;
+  inspectionEndedAt?: string;
+  packagingStartedAt?: string;
+  packagingEndedAt?: string;
   operator: string;
   notes: string;
-  history: any[];
+  history: Array<{ timestamp: string; action: string; userId?: string; details?: string }>;
   costPerKg: number;
   packagingUnits: PackagingUnit[];
 }
@@ -330,6 +404,31 @@ export interface Location {
   is_active: boolean;
   is_roastery: boolean;
   type?: 'WAREHOUSE' | 'BRANCH' | 'ROASTERY';
+  code?: string;
+  area?: string;
+  city?: string;
+  gps_lat?: number | string | null;
+  gps_lng?: number | string | null;
+  phone?: string;
+  email?: string;
+  fax?: string;
+  operating_hours?: Record<string, { open: string; close: string; closed?: boolean }>;
+  branch_type?: string;
+  status?: string;
+  opening_date?: string;
+  closing_date?: string;
+  area_sqm?: number;
+  seating_capacity?: number;
+  is_hq?: boolean;
+  parent_location_id?: string | null;
+  commercial_license_number?: string;
+  commercial_license_expiry?: string;
+  logo_url?: string;
+  exterior_photo_url?: string;
+  interior_photo_url?: string;
+  contact_person_name?: string;
+  contact_person_phone?: string;
+  contact_person_email?: string;
   contact_person?: ContactPerson;
 }
 
@@ -354,6 +453,7 @@ export interface SystemSettings {
   currency: string;
   late_penalty_type?: 'per_minute' | 'per_occurrence';
   late_penalty_amount?: number;
+  inventory_valuation_method?: 'FIFO' | 'LIFO' | 'WEIGHTED_AVG';
 }
 
 export interface SalaryAdvance {

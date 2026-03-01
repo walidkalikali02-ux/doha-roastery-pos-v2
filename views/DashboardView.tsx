@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
 import { ArrowUpRight, ArrowDownRight, Package, Flame, TrendingUp, AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
-import { useLanguage, useTheme } from '../App';
+import { useLanguage } from '../App';
 import { supabase } from '../supabaseClient';
-import { RoastingBatch, Transaction } from '../types';
+import { BatchStatus, RoastingBatch, Transaction } from '../types';
 
 const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: any) => (
   <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-orange-100 transition-colors duration-300">
@@ -28,7 +28,7 @@ const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: any) 
 
 const DashboardView: React.FC = () => {
   const { t } = useLanguage();
-  const { theme } = useTheme();
+  const theme = 'light';
   const [stats, setStats] = useState({
     totalSales: 0,
     roastCount: 0,
@@ -38,6 +38,17 @@ const DashboardView: React.FC = () => {
     lowStockCount: 0
   });
   const [isLoading, setIsLoading] = useState(true);
+
+  const normalizeBatchStatus = (status: string): BatchStatus => {
+    if (status === 'Ready for Packaging' || status === BatchStatus.PACKAGING) return BatchStatus.PACKAGING;
+    if (status === 'Completed' || status === BatchStatus.COMPLETED) return BatchStatus.COMPLETED;
+    if (status === 'QC Rejected' || status === BatchStatus.REJECTED) return BatchStatus.REJECTED;
+    if (status === 'Preparation' || status === BatchStatus.PREPARATION) return BatchStatus.PREPARATION;
+    if (status === 'Roasting' || status === 'In Progress' || status === BatchStatus.ROASTING) return BatchStatus.ROASTING;
+    if (status === 'Cooling' || status === BatchStatus.COOLING) return BatchStatus.COOLING;
+    if (status === 'Inspection' || status === BatchStatus.INSPECTION) return BatchStatus.INSPECTION;
+    return BatchStatus.PREPARATION;
+  };
 
   useEffect(() => {
     fetchDashboardData();
@@ -91,7 +102,7 @@ const DashboardView: React.FC = () => {
           level: b.level,
           preWeight: b.pre_weight,
           postWeight: b.post_weight,
-          status: b.status,
+          status: normalizeBatchStatus(b.status),
           wastePercentage: b.waste_percentage
         } as any)),
         lowStockCount
@@ -113,8 +124,8 @@ const DashboardView: React.FC = () => {
     { name: t.dayFri, sales: 3490, roast: 4300 },
   ];
 
-  const strokeColor = theme === 'dark' ? '#292524' : '#f5f5f5';
-  const textColor = theme === 'dark' ? '#a8a29e' : '#78716c';
+  const strokeColor = '#f5f5f5';
+  const textColor = '#78716c';
 
   if (isLoading) {
     return (
@@ -218,11 +229,11 @@ const DashboardView: React.FC = () => {
                   <td className="px-6 py-4 font-mono text-black text-sm">{batch.postWeight || batch.preWeight} {t.kg}</td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                      batch.status === 'Ready for Packaging'
+                      batch.status === BatchStatus.PACKAGING
                         ? 'bg-orange-600 text-white' 
                         : 'bg-white text-black border border-orange-600'
                     }`}>
-                      {batch.status === 'Ready for Packaging' ? t.ready : batch.status === 'Completed' ? t.completed : t.inProgress}
+                      {batch.status === BatchStatus.PACKAGING ? t.ready : batch.status === BatchStatus.COMPLETED ? t.completed : t.inProgress}
                     </span>
                   </td>
                 </tr>

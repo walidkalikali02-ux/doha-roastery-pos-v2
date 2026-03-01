@@ -86,6 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: (data.role as UserRole) || UserRole.CASHIER,
         permissions: data.permissions || getPermissionsForRole((data.role as UserRole) || UserRole.CASHIER),
         avatar: data.avatar_url,
+        location_id: data.location_id || undefined,
       };
     } catch (e) {
       console.error("Profile fetch error:", e);

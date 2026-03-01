@@ -457,6 +457,8 @@ CREATE POLICY "Authenticated Update" ON storage.objects FOR UPDATE WITH CHECK (b
 -- RLS Policies for Employees Table
 ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS employee_id UUID;
+
 DROP POLICY IF EXISTS "Admins and Managers can view all employees" ON employees;
 DROP POLICY IF EXISTS "Admins and Managers can insert employees" ON employees;
 DROP POLICY IF EXISTS "Admins and Managers can update employees" ON employees;
@@ -496,6 +498,18 @@ ON employee_time_logs FOR SELECT
 USING (
   auth.uid() IN (
     SELECT id FROM profiles WHERE role IN ('ADMIN', 'MANAGER')
+  )
+);
+
+DROP POLICY IF EXISTS "Employee can view own time logs" ON employee_time_logs;
+CREATE POLICY "Employee can view own time logs"
+ON employee_time_logs FOR SELECT
+USING (
+  EXISTS (
+    SELECT 1
+    FROM profiles p
+    WHERE p.id = auth.uid()
+      AND p.employee_id = employee_time_logs.employee_id
   )
 );
 

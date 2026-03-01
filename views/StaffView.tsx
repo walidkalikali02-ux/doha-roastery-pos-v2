@@ -78,6 +78,31 @@ type EmployeeTimeLog = {
   employee_id: string;
   clock_in_at: string;
   clock_out_at: string | null;
+  location_id?: string | null;
+};
+
+type BranchTransfer = {
+  id: string;
+  employee_id: string;
+  from_location_id: string | null;
+  to_location_id: string;
+  transfer_type: 'TEMPORARY' | 'PERMANENT';
+  status: 'REQUESTED' | 'APPROVED' | 'REJECTED' | 'CANCELLED' | 'COMPLETED';
+  reason: string | null;
+  start_at: string | null;
+  end_at: string | null;
+  requested_by_name: string | null;
+  requested_at: string;
+  approved_by_name: string | null;
+  approved_at: string | null;
+  created_at: string;
+};
+
+type BranchStaffingTarget = {
+  id: string;
+  location_id: string;
+  role: UserRole;
+  min_required: number;
 };
 
 type DailyAttendanceRow = {
@@ -125,7 +150,7 @@ export default function StaffView() {
   const { user } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [staffTab, setStaffTab] = useState<'overview' | 'schedule' | 'payroll' | 'performance'>('overview');
+  const [staffTab, setStaffTab] = useState<'overview' | 'schedule' | 'payroll' | 'performance' | 'branches'>('overview');
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
@@ -147,6 +172,17 @@ export default function StaffView() {
   const [quickClockValue, setQuickClockValue] = useState('');
   const [quickClocking, setQuickClocking] = useState(false);
   const [dailyAttendance, setDailyAttendance] = useState<DailyAttendanceRow[]>([]);
+  const [branchTransfers, setBranchTransfers] = useState<BranchTransfer[]>([]);
+  const [branchStaffingTargets, setBranchStaffingTargets] = useState<BranchStaffingTarget[]>([]);
+  const [showBranchTransferModal, setShowBranchTransferModal] = useState(false);
+  const [branchTransferEmployee, setBranchTransferEmployee] = useState<Employee | null>(null);
+  const [branchTransferForm, setBranchTransferForm] = useState({
+    to_location_id: '',
+    transfer_type: 'TEMPORARY' as 'TEMPORARY' | 'PERMANENT',
+    start_at: '',
+    end_at: '',
+    reason: ''
+  });
   const [systemSettings, setSystemSettings] = useState<SystemSettings>({
     id: '',
     printer_width: '80mm',
@@ -339,7 +375,7 @@ export default function StaffView() {
   const fetchOpenTimeLogs = async () => {
     const { data, error } = await supabase
       .from('employee_time_logs')
-      .select('id, employee_id, clock_in_at, clock_out_at')
+      .select('id, employee_id, clock_in_at, clock_out_at, location_id')
       .is('clock_out_at', null);
     if (error) throw error;
     const map: Record<string, EmployeeTimeLog> = {};
@@ -1007,9 +1043,27 @@ export default function StaffView() {
     if (data) setLocations(data);
   };
 
+  const fetchBranchTransfers = async () => {
+    const { data } = await supabase
+      .from('employee_branch_transfers')
+      .select('id,employee_id,from_location_id,to_location_id,transfer_type,status,reason,start_at,end_at,requested_by_name,requested_at,approved_by_name,approved_at,created_at')
+      .order('created_at', { ascending: false })
+      .limit(200);
+    if (data) setBranchTransfers(data as any);
+  };
+
+  const fetchBranchStaffingTargets = async () => {
+    const { data } = await supabase
+      .from('branch_staffing_targets')
+      .select('id,location_id,role,min_required');
+    if (data) setBranchStaffingTargets(data as any);
+  };
+
   useEffect(() => {
     fetchEmployees();
     fetchLocations();
+    fetchBranchTransfers().catch(() => {});
+    fetchBranchStaffingTargets().catch(() => {});
     fetchSystemSettings().catch(() => {});
   }, []);
 
@@ -1242,6 +1296,26 @@ export default function StaffView() {
     setClockingEmployeeIds((prev: Record<string, boolean>) => ({ ...prev, [employeeId]: value }));
   };
 
+  const getActiveTemporaryBranch = (employeeId: string, at: Date) => {
+    const atMs = at.getTime();
+    const row = branchTransfers.find(t =>
+      t.employee_id === employeeId &&
+      t.transfer_type === 'TEMPORARY' &&
+      t.status === 'APPROVED' &&
+      t.start_at &&
+      t.end_at &&
+      new Date(t.start_at).getTime() <= atMs &&
+      new Date(t.end_at).getTime() >= atMs
+    );
+    return row ? row.to_location_id : null;
+  };
+
+  const employeeAllowedAtBranch = (employee: Employee, locationId: string, at: Date) => {
+    if (!locationId) return false;
+    if (employee.location_id && employee.location_id === locationId) return true;
+    return getActiveTemporaryBranch(employee.id, at) === locationId;
+  };
+
   const handleClockIn = async (employee: Employee) => {
     if (!user?.id) return;
     if (openTimeLogs[employee.id]) {
@@ -1251,8 +1325,13 @@ export default function StaffView() {
     try {
       setClocking(employee.id, true);
       const now = new Date().toISOString();
+      const clockLocationId = (user as any)?.location_id || employee.location_id || null;
+      if (clockLocationId && !employeeAllowedAtBranch(employee, clockLocationId, new Date())) {
+        alert(t.actionFailed);
+        return;
+      }
       const { error } = await supabase.from('employee_time_logs').insert([
-        { employee_id: employee.id, clock_in_at: now, created_by: user.id }
+        { employee_id: employee.id, clock_in_at: now, created_by: user.id, location_id: clockLocationId }
       ]);
       if (error) throw error;
       await fetchOpenTimeLogs();
@@ -1263,6 +1342,10 @@ export default function StaffView() {
         alert('Clock out is required before clocking in again.');
       } else if (typeof err.message === 'string' && err.message.toLowerCase().includes('overlapping')) {
         alert('Time log overlaps an existing shift.');
+      } else if (typeof err.message === 'string' && err.message.includes('EMPLOYEE_NOT_ASSIGNED_TO_BRANCH')) {
+        alert(t.actionFailed);
+      } else if (typeof err.message === 'string' && err.message.includes('EMPLOYEE_NO_HOME_BRANCH')) {
+        alert(t.actionFailed);
       } else {
         alert('Failed to clock in. ' + (err.message || 'Please try again.'));
       }
@@ -1326,12 +1409,18 @@ export default function StaffView() {
     }
     try {
       setManualSubmitting(true);
+      const clockLocationId = (user as any)?.location_id || manualEntryEmployee.location_id || null;
+      if (clockLocationId && !employeeAllowedAtBranch(manualEntryEmployee, clockLocationId, new Date(clockInIso))) {
+        alert(t.actionFailed);
+        return;
+      }
       const { error } = await supabase.from('employee_time_logs').insert([
         {
           employee_id: manualEntryEmployee.id,
           clock_in_at: clockInIso,
           clock_out_at: clockOutIso,
           created_by: user.id,
+          location_id: clockLocationId,
           is_manual: true,
           manual_reason: manualReason.trim()
         }
@@ -1344,6 +1433,8 @@ export default function StaffView() {
       console.error('Error saving manual entry:', err);
       if (typeof err.message === 'string' && err.message.toLowerCase().includes('overlapping')) {
         alert('Time log overlaps an existing shift.');
+      } else if (typeof err.message === 'string' && err.message.includes('EMPLOYEE_NOT_ASSIGNED_TO_BRANCH')) {
+        alert(t.actionFailed);
       } else {
         alert('Failed to save manual entry. ' + (err.message || 'Please try again.'));
       }
@@ -1432,6 +1523,44 @@ export default function StaffView() {
     const [hours, minutes] = time.split(':').map(Number);
     if (Number.isNaN(hours) || Number.isNaN(minutes)) return null;
     return hours * 60 + minutes;
+  };
+
+  const isNowWithinShift = (employee: Employee, at: Date) => {
+    const template = employee.shift_template ? SHIFT_TEMPLATES[employee.shift_template as ShiftTemplate] : null;
+    const start = employee.shift_start_time || template?.start || null;
+    const end = employee.shift_end_time || template?.end || null;
+    const startM = toMinutes(start);
+    const endM = toMinutes(end);
+    if (startM === null || endM === null) return false;
+    const nowM = at.getHours() * 60 + at.getMinutes();
+    if (startM <= endM) return nowM >= startM && nowM <= endM;
+    return nowM >= startM || nowM <= endM;
+  };
+
+  const branchRoles: UserRole[] = [
+    UserRole.MANAGER,
+    UserRole.CASHIER,
+    UserRole.ROASTER,
+    UserRole.WAREHOUSE_STAFF,
+    UserRole.HR
+  ];
+
+  const getTargetMin = (locationId: string, role: UserRole) => {
+    const trow = branchStaffingTargets.find(r => r.location_id === locationId && r.role === role);
+    return trow ? Number(trow.min_required) || 0 : 0;
+  };
+
+  const upsertTargetMin = async (locationId: string, role: UserRole, minRequired: number) => {
+    const payload = { location_id: locationId, role, min_required: Math.max(0, Math.trunc(Number(minRequired) || 0)) };
+    const { data, error } = await supabase.from('branch_staffing_targets').upsert(payload, { onConflict: 'location_id,role' }).select('id,location_id,role,min_required');
+    if (error) throw error;
+    if (data && data[0]) {
+      setBranchStaffingTargets(prev => {
+        const exists = prev.find(x => x.location_id === locationId && x.role === role);
+        if (exists) return prev.map(x => (x.location_id === locationId && x.role === role) ? (data[0] as any) : x);
+        return [...prev, data[0] as any];
+      });
+    }
   };
 
   const toMinutesFromTimestamp = (timestamp?: string | null) => {
@@ -1580,6 +1709,41 @@ export default function StaffView() {
   const workingNow = useMemo(() => {
     return employees.filter(employee => !!openTimeLogs[employee.id]);
   }, [employees, openTimeLogs]);
+
+  const branchStaffing = useMemo(() => {
+    const at = new Date();
+    const initRoleCounts = () => branchRoles.reduce((acc, r) => {
+      acc[r] = { active: 0, available: 0, onShift: 0, clockedIn: 0 };
+      return acc;
+    }, {} as Record<UserRole, { active: number; available: number; onShift: number; clockedIn: number }>);
+
+    const map = new Map<string, { location: Location; byRole: Record<UserRole, { active: number; available: number; onShift: number; clockedIn: number }> }>();
+    locations.forEach(loc => {
+      map.set(loc.id, { location: loc, byRole: initRoleCounts() });
+    });
+
+    employees.forEach(emp => {
+      const assigned = getActiveTemporaryBranch(emp.id, at) || emp.location_id || '';
+      if (!assigned) return;
+      const bucket = map.get(assigned);
+      if (!bucket) return;
+      if (!branchRoles.includes(emp.role)) return;
+
+      const roleBucket = bucket.byRole[emp.role];
+      const isActive = emp.employment_status === 'Active';
+      const isAvailable = isActive && !emp.is_on_leave;
+      const onShift = isAvailable && isNowWithinShift(emp, at);
+      const openLog = openTimeLogs[emp.id];
+      const clockedIn = !!openLog && (!openLog.location_id || openLog.location_id === assigned);
+
+      if (isActive) roleBucket.active += 1;
+      if (isAvailable) roleBucket.available += 1;
+      if (onShift) roleBucket.onShift += 1;
+      if (clockedIn) roleBucket.clockedIn += 1;
+    });
+
+    return Array.from(map.values()).sort((a, b) => (a.location.name || '').localeCompare(b.location.name || ''));
+  }, [employees, locations, branchTransfers, openTimeLogs, branchRoles]);
 
   const calendarDays = useMemo(() => {
     if (!calendarMonth) return [];
@@ -2270,7 +2434,7 @@ export default function StaffView() {
 
       const { data: roastData } = await supabase
         .from('roasting_batches')
-        .select('waste_percentage, operator, roast_date')
+        .select('waste_percentage, operator, roast_date, quality_score, qc_status')
         .gte('roast_date', start.toISOString().slice(0, 10))
         .lte('roast_date', end.toISOString().slice(0, 10));
       const matchedRoasts = (roastData || []).filter(batch => (batch.operator || '').trim() === fullName);
@@ -2278,6 +2442,14 @@ export default function StaffView() {
       const avgWaste = roastCount
         ? matchedRoasts.reduce((sum, batch) => sum + Number(batch.waste_percentage || 0), 0) / roastCount
         : 0;
+      const qualitySamples = matchedRoasts.map((batch: any) => Number(batch.quality_score)).filter((value: number) => Number.isFinite(value));
+      const avgQualityScore = qualitySamples.length
+        ? qualitySamples.reduce((sum: number, value: number) => sum + value, 0) / qualitySamples.length
+        : 0;
+      const qcEvaluated = matchedRoasts.filter((batch: any) => batch.qc_status === 'PASSED' || batch.qc_status === 'FAILED');
+      const qcTotal = qcEvaluated.length;
+      const qcPassed = qcEvaluated.filter((batch: any) => batch.qc_status === 'PASSED').length;
+      const qcSuccessRate = qcTotal ? (qcPassed / qcTotal) * 100 : 0;
 
       const nextValues: Record<string, string> = {};
       reviewRoleKpis.forEach((kpi: PerformanceKpi) => {
@@ -2291,6 +2463,8 @@ export default function StaffView() {
         if (kpi.source_module === 'ROASTING') {
           if (kpi.source_metric === 'avg_waste_percentage') nextValues[kpi.id] = String(Math.round(avgWaste * 100) / 100);
           if (kpi.source_metric === 'batch_count') nextValues[kpi.id] = String(roastCount);
+          if (kpi.source_metric === 'avg_quality_score') nextValues[kpi.id] = String(Math.round(avgQualityScore * 100) / 100);
+          if (kpi.source_metric === 'qc_success_rate') nextValues[kpi.id] = String(Math.round(qcSuccessRate * 100) / 100);
         }
       });
 
@@ -2312,7 +2486,10 @@ export default function StaffView() {
         const rawValue = reviewKpiValues[kpi.id];
         const actualValue = rawValue === '' || rawValue == null ? null : Number(rawValue);
         const target = Number(kpi.target_value) || 0;
-        const score = actualValue != null && target > 0 ? Math.round((actualValue / target) * 10000) / 100 : null;
+        const isInverseMetric = kpi.source_module === 'ROASTING' && kpi.source_metric === 'avg_waste_percentage';
+        const score = actualValue != null && target > 0
+          ? Math.round((((isInverseMetric ? (actualValue > 0 ? target / actualValue : 0) : actualValue / target)) * 100) * 100) / 100
+          : null;
         return {
           review_id: '',
           kpi_id: kpi.id,
@@ -2614,6 +2791,14 @@ export default function StaffView() {
           }`}
         >
           {t.staffTabPerformance}
+        </button>
+        <button
+          onClick={() => setStaffTab('branches')}
+          className={`px-4 py-2 rounded-xl font-semibold text-sm ${
+            staffTab === 'branches' ? 'bg-orange-600 text-white' : 'bg-white text-black '
+          }`}
+        >
+          {t.branchStaffing || 'Branch Staffing'}
         </button>
       </div>
       )}
@@ -3119,6 +3304,8 @@ export default function StaffView() {
                         <>
                           <option value="avg_waste_percentage">{t.avgWastePercentage}</option>
                           <option value="batch_count">{t.batchCount}</option>
+                          <option value="avg_quality_score">{t.avgQualityScore}</option>
+                          <option value="qc_success_rate">{t.qcSuccessRate}</option>
                         </>
                       )}
                     </select>
