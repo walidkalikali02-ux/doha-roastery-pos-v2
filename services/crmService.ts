@@ -13,8 +13,10 @@ export const crmService = {
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    if (searchQuery) {
-      query = query.or(`phone.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%`);
+    const normalizedSearch = searchQuery.trim();
+    if (normalizedSearch) {
+      const escapedSearch = normalizedSearch.replace(/[%_]/g, '\\$&');
+      query = query.or(`phone.ilike.%${escapedSearch}%,full_name.ilike.%${escapedSearch}%`);
     }
 
     const { data, count, error } = await query;
