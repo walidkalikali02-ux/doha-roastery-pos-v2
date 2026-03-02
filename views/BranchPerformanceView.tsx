@@ -26,6 +26,25 @@ const BranchPerformanceView: React.FC = () => {
     fetchBranchPerformance();
   }, [selectedPeriod]);
 
+  const getPeriodStart = (period: 'day' | 'week' | 'month' | 'year', baseDate: Date, periodsBack = 1) => {
+    const date = new Date(baseDate);
+    switch (period) {
+      case 'day':
+        date.setDate(date.getDate() - periodsBack);
+        break;
+      case 'week':
+        date.setDate(date.getDate() - (7 * periodsBack));
+        break;
+      case 'month':
+        date.setMonth(date.getMonth() - periodsBack);
+        break;
+      case 'year':
+        date.setFullYear(date.getFullYear() - periodsBack);
+        break;
+    }
+    return date;
+  };
+
   const fetchBranchPerformance = async () => {
     setIsLoading(true);
     try {
@@ -37,26 +56,17 @@ const BranchPerformanceView: React.FC = () => {
         return;
       }
 
-      const getDateRange = () => {
-        const now = new Date();
-        switch (selectedPeriod) {
-          case 'day':
-            return new Date(now.setDate(now.getDate() - 1)).toISOString();
-          case 'week':
-            return new Date(now.setDate(now.getDate() - 7)).toISOString();
-          case 'month':
-            return new Date(now.setMonth(now.getMonth() - 1)).toISOString();
-          case 'year':
-            return new Date(now.setFullYear(now.getFullYear() - 1)).toISOString();
-        }
-      };
-
-      const dateFrom = getDateRange();
+      const now = new Date();
+      const currentPeriodStart = getPeriodStart(selectedPeriod, now, 1);
+      const previousPeriodStart = getPeriodStart(selectedPeriod, currentPeriodStart, 1);
+      const currentPeriodStartIso = currentPeriodStart.toISOString();
+      const previousPeriodStartIso = previousPeriodStart.toISOString();
 
       const { data: transactions } = await supabase
         .from('transactions')
         .select('*, transaction_items(*)')
-        .gte('created_at', dateFrom);
+        .gte('created_at', previousPeriodStartIso)
+        .lt('created_at', now.toISOString());
 
       const { data: staff } = await supabase.from('staff').select('id, location_id');
 
@@ -64,15 +74,23 @@ const BranchPerformanceView: React.FC = () => {
         const locationTransactions = (transactions || []).filter(
           (t: any) => t.location_id === location.id
         );
-        
-        const totalSales = locationTransactions.reduce((sum: number, t: any) => sum + (t.total || 0), 0);
-        const totalTransactions = locationTransactions.length;
+
+        const currentTransactions = locationTransactions.filter(
+          (tx: any) => tx.created_at && tx.created_at >= currentPeriodStartIso
+        );
+        const previousTransactions = locationTransactions.filter(
+          (tx: any) => tx.created_at && tx.created_at >= previousPeriodStartIso && tx.created_at < currentPeriodStartIso
+        );
+
+        const totalSales = currentTransactions.reduce((sum: number, t: any) => sum + (t.total || 0), 0);
+        const previousPeriodSales = previousTransactions.reduce((sum: number, t: any) => sum + (t.total || 0), 0);
+        const totalTransactions = currentTransactions.length;
         const avgTransactionValue = totalTransactions > 0 ? totalSales / totalTransactions : 0;
         
         const locationStaff = (staff || []).filter((s: any) => s.location_id === location.id);
         
         const productMap = new Map<string, { quantity: number; revenue: number }>();
-        locationTransactions.forEach((t: any) => {
+        currentTransactions.forEach((t: any) => {
           (t.transaction_items || []).forEach((item: any) => {
             const existing = productMap.get(item.name || item.product_name) || { quantity: 0, revenue: 0 };
             existing.quantity += item.quantity || 1;
@@ -86,7 +104,9 @@ const BranchPerformanceView: React.FC = () => {
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, 5);
 
-        const growth = Math.random() * 30 - 10;
+        const growth = previousPeriodSales > 0
+          ? ((totalSales - previousPeriodSales) / previousPeriodSales) * 100
+          : (totalSales > 0 ? 100 : 0);
 
         return {
           id: location.id,

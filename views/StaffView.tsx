@@ -337,8 +337,8 @@ export default function StaffView() {
       if (!event.target.files || event.target.files.length === 0) return;
       
       const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
+      const fileExt = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const fileName = `${crypto.randomUUID()}.${fileExt}`;
       const filePath = `${fileName}`;
 
       const { error: uploadError } = await supabase.storage
