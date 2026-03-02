@@ -21,17 +21,24 @@ interface CRMViewProps {}
 
 const CRMView: React.FC<CRMViewProps> = () => {
   const { t, lang } = useLanguage();
+  type CustomerTier = Customer['tier'];
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    name: string;
+    phone: string;
+    email: string;
+    notes: string;
+    tier: CustomerTier;
+  }>({
     name: '',
     phone: '',
     email: '',
     notes: '',
-    tier: 'bronze' as const
+    tier: 'bronze'
   });
 
   useEffect(() => {
@@ -149,7 +156,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
   const totalRevenue = customers.reduce((sum, c) => sum + (c.total_spent || 0), 0);
   const avgSpent = totalCustomers > 0 ? totalRevenue / totalCustomers : 0;
 
-  const tierColors = {
+  const tierColors: Record<CustomerTier, string> = {
     bronze: 'bg-amber-100 text-amber-700',
     silver: 'bg-gray-100 text-gray-700',
     gold: 'bg-yellow-100 text-yellow-700',

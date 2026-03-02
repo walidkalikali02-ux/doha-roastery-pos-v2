@@ -19,6 +19,14 @@ interface PackagingLine {
   quantity: string;
 }
 
+const ACTIVE_BATCH_STATUSES: BatchStatus[] = [
+  BatchStatus.PREPARATION,
+  BatchStatus.ROASTING,
+  BatchStatus.COOLING,
+  BatchStatus.INSPECTION,
+  BatchStatus.PACKAGING
+];
+
 const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = ({ onDetailOpen }) => {
   const { lang, t } = useLanguage();
   const { user } = useAuth();
@@ -113,8 +121,8 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
       
       if (batchData) {
         const mapped = batchData.map(mapBatchFromDB);
-        setActiveBatches(mapped.filter(b => b.status === BatchStatus.IN_PROGRESS));
-        setCompletedBatches(mapped.filter(b => b.status !== BatchStatus.IN_PROGRESS));
+        setActiveBatches(mapped.filter(b => ACTIVE_BATCH_STATUSES.includes(b.status)));
+        setCompletedBatches(mapped.filter(b => !ACTIVE_BATCH_STATUSES.includes(b.status)));
       }
     } catch (err) { console.error('Fetch error:', err); }
     finally { setIsLoading(false); }
@@ -296,7 +304,7 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
     const payload = {
       id: batchCode, bean_id: selectedBean.id, roast_date: now.toISOString().split('T')[0],
       roast_time: now.toTimeString().split(' ')[0], level: newBatchData.level, pre_weight: pre,
-      status: BatchStatus.IN_PROGRESS, operator: user?.name || 'Roaster', notes: newBatchData.notes,
+      status: BatchStatus.PREPARATION, operator: user?.name || 'Roaster', notes: newBatchData.notes,
       cost_per_kg: selectedBean.cost_per_kg, history: [{ 
         timestamp: now.toLocaleString(), action: 'CREATE', operator: user?.name || 'System',
         details: `Batch created with ${pre}kg of ${selectedBean.label}`

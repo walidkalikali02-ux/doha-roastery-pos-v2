@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useLanguage } from '../App';
-import { TrendingUp, TrendingDown, BarChart3, PieChart, Users, DollarSign, Package, Coffee, ArrowUpDown } from 'lucide-react';
-
-interface BranchPerformanceViewProps {}
+import { TrendingUp, TrendingDown, BarChart3, PieChart, Users, DollarSign, Coffee, ArrowUpDown } from 'lucide-react';
 
 interface BranchStats {
   id: string;
@@ -187,7 +185,7 @@ const BranchPerformanceView: React.FC = () => {
         <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">{t.totalTransactions || 'Total Transactions'}</p>
+              <p className="text-xs font-bold text-gray-500 uppercase">{t.transactionsCount || 'Total Transactions'}</p>
               <p className="text-2xl font-bold text-black mt-1">{totalSystemTransactions}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-xl">
@@ -222,7 +220,7 @@ const BranchPerformanceView: React.FC = () => {
                   onClick={() => handleSort('sales')}
                 >
                   <div className="flex items-center gap-1">
-                    {t.sales || 'Sales'}
+                    {t.salesTotal || 'Sales'}
                     <ArrowUpDown size={14} />
                   </div>
                 </th>
@@ -231,17 +229,17 @@ const BranchPerformanceView: React.FC = () => {
                   onClick={() => handleSort('transactions')}
                 >
                   <div className="flex items-center gap-1">
-                    {t.transactions || 'Transactions'}
+                    {t.transactionsCount || 'Transactions'}
                     <ArrowUpDown size={14} />
                   </div>
                 </th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.avgValue || 'Avg. Value'}</th>
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.avgTransaction || 'Avg. Value'}</th>
                 <th 
                   className="text-left p-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('growth')}
                 >
                   <div className="flex items-center gap-1">
-                    {t.growth || 'Growth'}
+                    {'Growth'}
                     <ArrowUpDown size={14} />
                   </div>
                 </th>
@@ -260,7 +258,7 @@ const BranchPerformanceView: React.FC = () => {
               ) : sortedStats.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="p-8 text-center text-gray-500">
-                    {t.noData || 'No data available'}
+                    {'No data available'}
                   </td>
                 </tr>
               ) : (

@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useLanguage } from '../App';
-import { DollarSign, TrendingUp, PieChart, ArrowUpDown, Download, Calendar } from 'lucide-react';
-
-interface BranchFinancialsViewProps {}
+import { DollarSign, TrendingUp, PieChart } from 'lucide-react';
 
 interface FinancialData {
   id: string;
@@ -149,7 +147,7 @@ const BranchFinancialsView: React.FC = () => {
                 }`}
               >
                 {period === 'month' ? (t.month || 'Month') : 
-                 period === 'quarter' ? (t.quarter || 'Quarter') : 
+                 period === 'quarter' ? (t.quarterly || 'Quarter') : 
                  (t.year || 'Year')}
               </button>
             ))}
@@ -170,7 +168,7 @@ const BranchFinancialsView: React.FC = () => {
                 viewMode === 'detailed' ? 'bg-white text-green-600 shadow-sm' : 'text-black'
               }`}
             >
-              {t.detailed || 'Detailed'}
+              {t.details || 'Detailed'}
             </button>
           </div>
         </div>
@@ -237,9 +235,9 @@ const BranchFinancialsView: React.FC = () => {
               <tr className="bg-gray-50">
                 <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.branch || 'Branch'}</th>
                 <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.revenue || 'Revenue'}</th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.cost || 'Cost'}</th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.profit || 'Profit'}</th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.margin || 'Margin'}</th>
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">Cost</th>
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">Profit</th>
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.marginLabel || 'Margin'}</th>
               </tr>
             </thead>
             <tbody>
@@ -254,7 +252,7 @@ const BranchFinancialsView: React.FC = () => {
               ) : sortedByProfit.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="p-8 text-center text-gray-500">
-                    {t.noData || 'No data available'}
+                    {'No data available'}
                   </td>
                 </tr>
               ) : (
