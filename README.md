@@ -37,3 +37,18 @@ To enable cash management features, run the SQL script:
 ```
 
 This creates the necessary `cash_movements` table and adds required columns to the `shifts` table.
+
+## Realtime Inventory Engine Setup
+
+To enable realtime inventory controls and forecasting, run:
+
+```sql
+-- Execute enable_realtime_inventory_engine.sql in your Supabase SQL Editor
+```
+
+This extension adds:
+- `product_bom` (service-type BOM mapping for DINE_IN/TAKEAWAY/ALL)
+- `inventory_ledger` (realtime movement mirror)
+- `inventory_metrics` (velocity, stockout horizon, dynamic reorder point)
+- `calendar_events` (seasonal/event multipliers)
+- smart alerts, transfer recommendations, and POS inventory event processing RPCs
