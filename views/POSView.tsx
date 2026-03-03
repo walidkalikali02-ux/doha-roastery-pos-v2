@@ -675,12 +675,14 @@ const POSView: React.FC = () => {
         timestamp: now.toISOString()
       };
 
-      await supabase.from('transactions').insert([transactionData]);
+      const { error: transactionInsertError } = await supabase.from('transactions').insert([transactionData]);
+      if (transactionInsertError) throw transactionInsertError;
 
-      const { data: allInv } = await supabase
+      const { data: allInv, error: allInvError } = await supabase
         .from('inventory_items')
         .select('*')
         .eq('location_id', selectedLocationId);
+      if (allInvError) throw allInvError;
       const invById = new Map((allInv || []).map(inv => [inv.id, inv]));
       const invByProductId = new Map((allInv || []).map((inv: any) => [inv.product_id || inv.productId, inv]));
       const invByName = new Map((allInv || []).map(inv => [inv.name, inv]));
@@ -743,10 +745,11 @@ const POSView: React.FC = () => {
 
       if (selectedCustomer) {
         try {
-          await supabase.rpc('record_customer_transaction', {
+          const { error: loyaltyError } = await supabase.rpc('record_customer_transaction', {
             p_customer_id: selectedCustomer.id,
             p_spent_amount: totals.total
           });
+          if (loyaltyError) throw loyaltyError;
         } catch (err) {
           console.error("Failed to update loyalty:", err);
         }
@@ -792,13 +795,14 @@ const POSView: React.FC = () => {
 
       // Log the reprint action
       try {
-        await supabase.from('reprint_logs').insert([{
+        const { error: reprintLogError } = await supabase.from('reprint_logs').insert([{
           transaction_id: transaction.id,
           user_id: user?.id === 'demo-user' ? null : user?.id,
           cashier_name: user?.name || 'Unknown',
           reprinted_at: now,
           reason: t.customerRequest
         }]);
+        if (reprintLogError) throw reprintLogError;
       } catch (err) {
         console.error("Failed to log reprint:", err);
       }
