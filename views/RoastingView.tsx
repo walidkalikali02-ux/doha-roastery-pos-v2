@@ -183,12 +183,31 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
   const handleCreateProduction = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!showProductionModal || isSaving) return;
+    if (!productionDates.productionDate || !productionDates.packagingDate || !productionDates.targetLocationId) {
+      alert(t.fieldRequired || 'Missing required production fields.');
+      return;
+    }
     
     const { remaining } = getBatchWeightStats(showProductionModal);
     
     if (totalBatchPackagingWeightNeeded > remaining + 0.001) {
        alert(t.insufficientBatchWeight);
        return;
+    }
+
+    const validatedLines = packagingLines
+      .filter(line => line.productId && line.quantity)
+      .map(line => {
+        const product = products.find(p => p.id === line.productId);
+        const template = templates.find(tm => tm.id === product?.templateId);
+        const qty = parseInt(line.quantity, 10);
+        return { line, product, template, qty };
+      });
+
+    const hasInvalidLine = validatedLines.some(v => !v.product || !v.template || !Number.isFinite(v.qty) || v.qty <= 0);
+    if (hasInvalidLine || validatedLines.length === 0) {
+      alert('Invalid packaging line data. Please review product and quantity.');
+      return;
     }
 
     setIsSaving(true);
@@ -198,13 +217,7 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
       const newUnits: PackagingUnit[] = [];
       const inventoryItemsToInsert: any[] = [];
 
-      for (const line of packagingLines) {
-        if (!line.productId || !line.quantity) continue;
-        
-        const product = products.find(p => p.id === line.productId);
-        const template = templates.find(tm => tm.id === product?.templateId);
-        const qty = parseInt(line.quantity);
-        
+      for (const { product, template, qty } of validatedLines) {
         const expDate = new Date(productionDates.productionDate);
         expDate.setDate(expDate.getDate() + (template?.shelf_life_days || 180));
         const expiry = expDate.toISOString().split('T')[0];
@@ -212,37 +225,37 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
         const unit: PackagingUnit = {
           id: crypto.randomUUID(),
           timestamp: now.toISOString(),
-          templateId: template!.id,
-          productId: product!.id,
-          size: template!.sizeLabel,
+          templateId: template.id,
+          productId: product.id,
+          size: template.sizeLabel,
           quantity: qty,
           operator: user?.name || 'System',
-          packagingCostTotal: qty * template!.unitCost,
+          packagingCostTotal: qty * template.unitCost,
           productionDate: productionDates.productionDate,
           expiryDate: expiry,
           packagingDate: productionDates.packagingDate,
-          sku: `${template!.skuPrefix}-${showProductionModal.id.split('-').pop()}-${Math.floor(1000 + Math.random() * 9000)}`
+          sku: `${template.skuPrefix}-${showProductionModal.id.split('-').pop()}-${crypto.randomUUID().slice(0, 8).toUpperCase()}`
         };
 
         newUnits.push(unit);
 
         inventoryItemsToInsert.push({
-          name: product!.name, 
-          category: product!.category, 
+          name: product.name, 
+          category: product.category, 
           type: 'PACKAGED_COFFEE', 
-          size: template!.sizeLabel,
-          price: product!.basePrice, 
+          size: template.sizeLabel,
+          price: product.basePrice, 
           stock: qty, 
           batch_id: showProductionModal.id, 
-          product_id: product!.id,
-          sku_prefix: template!.skuPrefix, 
-          image: product!.image || 'https://picsum.photos/seed/coffee/200/200',
+          product_id: product.id,
+          sku_prefix: template.skuPrefix, 
+          image: product.image || 'https://picsum.photos/seed/coffee/200/200',
           location_id: productionDates.targetLocationId,
           expiry_date: expiry
         });
       }
 
-      await supabase.from('roasting_batches').update({
+      const { error: batchUpdateError } = await supabase.from('roasting_batches').update({
         packaging_units: [...showProductionModal.packagingUnits, ...newUnits],
         history: [...showProductionModal.history, { 
           timestamp: now.toLocaleString(), 
@@ -251,9 +264,11 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
           details: `Batch Packaged: ${newUnits.length} items. Total Weight: ${totalBatchPackagingWeightNeeded.toFixed(2)}kg.` 
         }]
       }).eq('id', showProductionModal.id);
+      if (batchUpdateError) throw batchUpdateError;
 
       if (inventoryItemsToInsert.length > 0) {
-        await supabase.from('inventory_items').insert(inventoryItemsToInsert);
+        const { error: inventoryInsertError } = await supabase.from('inventory_items').insert(inventoryItemsToInsert);
+        if (inventoryInsertError) throw inventoryInsertError;
         
         // --- Thermal Receipt Integration ---
         // Prepare production data for the thermal receipt module
@@ -320,8 +335,10 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
         alert(t.insufficientStock);
         return;
       }
-      await supabase.from('roasting_batches').insert([payload]);
-      await supabase.from('green_beans').update({ quantity: (freshBean.quantity || 0) - pre }).eq('id', selectedBean.id);
+      const { error: batchInsertError } = await supabase.from('roasting_batches').insert([payload]);
+      if (batchInsertError) throw batchInsertError;
+      const { error: greenBeanUpdateError } = await supabase.from('green_beans').update({ quantity: (freshBean.quantity || 0) - pre }).eq('id', selectedBean.id);
+      if (greenBeanUpdateError) throw greenBeanUpdateError;
       const { error: movementError } = await supabase.from('green_bean_movements').insert({
         bean_id: selectedBean.id,
         batch_reference: batchCode,
