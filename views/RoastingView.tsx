@@ -372,16 +372,20 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
       details: t.batchOutputRecorded.replace('{weight}', post.toString()).replace('{waste}', waste.toFixed(2)) 
     };
     try {
-      await supabase.from('roasting_batches').update({
+      const { error: finishError } = await supabase.from('roasting_batches').update({
         post_weight: post, waste_percentage: parseFloat(waste.toFixed(2)), status: BatchStatus.COMPLETED,
         history: [...batch.history, historyEntry]
       }).eq('id', batchId);
+      if (finishError) throw finishError;
       fetchData();
       setFinishingBatchId(null);
       setPostWeightInput('');
       setShowSuccess(true);
       setSuccessMsg(t.roastCompleted);
       setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err) {
+      console.error(err);
+      alert(t.productionSyncFailed);
     } finally { setIsSaving(false); }
   };
 
@@ -401,28 +405,32 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
         .eq('id', batch.beanId)
         .single();
       if (beanError || !freshBean) throw beanError;
-      await supabase.from('green_beans')
+      const { error: restoreError } = await supabase.from('green_beans')
         .update({ quantity: (freshBean.quantity || 0) + batch.preWeight })
         .eq('id', batch.beanId);
-      await supabase.from('green_bean_movements')
+      if (restoreError) throw restoreError;
+      const { error: movementDeleteError } = await supabase.from('green_bean_movements')
         .delete()
         .eq('batch_reference', batch.id);
+      if (movementDeleteError) throw movementDeleteError;
       const historyEntry = {
         timestamp: new Date().toLocaleString(),
         action: 'DELETE',
         operator: user?.name || 'System',
         details: `Batch cancelled. Restored ${batch.preWeight}kg to green beans`
       };
-      await supabase.from('roasting_batches').update({
+      const { error: cancelError } = await supabase.from('roasting_batches').update({
         status: BatchStatus.DELETED,
         history: [...batch.history, historyEntry]
       }).eq('id', batch.id);
+      if (cancelError) throw cancelError;
       fetchData();
       setShowSuccess(true);
       setSuccessMsg(t.batchCancelled);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err) {
       console.error(err);
+      alert(t.productionSyncFailed);
     } finally {
       setIsSaving(false);
     }
