@@ -446,15 +446,20 @@ const ConfigurationView: React.FC = () => {
         is_active: roastProfileForm.isActive
       };
       if (editingRoastProfileId) {
-        await supabase.from('roast_profiles').update(payload).eq('id', editingRoastProfileId);
+        const { error } = await supabase.from('roast_profiles').update(payload).eq('id', editingRoastProfileId);
+        if (error) throw error;
       } else {
-        await supabase.from('roast_profiles').insert([payload]);
+        const { error } = await supabase.from('roast_profiles').insert([payload]);
+        if (error) throw error;
       }
       await fetchInitialData();
       resetRoastProfileForm();
       setShowSuccess(true);
       setSuccessMsg(t.saveSuccess);
       setTimeout(() => setShowSuccess(false), 2000);
+    } catch (error) {
+      console.error('Failed to save roast profile:', error);
+      alert(t.actionFailed);
     } finally {
       setIsSaving(false);
     }
@@ -520,8 +525,12 @@ const ConfigurationView: React.FC = () => {
     setIsSaving(true);
     try {
       const nextActive = !(profile.is_active ?? true);
-      await supabase.from('roast_profiles').update({ is_active: nextActive }).eq('id', profile.id);
+      const { error } = await supabase.from('roast_profiles').update({ is_active: nextActive }).eq('id', profile.id);
+      if (error) throw error;
       setRoastProfiles(prev => prev.map(item => item.id === profile.id ? { ...item, is_active: nextActive } : item));
+    } catch (error) {
+      console.error('Failed to toggle roast profile:', error);
+      alert(t.actionFailed);
     } finally {
       setIsSaving(false);
     }
