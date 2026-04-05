@@ -70,39 +70,41 @@ const CRMView: React.FC<CRMViewProps> = () => {
 
   const handleSaveCustomer = async () => {
     try {
+      const customerData = {
+        name: formData.name,
+        phone: formData.phone,
+        email: formData.email || null,
+        notes: formData.notes || null,
+      };
+
       if (editingCustomer) {
         const { error } = await supabase
           .from('customers')
-          .update({
-            full_name: formData.name,
-            phone: formData.phone,
-            email: formData.email,
-            notes: formData.notes,
-            last_edited_by_name: user?.name || 'Unknown',
-          })
+          .update(customerData)
           .eq('id', editingCustomer.id);
         
-        if (error) throw error;
+        if (error) {
+          console.error('Update error details:', error);
+          throw error;
+        }
       } else {
         const { error } = await supabase
           .from('customers')
-          .insert([{
-            full_name: formData.name,
-            phone: formData.phone,
-            email: formData.email,
-            notes: formData.notes,
-            last_edited_by_name: user?.name || 'Unknown',
-          }]);
+          .insert([customerData]);
         
-        if (error) throw error;
+        if (error) {
+          console.error('Insert error details:', error);
+          throw error;
+        }
       }
 
       fetchCustomers();
       setShowAddModal(false);
       setEditingCustomer(null);
       setFormData({ name: '', phone: '', email: '', notes: '' });
-    } catch (error) {
-      console.error('Error saving customer:', error);
+    } catch (error: any) {
+      console.error('Error saving customer:', error?.message || error);
+      alert(error?.message || 'Failed to save customer. Check console for details.');
     }
   };
 
