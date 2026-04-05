@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
-import { LayoutDashboard, Flame, Package, ClipboardList, ShoppingCart, BarChart3, Menu, X, Coffee, BrainCircuit, Languages, Sun, Moon, Keyboard, ChevronRight, ChevronLeft, Zap, UserCircle, LogOut, Clock, AlertTriangle, Settings, Loader2, Users, DollarSign, TrendingUp } from 'lucide-react';
+import { LayoutDashboard, Flame, Package, ClipboardList, ShoppingCart, BarChart3, Menu, X, Coffee, BrainCircuit, Languages, Sun, Moon, Keyboard, ChevronRight, ChevronLeft, Zap, UserCircle, LogOut, Clock, AlertTriangle, Settings, Loader2, Users, DollarSign, TrendingUp, User } from 'lucide-react';
 import DashboardView from './views/DashboardView';
 import RoastingView from './views/RoastingView';
 import InventoryView from './views/InventoryView';
@@ -13,9 +13,25 @@ import StaffView from './views/StaffView';
 import BranchPerformanceView from './views/BranchPerformanceView';
 import BranchFinancialsView from './views/BranchFinancialsView';
 import CRMView from './views/CRMView';
+import ProfileView from './views/ProfileView';
 import { translations, Language } from './translations';
 import { UserRole } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useRoleGuard } from './hooks/useRoleGuard';
+import { AccessDeniedToast } from './components/common/AccessDeniedToast';
+
+type TabId = 'dashboard' | 'staff' | 'roasting' | 'inventory' | 'pos' | 'reports' | 'branchPerformance' | 'branchFinancials' | 'crm' | 'ai' | 'configuration' | 'profile';
+
+const getDefaultTab = (role: UserRole): TabId => {
+  switch (role) {
+    case UserRole.CASHIER:
+      return 'pos';
+    case UserRole.ADMIN:
+    case UserRole.MANAGER:
+    default:
+      return 'dashboard';
+  }
+};
 
 interface LanguageContextType {
   lang: Language;
@@ -50,7 +66,7 @@ const AppContent: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { user, isAuthenticated, isLoading, logout, sessionExpiresAt, refreshSession, error } = useAuth();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'staff' | 'roasting' | 'inventory' | 'pos' | 'reports' | 'branchPerformance' | 'branchFinancials' | 'crm' | 'ai' | 'configuration'>(() => (localStorage.getItem('activeTab') as any) || 'dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'staff' | 'roasting' | 'inventory' | 'pos' | 'reports' | 'branchPerformance' | 'branchFinancials' | 'crm' | 'ai' | 'configuration' | 'profile'>(() => (localStorage.getItem('activeTab') as any) || 'dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -59,32 +75,41 @@ const AppContent: React.FC = () => {
   const [activeDetailId, setActiveDetailId] = useState<string | null>(null);
 
   const allMenuItems = [
-    { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR, UserRole.ROASTER, UserRole.CASHIER, UserRole.WAREHOUSE_STAFF] },
+    { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR, UserRole.ROASTER, UserRole.WAREHOUSE_STAFF] },
     { id: 'staff', label: t.staff, icon: Users, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR] },
     { id: 'roasting', label: t.roasting, icon: Flame, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER] },
-    { id: 'inventory', label: t.inventory, icon: ClipboardList, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER, UserRole.CASHIER, UserRole.WAREHOUSE_STAFF] },
+    { id: 'inventory', label: t.inventory, icon: ClipboardList, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER, UserRole.WAREHOUSE_STAFF] },
     { id: 'pos', label: t.pos, icon: ShoppingCart, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.CASHIER] },
-    { id: 'reports', label: t.reports, icon: BarChart3, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR] },
+    { id: 'reports', label: t.reports, icon: BarChart3, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR, UserRole.CASHIER] },
     { id: 'branchPerformance', label: t.branchPerformance || 'Branch Performance', icon: TrendingUp, roles: [UserRole.ADMIN, UserRole.MANAGER] },
     { id: 'branchFinancials', label: t.branchFinancials || 'Branch Financials', icon: DollarSign, roles: [UserRole.ADMIN, UserRole.MANAGER] },
     { id: 'crm', label: t.crm || 'CRM', icon: Users, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.CASHIER] },
     { id: 'ai', label: t.ai, icon: BrainCircuit, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-    { id: 'configuration', label: t.configuration, icon: Settings, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER, UserRole.CASHIER, UserRole.WAREHOUSE_STAFF] },
+    { id: 'configuration', label: t.configuration, icon: Settings, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER, UserRole.WAREHOUSE_STAFF] },
+    { id: 'profile', label: t.profile, icon: User, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR, UserRole.ROASTER, UserRole.CASHIER, UserRole.WAREHOUSE_STAFF] },
   ];
 
   const userRole = user?.role || UserRole.CASHIER;
   const toggleLang = () => setLang(lang === 'ar' ? 'en' : 'ar');
   const menuItems = allMenuItems.filter(item => item.roles.includes(userRole));
 
+  const currentMenuRoles = allMenuItems.find(m => m.id === activeTab)?.roles ?? [];
+  const { isAllowed, toastMessage, denyAccess, dismissToast } = useRoleGuard(currentMenuRoles);
+
   // Guard against unauthorized tab access (e.g. from localStorage or manually switching state)
   useEffect(() => {
-    if (isAuthenticated && user) {
-      const isAllowed = allMenuItems.find(i => i.id === activeTab)?.roles.includes(user.role);
-      if (!isAllowed) {
-        setActiveTab('dashboard');
-      }
+    if (!user) return;
+
+    const allowedMenuIds = allMenuItems
+      .filter(item => item.roles.includes(user.role))
+      .map(item => item.id);
+
+    if (!allowedMenuIds.includes(activeTab)) {
+      const fallback = getDefaultTab(user.role);
+      setActiveTab(fallback);
+      denyAccess(t.accessRestricted);
     }
-  }, [activeTab, isAuthenticated, user]);
+  }, [activeTab, user?.role]);
 
   useEffect(() => {
     if (sessionExpiresAt) {
@@ -370,20 +395,26 @@ const AppContent: React.FC = () => {
             {activeTab === 'crm' && <CRMView />}
             {activeTab === 'ai' && <AIInsights />}
             {activeTab === 'configuration' && <ConfigurationView />}
+            {activeTab === 'profile' && <ProfileView />}
           </div>
         </div>
       </main>
+      {toastMessage && (
+        <AccessDeniedToast message={toastMessage} onDismiss={dismissToast} />
+      )}
     </div>
   );
 };
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('lang') as Language) || 'ar');
-  const theme = 'light';
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'light');
   
   const t = translations[lang];
 
-  const toggleTheme = () => {};
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+  };
 
   return (
     <AuthProvider>

@@ -37,6 +37,11 @@ alter table locations add column if not exists commercial_license_expiry date;
 alter table locations add column if not exists logo_url text;
 alter table locations add column if not exists exterior_photo_url text;
 alter table locations add column if not exists interior_photo_url text;
+alter table locations add column if not exists service_level_target numeric check (service_level_target >= 0 and service_level_target <= 100) default 95;
+alter table locations add column if not exists replenishment_frequency text check (replenishment_frequency in ('DAILY', 'WEEKLY', 'BI_WEEKLY')) default 'WEEKLY';
+alter table locations add column if not exists lead_time_from_hub_days integer check (lead_time_from_hub_days >= 0) default 1;
+alter table locations add column if not exists emergency_priority_level text check (emergency_priority_level in ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL')) default 'MEDIUM';
+alter table locations add column if not exists branch_category text check (branch_category in ('HIGH_VELOCITY', 'MEDIUM_VELOCITY', 'LOW_VELOCITY')) default 'MEDIUM_VELOCITY';
 
 create unique index if not exists locations_code_unique on locations(code) where code is not null;
 create unique index if not exists locations_hq_unique on locations(is_hq) where is_hq = true;
@@ -389,6 +394,24 @@ create table if not exists accounting_entries (
   credit_account text,
   batch_id text
 );
+
+create table if not exists sku_branch_policies (
+  id uuid default gen_random_uuid() primary key,
+  branch_location_id uuid not null references locations(id) on delete cascade,
+  product_id uuid not null references product_definitions(id) on delete cascade,
+  min_stock numeric,
+  reorder_threshold numeric,
+  safety_stock numeric,
+  transfer_unit text,
+  shelf_life_days integer,
+  consumption_classification text check (consumption_classification in ('FAST_MOVING', 'SLOW_MOVING')),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now(),
+  unique (branch_location_id, product_id)
+);
+
+create index if not exists sku_branch_policies_branch_idx on sku_branch_policies(branch_location_id);
+create index if not exists sku_branch_policies_product_idx on sku_branch_policies(product_id);
 alter table accounting_entries add column if not exists stock_adjustment_id uuid;
 alter table accounting_entries add column if not exists transaction_id text;
 alter table accounting_entries add column if not exists debit_account text;
@@ -965,6 +988,15 @@ create policy "Warehouse update inventory items" on inventory_items for update u
 create policy "Warehouse insert inventory items" on inventory_items for insert with check (current_user_is_warehouse_staff() and current_user_can_access_location(location_id));
 create policy "Warehouse delete inventory items" on inventory_items for delete using (current_user_is_warehouse_staff() and current_user_can_access_location(location_id));
 
+alter table sku_branch_policies enable row level security;
+drop policy if exists "Auth read sku branch policies" on sku_branch_policies;
+drop policy if exists "Warehouse manage sku branch policies" on sku_branch_policies;
+create policy "Auth read sku branch policies" on sku_branch_policies
+for select using (current_user_can_access_location(branch_location_id));
+create policy "Warehouse manage sku branch policies" on sku_branch_policies
+for all using (current_user_is_warehouse_staff() and current_user_can_access_location(branch_location_id))
+with check (current_user_is_warehouse_staff() and current_user_can_access_location(branch_location_id));
+
 drop trigger if exists inventory_movement_log on inventory_items;
 create trigger inventory_movement_log
 after update of stock on inventory_items
@@ -984,6 +1016,127 @@ select
   i.expiry_date,
   i.last_movement_at
 from inventory_items i;
+
+create or replace view network_stock_visibility as
+with transfer_lines as (
+  select
+    st.id as transfer_id,
+    st.status,
+    st.source_location_id,
+    st.destination_location_id,
+    (line->>'itemId')::uuid as inventory_item_id,
+    coalesce((line->>'quantity')::numeric, 0) as quantity
+  from stock_transfers st
+  left join lateral jsonb_array_elements(coalesce(st.manifest, '[]'::jsonb)) as line on true
+  where st.status in ('APPROVED', 'IN_TRANSIT')
+),
+in_transit_in as (
+  select
+    tl.destination_location_id as location_id,
+    i.product_id,
+    sum(tl.quantity) as in_transit_in_qty
+  from transfer_lines tl
+  left join inventory_items i on i.id = tl.inventory_item_id
+  group by tl.destination_location_id, i.product_id
+),
+in_transit_out as (
+  select
+    tl.source_location_id as location_id,
+    i.product_id,
+    sum(tl.quantity) as in_transit_out_qty
+  from transfer_lines tl
+  left join inventory_items i on i.id = tl.inventory_item_id
+  group by tl.source_location_id, i.product_id
+)
+select
+  pls.location_id,
+  l.name as location_name,
+  l.type as location_type,
+  l.is_hq,
+  pls.product_id,
+  pls.product_name,
+  sum(pls.stock) as on_hand_qty,
+  coalesce(itin.in_transit_in_qty, 0) as in_transit_in_qty,
+  coalesce(itout.in_transit_out_qty, 0) as in_transit_out_qty
+from product_location_stock pls
+join locations l on l.id = pls.location_id
+left join in_transit_in itin
+  on itin.location_id = pls.location_id
+ and itin.product_id is not distinct from pls.product_id
+left join in_transit_out itout
+  on itout.location_id = pls.location_id
+ and itout.product_id is not distinct from pls.product_id
+group by
+  pls.location_id, l.name, l.type, l.is_hq,
+  pls.product_id, pls.product_name,
+  itin.in_transit_in_qty, itout.in_transit_out_qty;
+
+create or replace view branch_coverage_status as
+with movement_daily as (
+  select
+    m.location_id,
+    i.product_id,
+    m.created_at::date as movement_day,
+    sum(abs(m.quantity)) as consumed_qty
+  from inventory_movements m
+  join inventory_items i on i.id = m.inventory_item_id
+  where m.quantity < 0
+    and m.movement_type in ('SALE', 'TRANSFER_OUT', 'ADJUSTMENT')
+    and m.created_at >= now() - interval '30 days'
+  group by m.location_id, i.product_id, m.created_at::date
+),
+avg_consumption as (
+  select
+    location_id,
+    product_id,
+    coalesce(sum(consumed_qty) / nullif(count(distinct movement_day), 0), 0) as avg_daily_consumption
+  from movement_daily
+  group by location_id, product_id
+),
+stock_by_product as (
+  select
+    pls.location_id,
+    pls.product_id,
+    sum(pls.stock) as current_stock
+  from product_location_stock pls
+  group by pls.location_id, pls.product_id
+)
+select
+  sbp.location_id,
+  l.name as location_name,
+  sbp.product_id,
+  pd.name as product_name,
+  sbp.current_stock,
+  coalesce(nsv.in_transit_in_qty, 0) as in_transit_qty,
+  coalesce(ac.avg_daily_consumption, 0) as avg_daily_consumption,
+  case
+    when coalesce(ac.avg_daily_consumption, 0) <= 0 then null
+    else sbp.current_stock / nullif(ac.avg_daily_consumption, 0)
+  end as days_of_coverage,
+  coalesce(l.service_level_target, 95) as service_level_target,
+  coalesce(l.lead_time_from_hub_days, 1) as lead_time_from_hub_days,
+  case
+    when sbp.current_stock <= 0 then true
+    when coalesce(ac.avg_daily_consumption, 0) <= 0 then false
+    else (sbp.current_stock / nullif(ac.avg_daily_consumption, 0)) <= greatest(1, coalesce(l.lead_time_from_hub_days, 1))
+  end as stockout_risk,
+  case
+    when coalesce(ac.avg_daily_consumption, 0) <= 0 then sbp.current_stock > coalesce(sbp2.safety_stock, 0) * 3 and coalesce(sbp2.safety_stock, 0) > 0
+    else (sbp.current_stock / nullif(ac.avg_daily_consumption, 0)) > greatest(7, coalesce(l.lead_time_from_hub_days, 1) * 4)
+  end as overstock_risk,
+  case
+    when coalesce(ac.avg_daily_consumption, 0) <= 0 then false
+    else (sbp.current_stock / nullif(ac.avg_daily_consumption, 0)) < greatest(
+      1,
+      coalesce(l.lead_time_from_hub_days, 1) * (coalesce(l.service_level_target, 95) / 100.0)
+    )
+  end as coverage_below_service_target
+from stock_by_product sbp
+join locations l on l.id = sbp.location_id and l.type = 'BRANCH'
+left join product_definitions pd on pd.id = sbp.product_id
+left join avg_consumption ac on ac.location_id = sbp.location_id and ac.product_id is not distinct from sbp.product_id
+left join network_stock_visibility nsv on nsv.location_id = sbp.location_id and nsv.product_id is not distinct from sbp.product_id
+left join sku_branch_policies sbp2 on sbp2.branch_location_id = sbp.location_id and sbp2.product_id = sbp.product_id;
 
 create or replace view low_stock_report as
 select

@@ -51,7 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       case UserRole.ROASTER:
         return ['can_roast', 'can_edit_stock'];
       case UserRole.CASHIER:
-        return ['can_sell', 'can_view_reports'];
+        return ['can_sell', 'can_view_own_stats', 'can_manage_shift'];
       case UserRole.WAREHOUSE_STAFF:
         return ['can_edit_stock'];
       default:
