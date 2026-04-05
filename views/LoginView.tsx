@@ -152,7 +152,13 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
             viewMode === 'forgotPassword' ? renderForgotPassword() : (
               <>
                   <div className="text-center mb-8">
-                    <div className="w-16 h-16 bg-white  rounded-2xl flex items-center justify-center text-orange-600  mx-auto mb-4 border-2 border-orange-600 "><Coffee size={40} /></div>
+                    <div className="mx-auto mb-4 w-32 h-32 rounded-[2rem] shadow-2xl overflow-hidden border-4 border-orange-100">
+                      <img
+                        src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=400&q=80"
+                        alt="Roastery hero"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
                     <h2 className="text-3xl font-bold text-black  mb-2">{t.welcomeBack}</h2>
                     <p className="text-black  text-sm">{t.loginToManage}</p>
                   </div>

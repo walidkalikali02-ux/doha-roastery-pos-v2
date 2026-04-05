@@ -657,25 +657,29 @@ const POSView: React.FC = () => {
       });
 
       const transactionData = {
-        id: invoiceNo,
+        id: crypto.randomUUID(),
+        location_id: selectedLocationId || null,
         items: enrichedItems,
         subtotal: totals.subtotal,
         vat_amount: totals.vat,
         total: totals.total,
-        location_id: selectedLocationId || null,
         payment_method: paymentMethod,
         payment_breakdown: breakdown || null,
-        // REQ-003: Record payment reference for card transactions
         card_reference: paymentMethod === 'CARD' ? cardReference : (breakdown?.card_reference || null),
         user_id: validUserId,
         cashier_name: user?.name || 'Cashier',
         received_amount: receivedAmount || totals.total,
         change_amount: change,
-        created_at: now.toISOString(),
-        timestamp: now.toISOString()
+        created_at: now.toISOString()
       };
 
-      await supabase.from('transactions').insert([transactionData]);
+      const { error: txError } = await supabase.from('transactions').insert([transactionData]);
+      if (txError) {
+        console.error('Transaction insert failed:', txError);
+        alert('Failed to record sale: ' + txError.message);
+        setIsProcessing(false);
+        return;
+      }
 
       const { data: allInv } = await supabase
         .from('inventory_items')

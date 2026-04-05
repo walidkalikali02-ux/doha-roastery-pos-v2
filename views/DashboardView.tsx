@@ -138,6 +138,23 @@ const DashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
+      <section className="relative overflow-hidden rounded-[32px] border border-orange-100 shadow-sm">
+        <img
+          src="https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=crop&w=1800&q=80"
+          alt="Doha Roastery hero"
+          className="h-48 w-full object-cover md:h-64"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/30 to-transparent" />
+        <div className="absolute inset-0 flex items-end p-6 md:p-8">
+          <div className="max-w-xl text-white">
+            <h1 className="text-2xl font-black md:text-4xl">{t.appName}</h1>
+            <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-100 md:text-sm">
+              {t.weeklyAnalysis} • {t.roastingActivity}
+            </p>
+          </div>
+        </div>
+      </section>
+
       {stats.lowStockCount > 0 && (
         <div className="bg-white border-2 border-orange-600 p-4 md:p-5 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4 animate-pulse-once transition-colors">
           <div className="flex items-center gap-4 text-black">

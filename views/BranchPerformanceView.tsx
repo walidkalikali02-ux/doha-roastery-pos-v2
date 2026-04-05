@@ -10,6 +10,7 @@ interface BranchStats {
   totalTransactions: number;
   avgTransactionValue: number;
   topProducts: Array<{ name: string; quantity: number; revenue: number }>;
+  cashierSales: Array<{ cashier_name: string; sales_count: number; total_amount: number }>;
   staffCount: number;
   growth: number;
 }
@@ -55,10 +56,45 @@ const BranchPerformanceView: React.FC = () => {
 
       const { data: transactions } = await supabase
         .from('transactions')
-        .select('*, transaction_items(*)')
+        .select('*')
         .gte('created_at', dateFrom);
 
       const { data: staff } = await supabase.from('staff').select('id, location_id');
+
+      const allStats: BranchStats = {
+        id: 'all',
+        name: 'All Branches',
+        totalSales: 0,
+        totalTransactions: 0,
+        avgTransactionValue: 0,
+        topProducts: [],
+        cashierSales: [],
+        staffCount: 0,
+        growth: 0
+      };
+
+      const cashierSalesMapAll = new Map<string, { count: number; total: number }>();
+      
+      (transactions || []).forEach((t: any) => {
+        allStats.totalSales += t.total || 0;
+        allStats.totalTransactions += 1;
+        const name = t.cashier_name || 'Unknown';
+        const existing = cashierSalesMapAll.get(name) || { count: 0, total: 0 };
+        cashierSalesMapAll.set(name, {
+          count: existing.count + 1,
+          total: existing.total + (t.total || 0)
+        });
+      });
+      
+      allStats.avgTransactionValue = allStats.totalTransactions > 0 
+        ? allStats.totalSales / allStats.totalTransactions : 0;
+      allStats.cashierSales = Array.from(cashierSalesMapAll.entries())
+        .map(([cashier_name, data]) => ({
+          cashier_name,
+          sales_count: data.count,
+          total_amount: data.total
+        }))
+        .sort((a, b) => b.total_amount - a.total_amount);
 
       const stats: BranchStats[] = locations.map(location => {
         const locationTransactions = (transactions || []).filter(
@@ -86,6 +122,24 @@ const BranchPerformanceView: React.FC = () => {
           .sort((a, b) => b.revenue - a.revenue)
           .slice(0, 5);
 
+        const cashierSalesMap = new Map<string, { count: number; total: number }>();
+        locationTransactions.forEach((t: any) => {
+          const name = t.cashier_name || 'Unknown';
+          const existing = cashierSalesMap.get(name) || { count: 0, total: 0 };
+          cashierSalesMap.set(name, {
+            count: existing.count + 1,
+            total: existing.total + (t.total || 0)
+          });
+        });
+
+        const cashierSales = Array.from(cashierSalesMap.entries())
+          .map(([cashier_name, data]) => ({
+            cashier_name,
+            sales_count: data.count,
+            total_amount: data.total
+          }))
+          .sort((a, b) => b.total_amount - a.total_amount);
+
         const growth = Math.random() * 30 - 10;
 
         return {
@@ -95,12 +149,13 @@ const BranchPerformanceView: React.FC = () => {
           totalTransactions,
           avgTransactionValue,
           topProducts,
+          cashierSales,
           staffCount: locationStaff.length,
           growth
         };
       });
 
-      setBranchStats(stats);
+      setBranchStats([allStats, ...stats]);
     } catch (error) {
       console.error('Error fetching branch performance:', error);
     } finally {
@@ -330,6 +385,26 @@ const BranchPerformanceView: React.FC = () => {
                     </div>
                   </div>
                 ))
+              )}
+            </div>
+            
+            <h4 className="font-bold text-black mt-6 mb-3 pt-4 border-t border-gray-100 flex items-center gap-2">
+              <Users size={18} className="text-green-600" />
+              {t.cashierSales || 'Cashier Sales'}
+            </h4>
+            <div className="space-y-2">
+              {branch.cashierSales && branch.cashierSales.length > 0 ? (
+                branch.cashierSales.map((cs, idx) => (
+                  <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                    <div>
+                      <span className="font-medium text-black">{cs.cashier_name}</span>
+                      <span className="text-xs text-gray-500 mr-2">({cs.sales_count} {t.sales || 'sales'})</span>
+                    </div>
+                    <span className="font-bold text-green-600">{cs.total_amount.toFixed(2)} QAR</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-gray-500 text-sm">{t.noCashierData || 'No cashier data'}</p>
               )}
             </div>
           </div>

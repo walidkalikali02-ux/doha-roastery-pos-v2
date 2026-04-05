@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
 import { useLanguage } from '../App';
+import { useAuth } from '../contexts/AuthContext';
+import { UserRole } from '../types';
 import { Users, Search, Plus, Phone, Mail, Star, ShoppingCart, TrendingUp, Edit, Trash2, X } from 'lucide-react';
 
 interface Customer {
@@ -8,20 +10,18 @@ interface Customer {
   name: string;
   phone?: string;
   email?: string;
-  loyalty_points?: number;
-  total_spent?: number;
-  visit_count?: number;
-  last_visit?: string;
-  created_at?: string;
   notes?: string;
-  tier: 'bronze' | 'silver' | 'gold' | 'platinum';
+  is_active?: boolean;
+  created_at?: string;
+  created_by?: string;
 }
 
 interface CRMViewProps {}
 
 const CRMView: React.FC<CRMViewProps> = () => {
   const { t, lang } = useLanguage();
-  type CustomerTier = Customer['tier'];
+  const { user } = useAuth();
+  const canDelete = user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -32,13 +32,11 @@ const CRMView: React.FC<CRMViewProps> = () => {
     phone: string;
     email: string;
     notes: string;
-    tier: CustomerTier;
   }>({
     name: '',
     phone: '',
     email: '',
     notes: '',
-    tier: 'bronze'
   });
 
   useEffect(() => {
@@ -50,12 +48,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
     name: row?.full_name || row?.name || '',
     phone: row?.phone || '',
     email: row?.email || '',
-    loyalty_points: Number(row?.loyalty_points) || 0,
-    total_spent: Number(row?.total_spent) || 0,
-    visit_count: Number(row?.visit_count) || 0,
-    last_visit: row?.last_visit_date || row?.last_visit || '',
     notes: row?.notes || '',
-    tier: (row?.tier || 'bronze') as Customer['tier']
   });
 
   const fetchCustomers = async () => {
@@ -85,7 +78,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
             phone: formData.phone,
             email: formData.email,
             notes: formData.notes,
-            tier: formData.tier
+            last_edited_by_name: user?.name || 'Unknown',
           })
           .eq('id', editingCustomer.id);
         
@@ -98,10 +91,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
             phone: formData.phone,
             email: formData.email,
             notes: formData.notes,
-            tier: formData.tier,
-            loyalty_points: 0,
-            total_spent: 0,
-            visit_count: 0
+            last_edited_by_name: user?.name || 'Unknown',
           }]);
         
         if (error) throw error;
@@ -110,7 +100,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
       fetchCustomers();
       setShowAddModal(false);
       setEditingCustomer(null);
-      setFormData({ name: '', phone: '', email: '', notes: '', tier: 'bronze' });
+      setFormData({ name: '', phone: '', email: '', notes: '' });
     } catch (error) {
       console.error('Error saving customer:', error);
     }
@@ -123,7 +113,6 @@ const CRMView: React.FC<CRMViewProps> = () => {
       phone: customer.phone || '',
       email: customer.email || '',
       notes: customer.notes || '',
-      tier: customer.tier || 'bronze'
     });
     setShowAddModal(true);
   };
@@ -153,15 +142,6 @@ const CRMView: React.FC<CRMViewProps> = () => {
   });
 
   const totalCustomers = customers.length;
-  const totalRevenue = customers.reduce((sum, c) => sum + (c.total_spent || 0), 0);
-  const avgSpent = totalCustomers > 0 ? totalRevenue / totalCustomers : 0;
-
-  const tierColors: Record<CustomerTier, string> = {
-    bronze: 'bg-amber-100 text-amber-700',
-    silver: 'bg-gray-100 text-gray-700',
-    gold: 'bg-yellow-100 text-yellow-700',
-    platinum: 'bg-purple-100 text-purple-700'
-  };
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
@@ -179,7 +159,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
         <button
           onClick={() => {
             setEditingCustomer(null);
-            setFormData({ name: '', phone: '', email: '', notes: '', tier: 'bronze' });
+            setFormData({ name: '', phone: '', email: '', notes: '' });
             setShowAddModal(true);
           }}
           className="bg-purple-600 text-white px-6 py-3 rounded-2xl font-bold flex items-center gap-2 shadow-lg hover:bg-purple-700 transition-all"
@@ -189,54 +169,14 @@ const CRMView: React.FC<CRMViewProps> = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">{t.totalCustomers || 'Total Customers'}</p>
-              <p className="text-2xl font-bold text-black mt-1">{totalCustomers}</p>
-            </div>
-            <div className="p-3 bg-purple-100 rounded-xl">
-              <Users className="text-purple-600" size={24} />
-            </div>
+      <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-bold text-gray-500 uppercase">{t.totalCustomers || 'Total Customers'}</p>
+            <p className="text-2xl font-bold text-black mt-1">{totalCustomers}</p>
           </div>
-        </div>
-        
-        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">{t.totalRevenue || 'Total Revenue'}</p>
-              <p className="text-2xl font-bold text-black mt-1">{totalRevenue.toFixed(2)} QAR</p>
-            </div>
-            <div className="p-3 bg-green-100 rounded-xl">
-              <ShoppingCart className="text-green-600" size={24} />
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">{t.avgSpent || 'Avg. Spent'}</p>
-              <p className="text-2xl font-bold text-black mt-1">{avgSpent.toFixed(2)} QAR</p>
-            </div>
-            <div className="p-3 bg-blue-100 rounded-xl">
-              <TrendingUp className="text-blue-600" size={24} />
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">{t.loyaltyPoints || 'Loyalty Points'}</p>
-              <p className="text-2xl font-bold text-black mt-1">
-                {customers.reduce((sum, c) => sum + (c.loyalty_points || 0), 0).toLocaleString()}
-              </p>
-            </div>
-            <div className="p-3 bg-orange-100 rounded-xl">
-              <Star className="text-orange-600" size={24} />
-            </div>
+          <div className="p-3 bg-purple-100 rounded-xl">
+            <Users className="text-purple-600" size={24} />
           </div>
         </div>
       </div>
@@ -261,18 +201,13 @@ const CRMView: React.FC<CRMViewProps> = () => {
               <tr className="bg-gray-50">
                 <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.customer || 'Customer'}</th>
                 <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.contact || 'Contact'}</th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.tier || 'Tier'}</th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.loyaltyPoints || 'Points'}</th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.totalSpent || 'Total Spent'}</th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.visits || 'Visits'}</th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.lastVisit || 'Last Visit'}</th>
                 <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.actions || 'Actions'}</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center">
+                  <td colSpan={3} className="p-8 text-center">
                     <div className="flex justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
                     </div>
@@ -280,7 +215,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
                 </tr>
               ) : filteredCustomers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-8 text-center text-gray-500">
+                  <td colSpan={3} className="p-8 text-center text-gray-500">
                     {t.noCustomers || 'No customers found'}
                   </td>
                 </tr>
@@ -312,26 +247,6 @@ const CRMView: React.FC<CRMViewProps> = () => {
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold capitalize ${tierColors[customer.tier || 'bronze']}`}>
-                        {customer.tier || 'bronze'}
-                      </span>
-                    </td>
-                    <td className="p-4">
-                      <span className="font-bold text-orange-600">{customer.loyalty_points || 0}</span>
-                    </td>
-                    <td className="p-4">
-                      <span className="font-bold text-black font-mono">{(customer.total_spent || 0).toFixed(2)}</span>
-                      <span className="text-gray-500 text-xs mr-1">QAR</span>
-                    </td>
-                    <td className="p-4">
-                      <span className="font-bold text-black">{customer.visit_count || 0}</span>
-                    </td>
-                    <td className="p-4">
-                      <span className="text-sm text-gray-600">
-                        {customer.last_visit ? new Date(customer.last_visit).toLocaleDateString() : '-'}
-                      </span>
-                    </td>
-                    <td className="p-4">
                       <div className="flex gap-2">
                         <button
                           onClick={() => handleEditCustomer(customer)}
@@ -339,12 +254,14 @@ const CRMView: React.FC<CRMViewProps> = () => {
                         >
                           <Edit size={16} />
                         </button>
-                        <button
-                          onClick={() => handleDeleteCustomer(customer.id)}
-                          className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                        {canDelete && (
+                          <button
+                            onClick={() => handleDeleteCustomer(customer.id)}
+                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -397,20 +314,6 @@ const CRMView: React.FC<CRMViewProps> = () => {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   className="w-full mt-1 px-4 py-3 rounded-2xl bg-gray-50 border-none outline-none focus:ring-2 focus:ring-purple-600"
                 />
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">{t.tier || 'Tier'}</label>
-                <select
-                  value={formData.tier}
-                  onChange={(e) => setFormData({ ...formData, tier: e.target.value as any })}
-                  className="w-full mt-1 px-4 py-3 rounded-2xl bg-gray-50 border-none outline-none focus:ring-2 focus:ring-purple-600"
-                >
-                  <option value="bronze">Bronze</option>
-                  <option value="silver">Silver</option>
-                  <option value="gold">Gold</option>
-                  <option value="platinum">Platinum</option>
-                </select>
               </div>
 
               <div>

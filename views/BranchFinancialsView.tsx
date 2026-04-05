@@ -17,6 +17,7 @@ interface FinancialData {
     other: number;
   };
   monthlyData: Array<{ month: string; revenue: number; cost: number }>;
+  cashierSales: Array<{ cashier_name: string; sales_count: number; total_amount: number }>;
 }
 
 const BranchFinancialsView: React.FC = () => {
@@ -92,6 +93,24 @@ const BranchFinancialsView: React.FC = () => {
           { month: 'Mar', revenue: revenue, cost: cost },
         ];
 
+        const cashierSalesMap = new Map<string, { count: number; total: number }>();
+        locationTransactions.forEach((t: any) => {
+          const name = t.cashier_name || 'Unknown';
+          const existing = cashierSalesMap.get(name) || { count: 0, total: 0 };
+          cashierSalesMap.set(name, {
+            count: existing.count + 1,
+            total: existing.total + (t.total || 0)
+          });
+        });
+
+        const cashierSales = Array.from(cashierSalesMap.entries())
+          .map(([cashier_name, data]) => ({
+            cashier_name,
+            sales_count: data.count,
+            total_amount: data.total
+          }))
+          .sort((a, b) => b.total_amount - a.total_amount);
+
         return {
           id: location.id,
           name: location.name,
@@ -100,7 +119,8 @@ const BranchFinancialsView: React.FC = () => {
           profit,
           margin,
           expenses,
-          monthlyData
+          monthlyData,
+          cashierSales
         };
       });
 
@@ -331,6 +351,23 @@ const BranchFinancialsView: React.FC = () => {
                   </div>
                 </div>
               </div>
+              
+              <h4 className="font-bold text-black mt-6 mb-3 pt-4 border-t border-gray-100">{t.cashierSales || 'Cashier Sales'}</h4>
+              {branch.cashierSales && branch.cashierSales.length > 0 ? (
+                <div className="space-y-2">
+                  {branch.cashierSales.map((cs, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                      <div>
+                        <span className="font-medium text-black">{cs.cashier_name}</span>
+                        <span className="text-xs text-gray-500 mr-2">({cs.sales_count} {t.sales || 'sales'})</span>
+                      </div>
+                      <span className="font-bold text-green-600">{cs.total_amount.toFixed(2)} QAR</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-gray-500 text-sm">{t.noCashierData || 'No cashier data'}</p>
+              )}
             </div>
           ))}
         </div>

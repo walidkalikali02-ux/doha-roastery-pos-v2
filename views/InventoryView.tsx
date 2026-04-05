@@ -124,6 +124,33 @@ interface InventoryCountEntry {
   notes?: string | null;
 }
 
+interface NetworkStockVisibilityRow {
+  location_id: string;
+  location_name: string;
+  location_type: 'WAREHOUSE' | 'BRANCH' | 'ROASTERY';
+  is_hq?: boolean;
+  product_id?: string | null;
+  on_hand_qty: number;
+  in_transit_in_qty: number;
+  in_transit_out_qty: number;
+}
+
+interface BranchCoverageRow {
+  location_id: string;
+  location_name: string;
+  product_id?: string | null;
+  product_name?: string | null;
+  current_stock: number;
+  in_transit_qty: number;
+  avg_daily_consumption: number;
+  days_of_coverage?: number | null;
+  service_level_target?: number | null;
+  lead_time_from_hub_days?: number | null;
+  stockout_risk: boolean;
+  overstock_risk: boolean;
+  coverage_below_service_target: boolean;
+}
+
 const InventoryView: React.FC = () => {
   const { lang, t } = useLanguage();
   const { user } = useAuth();
@@ -147,6 +174,8 @@ const InventoryView: React.FC = () => {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [countTasks, setCountTasks] = useState<InventoryCountTask[]>([]);
   const [countEntries, setCountEntries] = useState<InventoryCountEntry[]>([]);
+  const [networkVisibilityRows, setNetworkVisibilityRows] = useState<NetworkStockVisibilityRow[]>([]);
+  const [branchCoverageRows, setBranchCoverageRows] = useState<BranchCoverageRow[]>([]);
 
   const [adjustmentForm, setAdjustmentForm] = useState({
     locationId: '',
@@ -183,6 +212,11 @@ const InventoryView: React.FC = () => {
     logo_url: '',
     exterior_photo_url: '',
     interior_photo_url: '',
+    service_level_target: 95,
+    replenishment_frequency: 'WEEKLY',
+    lead_time_from_hub_days: 1,
+    emergency_priority_level: 'MEDIUM',
+    branch_category: 'MEDIUM_VELOCITY',
     contact_person_name: '',
     contact_person_phone: '',
     contact_person_email: '',
@@ -392,10 +426,11 @@ const InventoryView: React.FC = () => {
   }, [packagedItems, searchTerm]);
 
   const filteredCountTasks = useMemo(() => {
-    const term = searchTerm.toLowerCase();
+    const term = String(searchTerm || '').toLowerCase();
     return countTasks.filter(task => {
-      const locationName = locations.find(l => l.id === task.location_id)?.name || '';
-      return task.name.toLowerCase().includes(term) || locationName.toLowerCase().includes(term);
+      const locationName = String(locations.find(l => l.id === task.location_id)?.name || '').toLowerCase();
+      const taskName = String(task.name || '').toLowerCase();
+      return taskName.includes(term) || locationName.includes(term);
     });
   }, [countTasks, locations, searchTerm]);
 
@@ -867,6 +902,11 @@ const InventoryView: React.FC = () => {
       logo_url: String(locationForm.logo_url || '').trim() || null,
       exterior_photo_url: String(locationForm.exterior_photo_url || '').trim() || null,
       interior_photo_url: String(locationForm.interior_photo_url || '').trim() || null,
+      service_level_target: type === 'BRANCH' ? coerceNumber(locationForm.service_level_target) : null,
+      replenishment_frequency: type === 'BRANCH' ? (locationForm.replenishment_frequency || 'WEEKLY') : null,
+      lead_time_from_hub_days: type === 'BRANCH' ? coerceInt(locationForm.lead_time_from_hub_days) : null,
+      emergency_priority_level: type === 'BRANCH' ? (locationForm.emergency_priority_level || 'MEDIUM') : null,
+      branch_category: type === 'BRANCH' ? (locationForm.branch_category || 'MEDIUM_VELOCITY') : null,
       contact_person_name: String(locationForm.contact_person_name || '').trim() || null,
       contact_person_phone: String(locationForm.contact_person_phone || '').trim() || null,
       contact_person_email: String(locationForm.contact_person_email || '').trim() || null,
@@ -1139,9 +1179,9 @@ const InventoryView: React.FC = () => {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-    const [invRes, locRes, adjRes, transRes, poRes, countRes, countEntryRes] = await Promise.all([
+    const [invRes, locRes, adjRes, transRes, poRes, countRes, countEntryRes, netRes, coverageRes] = await Promise.all([
         supabase.from('inventory_items').select('id,name,stock,reserved_stock,damaged_stock,min_stock,max_stock,unit,type,batch_id,location_id,expiry_date,roast_date,last_movement_at,cost_per_unit,sku_prefix,price,product_id,image'),
-        supabase.from('locations').select('id,code,name,type,address,area,city,gps_lat,gps_lng,phone,email,fax,operating_hours,branch_type,status,opening_date,closing_date,area_sqm,seating_capacity,is_hq,parent_location_id,commercial_license_number,commercial_license_expiry,logo_url,exterior_photo_url,interior_photo_url,contact_person_name,contact_person_phone,contact_person_email,is_active,is_roastery').order('name', { ascending: true }),
+        supabase.from('locations').select('id,code,name,type,address,area,city,gps_lat,gps_lng,phone,email,fax,operating_hours,branch_type,status,opening_date,closing_date,area_sqm,seating_capacity,is_hq,parent_location_id,commercial_license_number,commercial_license_expiry,logo_url,exterior_photo_url,interior_photo_url,service_level_target,replenishment_frequency,lead_time_from_hub_days,emergency_priority_level,branch_category,contact_person_name,contact_person_phone,contact_person_email,is_active,is_roastery').order('name', { ascending: true }),
         activeTab === 'adjustments'
           ? supabase.from('stock_adjustments').select('id,item_id,location_id,quantity,reason,notes,status,created_at,user_name,item_name,location_name,value').order('created_at', { ascending: false })
           : Promise.resolve({ data: null }),
@@ -1156,7 +1196,13 @@ const InventoryView: React.FC = () => {
           : Promise.resolve({ data: null }),
         activeTab === 'counts'
           ? supabase.from('inventory_count_entries').select('id,count_task_id,inventory_item_id,location_id,counted_qty,system_qty,variance,variance_percent,variance_value,status,counted_at,counted_by_name,approved_by_name').order('counted_at', { ascending: false })
-          : Promise.resolve({ data: null })
+          : Promise.resolve({ data: null }),
+        supabase
+          .from('network_stock_visibility')
+          .select('location_id,location_name,location_type,is_hq,product_id,on_hand_qty,in_transit_in_qty,in_transit_out_qty'),
+        supabase
+          .from('branch_coverage_status')
+          .select('location_id,location_name,product_id,product_name,current_stock,in_transit_qty,avg_daily_consumption,days_of_coverage,service_level_target,lead_time_from_hub_days,stockout_risk,overstock_risk,coverage_below_service_target')
       ]);
 
       if (invRes.data) setPackagedItems(invRes.data.map(item => ({
@@ -1171,7 +1217,9 @@ const InventoryView: React.FC = () => {
       if (transRes.data) setTransferOrders(transRes.data);
       if (poRes.data) setPurchaseOrders(poRes.data);
       if (countRes.data) setCountTasks(countRes.data);
-    if (countEntryRes.data) setCountEntries(countEntryRes.data);
+      if (countEntryRes.data) setCountEntries(countEntryRes.data);
+      if (netRes.data) setNetworkVisibilityRows(netRes.data as any);
+      if (coverageRes.data) setBranchCoverageRows(coverageRes.data as any);
 
       setLastUpdated(new Date());
     } catch (err) {
@@ -1439,6 +1487,11 @@ const InventoryView: React.FC = () => {
       logo_url: '',
       exterior_photo_url: '',
       interior_photo_url: '',
+      service_level_target: 95,
+      replenishment_frequency: 'WEEKLY',
+      lead_time_from_hub_days: 1,
+      emergency_priority_level: 'MEDIUM',
+      branch_category: 'MEDIUM_VELOCITY',
       contact_person_name: '',
       contact_person_phone: '',
       contact_person_email: '',
@@ -1500,6 +1553,43 @@ const InventoryView: React.FC = () => {
       })
       .sort((a, b) => (a.name || '').localeCompare(b.name || ''));
   }, [locations, searchTerm, locationTypeFilter, branchStatusFilter, branchTypeFilter, hqFilter]);
+
+  const networkHealthSummary = useMemo(() => {
+    const hubStock = networkVisibilityRows
+      .filter(r => r.location_type !== 'BRANCH')
+      .reduce((sum, r) => sum + (Number(r.on_hand_qty) || 0), 0);
+    const inTransit = networkVisibilityRows.reduce((sum, r) => sum + (Number(r.in_transit_in_qty) || 0), 0);
+
+    const riskyBranchIds = new Set(
+      branchCoverageRows
+        .filter(r => r.stockout_risk || r.coverage_below_service_target)
+        .map(r => r.location_id)
+    );
+    const overstockCount = branchCoverageRows.filter(r => r.overstock_risk).length;
+    const coverageBelowCount = branchCoverageRows.filter(r => r.coverage_below_service_target).length;
+
+    const topRiskBranches = Array.from(
+      branchCoverageRows.reduce((acc, row) => {
+        if (!row.stockout_risk && !row.coverage_below_service_target) return acc;
+        const existing = acc.get(row.location_id) || { location_id: row.location_id, location_name: row.location_name, risky_skus: 0 };
+        existing.risky_skus += 1;
+        acc.set(row.location_id, existing);
+        return acc;
+      }, new Map<string, { location_id: string; location_name: string; risky_skus: number }>())
+        .values()
+    )
+      .sort((a, b) => b.risky_skus - a.risky_skus)
+      .slice(0, 5);
+
+    return {
+      hubStock,
+      inTransit,
+      riskyBranches: riskyBranchIds.size,
+      coverageBelowCount,
+      overstockCount,
+      topRiskBranches
+    };
+  }, [networkVisibilityRows, branchCoverageRows]);
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in slide-in-from-right-4 duration-500 pb-20">
@@ -1620,6 +1710,43 @@ const InventoryView: React.FC = () => {
                 <option value="NON_HQ">{t.nonHq || 'Non-HQ'}</option>
               </select>
             </div>
+          </div>
+        )}
+
+        {activeTab === 'locations' && (
+          <div className="px-6 py-6 border-b border-orange-50 bg-white space-y-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="bg-white border border-orange-100 rounded-2xl p-4">
+                <div className="text-[10px] font-black uppercase tracking-widest text-black">{t.hubStockHealth || 'Hub Stock Health'}</div>
+                <div className="text-2xl font-black text-black mt-1">{networkHealthSummary.hubStock.toLocaleString()}</div>
+              </div>
+              <div className="bg-white border border-orange-100 rounded-2xl p-4">
+                <div className="text-[10px] font-black uppercase tracking-widest text-black">{t.inTransit || 'In Transit'}</div>
+                <div className="text-2xl font-black text-black mt-1">{networkHealthSummary.inTransit.toLocaleString()}</div>
+              </div>
+              <div className="bg-white border border-red-100 rounded-2xl p-4">
+                <div className="text-[10px] font-black uppercase tracking-widest text-red-600">{t.riskOfStockout || 'Risk of Stockout'}</div>
+                <div className="text-2xl font-black text-red-600 mt-1">{networkHealthSummary.riskyBranches}</div>
+                <div className="text-[11px] font-semibold text-black mt-1">{networkHealthSummary.coverageBelowCount} {t.belowThreshold || 'below service target'}</div>
+              </div>
+              <div className="bg-white border border-orange-100 rounded-2xl p-4">
+                <div className="text-[10px] font-black uppercase tracking-widest text-orange-600">{t.overstockRisk || 'Overstock Risk'}</div>
+                <div className="text-2xl font-black text-orange-600 mt-1">{networkHealthSummary.overstockCount}</div>
+              </div>
+            </div>
+
+            {networkHealthSummary.topRiskBranches.length > 0 && (
+              <div className="bg-white border border-red-100 rounded-2xl p-4">
+                <div className="text-[10px] font-black uppercase tracking-widest text-red-600 mb-2">{t.coverageAlerts || 'Coverage Alerts'}</div>
+                <div className="flex flex-wrap gap-2">
+                  {networkHealthSummary.topRiskBranches.map(branch => (
+                    <span key={branch.location_id} className="px-3 py-1 rounded-full border border-red-200 bg-white text-xs font-bold text-black">
+                      {branch.location_name}: {branch.risky_skus} SKU
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -1749,7 +1876,7 @@ const InventoryView: React.FC = () => {
               </thead>
               <tbody className="divide-y divide-orange-50">
                 {purchaseOrders
-                  .filter(order => order.supplier_name.toLowerCase().includes(searchTerm.toLowerCase()))
+                  .filter(order => String(order.supplier_name || '').toLowerCase().includes(String(searchTerm || '').toLowerCase()))
                   .map(order => (
                     <tr key={order.id} className="hover/50">
                       <td className="px-8 py-5 font-mono text-xs text-black">{new Date(order.created_at).toLocaleDateString()}</td>
@@ -2071,7 +2198,7 @@ const InventoryView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-orange-50">
-                 {packagedItems.filter(i => i.name.toLowerCase().includes(searchTerm.toLowerCase())).map(item => {
+                 {packagedItems.filter(i => String(i.name || '').toLowerCase().includes(String(searchTerm || '').toLowerCase())).map(item => {
                    const status = getStockStatus(item);
                    const available = getAvailableStock(item);
                    return (
@@ -2214,6 +2341,74 @@ const InventoryView: React.FC = () => {
                           <option value="under_construction">{t.underConstruction || 'Under construction'}</option>
                           <option value="temp_closed">{t.tempClosed || 'Temporarily closed'}</option>
                           <option value="permanently_closed">{t.permanentlyClosed || 'Permanently closed'}</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-black">{t.serviceLevelTarget || 'Service level target (%)'}</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          step="0.1"
+                          value={(locationForm.service_level_target as any) ?? ''}
+                          onChange={e => setLocationForm({ ...locationForm, service_level_target: e.target.value as any })}
+                          disabled={locationForm.type !== 'BRANCH'}
+                          className="w-full bg-white  p-4 rounded-xl font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600 disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-black">{t.replenishmentFrequency || 'Replenishment frequency'}</label>
+                        <select
+                          value={locationForm.replenishment_frequency || 'WEEKLY'}
+                          onChange={e => setLocationForm({ ...locationForm, replenishment_frequency: e.target.value as any })}
+                          disabled={locationForm.type !== 'BRANCH'}
+                          className="w-full bg-white  p-4 rounded-xl font-bold outline-none focus:ring-2 focus:ring-orange-600 disabled:opacity-50"
+                        >
+                          <option value="DAILY">{t.daily || 'Daily'}</option>
+                          <option value="WEEKLY">{t.weekly || 'Weekly'}</option>
+                          <option value="BI_WEEKLY">{t.biWeekly || 'Bi-weekly'}</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-black">{t.leadTimeFromHub || 'Lead time from hub (days)'}</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={(locationForm.lead_time_from_hub_days as any) ?? ''}
+                          onChange={e => setLocationForm({ ...locationForm, lead_time_from_hub_days: e.target.value as any })}
+                          disabled={locationForm.type !== 'BRANCH'}
+                          className="w-full bg-white  p-4 rounded-xl font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600 disabled:opacity-50"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-black">{t.emergencyPriorityLevel || 'Emergency priority level'}</label>
+                        <select
+                          value={locationForm.emergency_priority_level || 'MEDIUM'}
+                          onChange={e => setLocationForm({ ...locationForm, emergency_priority_level: e.target.value as any })}
+                          disabled={locationForm.type !== 'BRANCH'}
+                          className="w-full bg-white  p-4 rounded-xl font-bold outline-none focus:ring-2 focus:ring-orange-600 disabled:opacity-50"
+                        >
+                          <option value="LOW">{t.priorityLow || 'Low'}</option>
+                          <option value="MEDIUM">{t.priorityMedium || 'Medium'}</option>
+                          <option value="HIGH">{t.priorityHigh || 'High'}</option>
+                          <option value="CRITICAL">{t.priorityCritical || 'Critical'}</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold uppercase text-black">{t.branchCategory || 'Branch category'}</label>
+                        <select
+                          value={locationForm.branch_category || 'MEDIUM_VELOCITY'}
+                          onChange={e => setLocationForm({ ...locationForm, branch_category: e.target.value as any })}
+                          disabled={locationForm.type !== 'BRANCH'}
+                          className="w-full bg-white  p-4 rounded-xl font-bold outline-none focus:ring-2 focus:ring-orange-600 disabled:opacity-50"
+                        >
+                          <option value="HIGH_VELOCITY">{t.highVelocity || 'High-velocity'}</option>
+                          <option value="MEDIUM_VELOCITY">{t.mediumVelocity || 'Medium-velocity'}</option>
+                          <option value="LOW_VELOCITY">{t.lowVelocity || 'Low-velocity'}</option>
                         </select>
                       </div>
                     </div>

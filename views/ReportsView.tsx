@@ -5,13 +5,17 @@ import { FileDown, Calendar, DollarSign, TrendingUp, TrendingDown, AlertTriangle
 import { useLanguage, useTheme } from '../App';
 import { supabase } from '../supabaseClient';
 import { exportExcelHtml, exportPdfPrint } from '../utils/reportExport';
+import { useAuth } from '../contexts/AuthContext';
+import { UserRole } from '../types';
+import { PersonalStatsPanel } from '../components/reports/PersonalStatsPanel';
 
 const COLORS = ['#ea580c', '#57534e', '#a8a29e', '#d6d3d1'];
 
 const ReportsView: React.FC = () => {
   const { t } = useLanguage();
   const { theme } = useTheme();
-  
+  const { user } = useAuth();
+
   const [profitabilityRows, setProfitabilityRows] = useState<Array<{ name: string; marginPct: number; trend: 'up' | 'down'; revenue: number; cost: number; profit: number }>>([]);
   const [profitabilityLoading, setProfitabilityLoading] = useState(false);
   const [productionLoading, setProductionLoading] = useState(false);
@@ -26,6 +30,10 @@ const ReportsView: React.FC = () => {
   const [productionCost, setProductionCost] = useState<any[]>([]);
   const [greenBeanConsumption, setGreenBeanConsumption] = useState<any[]>([]);
   const [recipeConsistency, setRecipeConsistency] = useState<any[]>([]);
+  const [cashierSales, setCashierSales] = useState<Array<{ cashier_name: string; sales_count: number; total_amount: number }>>([]);
+  const [cashierSalesLoading, setCashierSalesLoading] = useState(false);
+  const [paymentMethodData, setPaymentMethodData] = useState<Array<{ method: string; count: number; total: number }>>([]);
+  const [cashierProductSales, setCashierProductSales] = useState<Array<{ product_name: string; quantity: number; total: number }>>([]);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +91,94 @@ const ReportsView: React.FC = () => {
     load();
     return () => { cancelled = true; };
   }, [t.unknown]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      setCashierSalesLoading(true);
+      try {
+        const now = new Date();
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        const { data: transactions, error: txError } = await supabase
+          .from('transactions')
+          .select('*')
+          .gte('created_at', monthStart.toISOString());
+        
+        console.log('Transactions query:', { txError, count: transactions?.length });
+
+        const cashierMap = new Map<string, { count: number; total: number }>();
+        const paymentMap = new Map<string, { count: number; total: number }>();
+        const productMap = new Map<string, { quantity: number; total: number }>();
+        
+        (transactions || []).forEach((t: any) => {
+          const cashierName = t.cashier_name || 'Unknown';
+          const existingCashier = cashierMap.get(cashierName) || { count: 0, total: 0 };
+          cashierMap.set(cashierName, {
+            count: existingCashier.count + 1,
+            total: existingCashier.total + (t.total || 0)
+          });
+
+          const paymentMethod = t.payment_method || 'Unknown';
+          const existingPayment = paymentMap.get(paymentMethod) || { count: 0, total: 0 };
+          paymentMap.set(paymentMethod, {
+            count: existingPayment.count + 1,
+            total: existingPayment.total + (t.total || 0)
+          });
+
+          (t.items || []).forEach((item: any) => {
+            const productName = item.name || 'Unknown Product';
+            const existingProduct = productMap.get(productName) || { quantity: 0, total: 0 };
+            productMap.set(productName, {
+              quantity: existingProduct.quantity + (item.quantity || 1),
+              total: existingProduct.total + ((item.price || 0) * (item.quantity || 1))
+            });
+          });
+        });
+
+        const sales = Array.from(cashierMap.entries())
+          .map(([cashier_name, data]) => ({
+            cashier_name,
+            sales_count: data.count,
+            total_amount: data.total
+          }))
+          .sort((a, b) => b.total_amount - a.total_amount);
+
+        const paymentData = Array.from(paymentMap.entries())
+          .map(([method, data]) => ({
+            method,
+            count: data.count,
+            total: data.total
+          }));
+
+        const productData = Array.from(productMap.entries())
+          .map(([product_name, data]) => ({
+            product_name,
+            quantity: data.quantity,
+            total: data.total
+          }))
+          .sort((a, b) => b.total - a.total);
+
+        console.log('Processing data:', { 
+          transactionCount: transactions?.length,
+          cashierSalesCount: sales.length,
+          paymentMethodsCount: paymentData.length,
+          productsCount: productData.length 
+        });
+        
+        if (!cancelled) {
+          setCashierSales(sales);
+          setPaymentMethodData(paymentData);
+          setCashierProductSales(productData);
+        }
+      } catch (err) {
+        console.error('Error fetching cashier sales:', err);
+      } finally {
+        if (!cancelled) setCashierSalesLoading(false);
+      }
+    };
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -277,7 +373,17 @@ const ReportsView: React.FC = () => {
 
   const handleExportPdf = () => {
     exportPdfPrint(t.reports, buildExportSections());
-  };
+  };if (user?.role === UserRole.CASHIER) {
+    return (
+      <div className="p-6">
+        <PersonalStatsPanel
+          userId={user.id}
+          userName={user.name || ''}
+          t={t}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 md:space-y-8 animate-in zoom-in-95 duration-500">
@@ -715,6 +821,106 @@ const ReportsView: React.FC = () => {
             </div>
           </div>
         )}
+      </div>
+
+      <div className="bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-stone-200">
+        <h3 className="text-base md:text-lg font-bold mb-6 text-stone-800 flex items-center gap-2">
+          <DollarSign size={20} className="text-orange-600" />
+          {t.cashierSales || 'Cashier Sales'}
+        </h3>
+        {cashierSalesLoading ? (
+          <div className="flex justify-center p-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+          </div>
+        ) : cashierSales.length === 0 ? (
+          <p className="text-sm text-stone-500">{t.noCashierData || 'No cashier data'}</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className={`w-full ${t.dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
+              <thead className="text-[10px] font-black uppercase tracking-widest text-stone-500 border-b border-stone-200">
+                <tr>
+                  <th className="py-3">{t.cashier || 'Cashier'}</th>
+                  <th className="py-3">{t.salesCount || 'Sales'}</th>
+                  <th className="py-3">{t.totalAmount || 'Total'}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-stone-100">
+                {cashierSales.map((cs, idx) => (
+                  <tr key={idx} className="hover:bg-stone-50">
+                    <td className="py-3 font-bold text-stone-800">{cs.cashier_name}</td>
+                    <td className="py-3 text-stone-600">{cs.sales_count}</td>
+                    <td className="py-3 font-mono font-bold text-green-600">{cs.total_amount.toFixed(2)} QAR</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-stone-200">
+          <h3 className="text-base md:text-lg font-bold mb-6 text-stone-800 flex items-center gap-2">
+            <TrendingUp size={20} className="text-green-600" />
+            {t.cashManagement || 'Cash Management'}
+          </h3>
+          {cashierSalesLoading ? (
+            <div className="flex justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+            </div>
+          ) : paymentMethodData.length === 0 ? (
+            <p className="text-sm text-stone-500">{t.noDataAvailable || 'No data available'}</p>
+          ) : (
+            <div className="space-y-4">
+              {paymentMethodData.map((pm, idx) => (
+                <div key={idx} className="flex justify-between items-center p-4 bg-stone-50 rounded-xl">
+                  <div>
+                    <span className="font-bold text-stone-800">{pm.method}</span>
+                    <span className="text-xs text-stone-500 ml-2">({pm.count} {t.transactions || 'transactions'})</span>
+                  </div>
+                  <span className="font-mono font-bold text-green-600">{pm.total.toFixed(2)} QAR</span>
+                </div>
+              ))}
+              <div className="flex justify-between items-center p-4 bg-green-50 rounded-xl border border-green-200">
+                <span className="font-bold text-stone-800">{t.total || 'Total'}</span>
+                <span className="font-mono font-bold text-green-700">
+                  {paymentMethodData.reduce((sum, pm) => sum + pm.total, 0).toFixed(2)} QAR
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white p-5 md:p-8 rounded-2xl shadow-sm border border-stone-200">
+          <h3 className="text-base md:text-lg font-bold mb-6 text-stone-800 flex items-center gap-2">
+            <TrendingUp size={20} className="text-orange-600" />
+            {t.mostProfitableProducts || 'Most Profitable Products'}
+          </h3>
+          {cashierSalesLoading ? (
+            <div className="flex justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+            </div>
+          ) : cashierProductSales.length === 0 ? (
+            <p className="text-sm text-stone-500">{t.noDataAvailable || 'No data available'}</p>
+          ) : (
+            <div className="space-y-3">
+              {cashierProductSales.slice(0, 10).map((product, idx) => (
+                <div key={idx} className="flex justify-between items-center p-3 bg-stone-50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white ${
+                      idx === 0 ? 'bg-yellow-500' : idx === 1 ? 'bg-gray-400' : idx === 2 ? 'bg-amber-600' : 'bg-stone-400'
+                    }`}>
+                      {idx + 1}
+                    </span>
+                    <span className="font-medium text-stone-800">{product.product_name}</span>
+                    <span className="text-xs text-stone-500">({product.quantity})</span>
+                  </div>
+                  <span className="font-mono font-bold text-orange-600">{product.total.toFixed(2)} QAR</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
