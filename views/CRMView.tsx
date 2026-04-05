@@ -57,6 +57,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
       const { data, error } = await supabase
         .from('customers')
         .select('*')
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -70,17 +71,15 @@ const CRMView: React.FC<CRMViewProps> = () => {
 
   const handleSaveCustomer = async () => {
     try {
-      const customerData = {
-        name: formData.name,
-        phone: formData.phone,
-        email: formData.email || null,
-        notes: formData.notes || null,
-      };
-
       if (editingCustomer) {
         const { error } = await supabase
           .from('customers')
-          .update(customerData)
+          .update({
+            full_name: formData.name,
+            phone: formData.phone,
+            email: formData.email || null,
+            notes: formData.notes || null,
+          })
           .eq('id', editingCustomer.id);
         
         if (error) {
@@ -90,7 +89,13 @@ const CRMView: React.FC<CRMViewProps> = () => {
       } else {
         const { error } = await supabase
           .from('customers')
-          .insert([customerData]);
+          .insert([{
+            full_name: formData.name,
+            phone: formData.phone,
+            email: formData.email || null,
+            notes: formData.notes || null,
+            is_active: true,
+          }]);
         
         if (error) {
           console.error('Insert error details:', error);
@@ -123,11 +128,18 @@ const CRMView: React.FC<CRMViewProps> = () => {
     if (!confirm(t.confirmDelete || 'Are you sure you want to delete this customer?')) return;
     
     try {
-      const { error } = await supabase.from('customers').delete().eq('id', id);
-      if (error) throw error;
+      const { error } = await supabase
+        .from('customers')
+        .update({ is_active: false })
+        .eq('id', id);
+      if (error) {
+        console.error('Delete error details:', error);
+        throw error;
+      }
       fetchCustomers();
-    } catch (error) {
-      console.error('Error deleting customer:', error);
+    } catch (error: any) {
+      console.error('Error deleting customer:', error?.message || error);
+      alert(error?.message || 'Failed to delete customer. Check console for details.');
     }
   };
 
