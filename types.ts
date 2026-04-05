@@ -255,6 +255,7 @@ export interface Customer {
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
+  last_edited_by_name?: string;
 }
 
 export type RefundStatus = 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
@@ -426,6 +427,11 @@ export interface Location {
   logo_url?: string;
   exterior_photo_url?: string;
   interior_photo_url?: string;
+  service_level_target?: number | string | null;
+  replenishment_frequency?: 'DAILY' | 'WEEKLY' | 'BI_WEEKLY' | null;
+  lead_time_from_hub_days?: number | string | null;
+  emergency_priority_level?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | null;
+  branch_category?: 'HIGH_VELOCITY' | 'MEDIUM_VELOCITY' | 'LOW_VELOCITY' | null;
   contact_person_name?: string;
   contact_person_phone?: string;
   contact_person_email?: string;

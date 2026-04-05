@@ -48,16 +48,22 @@ export const crmService = {
     return data as Customer;
   },
 
-  async updateCustomer(id: string, customerData: Partial<Customer>): Promise<Customer> {
+  async updateCustomer(id: string, customerData: Partial<Customer>, editedByName?: string): Promise<Customer> {
+    const updateData: any = {
+      full_name: customerData.full_name,
+      phone: customerData.phone,
+      email: customerData.email,
+      notes: customerData.notes,
+      is_active: customerData.is_active
+    };
+    
+    if (editedByName) {
+      updateData.last_edited_by_name = editedByName;
+    }
+    
     const { data, error } = await supabase
       .from('customers')
-      .update({
-        full_name: customerData.full_name,
-        phone: customerData.phone,
-        email: customerData.email,
-        notes: customerData.notes,
-        is_active: customerData.is_active
-      })
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
