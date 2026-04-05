@@ -974,7 +974,7 @@ export default function StaffView() {
       const { data, error } = await supabase
         .from('employee_salary_advances')
         .insert([payload])
-        .select()
+        .select('*')
         .single();
       if (error) throw error;
       await fetchSalaryAdvances(editingEmployee.id);
@@ -2299,7 +2299,7 @@ export default function StaffView() {
           .from('payroll_approvals')
           .update(payload)
           .eq('id', payrollApproval.id)
-          .select()
+          .select('*')
           .single();
         if (error) throw error;
         setPayrollApproval(data as PayrollApproval);
@@ -2313,7 +2313,7 @@ export default function StaffView() {
               ...payload
             }
           ])
-          .select()
+          .select('*')
           .single();
         if (error) throw error;
         setPayrollApproval(data as PayrollApproval);
@@ -2543,7 +2543,7 @@ export default function StaffView() {
       const { data, error } = await supabase
         .from('performance_reviews')
         .insert([payload])
-        .select()
+        .select('*')
         .single();
       if (error) throw error;
       if (kpiRows.length) {

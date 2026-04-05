@@ -1940,7 +1940,7 @@ NOTIFY pgrst, 'reload schema';
           ...settings,
           updated_at: new Date().toISOString()
         })
-        .select()
+        .select('*')
         .single();
 
       if (error) throw error;
