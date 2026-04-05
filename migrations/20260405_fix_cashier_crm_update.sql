@@ -1,14 +1,23 @@
 -- Migration: 20260405_fix_cashier_crm_update
 -- Issue: Cashiers cannot edit customer information in CRM
 
--- Add missing last_edited_by_name column if it doesn't exist
+-- First check what columns exist in customers table
+-- This helps debug column name mismatches
+SELECT column_name, data_type FROM information_schema.columns WHERE table_name = 'customers';
+
+-- Add missing columns if they don't exist
 DO $$
 BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'customers' AND column_name = 'last_edited_by_name'
-  ) THEN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'customers' AND column_name = 'last_edited_by_name') THEN
     ALTER TABLE public.customers ADD COLUMN last_edited_by_name TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'customers' AND column_name = 'full_name') THEN
+    ALTER TABLE public.customers ADD COLUMN full_name TEXT;
+  END IF;
+  
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'customers' AND column_name = 'is_active') THEN
+    ALTER TABLE public.customers ADD COLUMN is_active BOOLEAN DEFAULT true;
   END IF;
 END $$;
 
