@@ -162,7 +162,9 @@ const ConfigurationView: React.FC = () => {
     beanId: '',
     laborCost: '0',
     roastingOverhead: '0',
-    estimatedGreenBeanCost: '0'
+    estimatedGreenBeanCost: '0',
+    allBranches: true,
+    selectedBranchIds: [] as string[]
   });
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredient[]>([]);
   const [bomComponents, setBomComponents] = useState<RecipeIngredient[]>([]);
@@ -1916,9 +1918,34 @@ NOTIFY pgrst, 'reload schema';
       payload.template_id = null;
     }
 
+    if (!productForm.allBranches && productForm.selectedBranchIds.length === 0) {
+      alert(t.selectAtLeastOneBranch || 'Please select at least one branch');
+      setIsSaving(false);
+      return;
+    }
+
     try {
-      const { error } = await supabase.from('product_definitions').upsert([payload]);
+      const { data: productData, error } = await supabase.from('product_definitions').upsert([payload]).select('id').single();
       if (error) throw error;
+
+      const branchesToUpdate = productForm.allBranches
+        ? locations.filter(l => l.type === 'BRANCH' || l.is_roastery).map(l => l.id)
+        : productForm.selectedBranchIds;
+
+      if (!editingId && branchesToUpdate.length > 0 && productData?.id) {
+        const inventoryItems = branchesToUpdate.map(branchId => ({
+          product_id: productData.id,
+          location_id: branchId,
+          stock: 0,
+          reserved_stock: 0,
+          damaged_stock: 0,
+          created_at: new Date().toISOString()
+        }));
+
+        const { error: invError } = await supabase.from('inventory_items').upsert(inventoryItems);
+        if (invError) console.error('Failed to create inventory items:', invError);
+      }
+
       await fetchInitialData();
       setShowProductModal(false);
       resetProductForm();
@@ -1962,7 +1989,8 @@ NOTIFY pgrst, 'reload schema';
       name: '', description: '', category: 'Coffee', roastLevel: RoastingLevel.MEDIUM,
       mainCategory: '', subCategory: '', variantOf: '', variantLabel: '', variantSize: '', variantFlavor: '', unit: 'piece', templateId: '', basePrice: '', image: '', sku: '', supplier: '', isActive: true, productStatus: 'ACTIVE', isPerishable: false, expiryDate: '', type: 'PACKAGED_COFFEE',
       beanId: '',
-      laborCost: '0', roastingOverhead: '0', estimatedGreenBeanCost: '0'
+      laborCost: '0', roastingOverhead: '0', estimatedGreenBeanCost: '0',
+      allBranches: true, selectedBranchIds: []
     });
     setRecipeIngredients([]);
     setBomComponents([]);
@@ -2463,7 +2491,8 @@ NOTIFY pgrst, 'reload schema';
                           name: product.name, description: product.description || '', category: product.category, mainCategory: product.mainCategory || '', subCategory: product.subCategory || '', variantOf: product.variantOf || '', variantLabel: product.variantLabel || '', variantSize: product.variantSize || '', variantFlavor: product.variantFlavor || '', unit: product.unit || 'piece', roastLevel: product.roastLevel || RoastingLevel.MEDIUM,
                           templateId: product.templateId || '', basePrice: product.basePrice.toString(), image: product.image || '', sku: product.sku || '', supplier: product.supplier || '', isActive: product.productStatus === 'ACTIVE', productStatus: product.productStatus || (product.isActive ? 'ACTIVE' : 'DISABLED'), isPerishable: product.isPerishable || false, expiryDate: product.expiryDate || '', type: product.type || 'PACKAGED_COFFEE',
                           beanId: product.beanId || '',
-                          laborCost: (product.laborCost || 0).toString(), roastingOverhead: (product.roastingOverhead || 0).toString(), estimatedGreenBeanCost: (product.estimatedGreenBeanCost || 0).toString()
+                          laborCost: (product.laborCost || 0).toString(), roastingOverhead: (product.roastingOverhead || 0).toString(), estimatedGreenBeanCost: (product.estimatedGreenBeanCost || 0).toString(),
+                          allBranches: true, selectedBranchIds: []
                         });
                         setRecipeIngredients(product.recipe?.ingredients || []);
                         setBomComponents(product.bom || []);
@@ -2967,6 +2996,42 @@ NOTIFY pgrst, 'reload schema';
                     <button type="button" onClick={() => setProductForm({ ...productForm, type: 'BEVERAGE' })} className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'BEVERAGE' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}>{t.beverage}</button>
                     <button type="button" onClick={() => setProductForm({ ...productForm, type: 'ACCESSORY' })} className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'ACCESSORY' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}>{t.accessories}</button>
                     <button type="button" onClick={() => setProductForm({ ...productForm, type: 'RAW_MATERIAL' })} className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'RAW_MATERIAL' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}>{t.rawMaterials}</button>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        id="allBranches"
+                        checked={productForm.allBranches}
+                        onChange={e => setProductForm({ ...productForm, allBranches: e.target.checked, selectedBranchIds: e.target.checked ? [] : productForm.selectedBranchIds })}
+                        className="h-5 w-5 accent-orange-600"
+                      />
+                      <label htmlFor="allBranches" className="text-xs font-black text-black uppercase tracking-widest">{t.allBranches || 'All Branches'}</label>
+                    </div>
+                    {!productForm.allBranches && (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto custom-scrollbar p-3 bg-orange-50 rounded-2xl">
+                        {locations.filter(l => l.type === 'BRANCH' || l.is_roastery).map(loc => (
+                          <label key={loc.id} className="flex items-center gap-2 text-xs font-bold cursor-pointer hover:bg-orange-100 p-2 rounded-lg transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={productForm.selectedBranchIds.includes(loc.id)}
+                              onChange={e => {
+                                const newIds = e.target.checked
+                                  ? [...productForm.selectedBranchIds, loc.id]
+                                  : productForm.selectedBranchIds.filter(id => id !== loc.id);
+                                setProductForm({ ...productForm, selectedBranchIds: newIds });
+                              }}
+                              className="h-4 w-4 accent-orange-600"
+                            />
+                            <span className="truncate">{loc.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                    {!productForm.allBranches && productForm.selectedBranchIds.length === 0 && (
+                      <p className="text-xs text-red-500 font-bold">{t.selectAtLeastOneBranch || 'Select at least one branch'}</p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
