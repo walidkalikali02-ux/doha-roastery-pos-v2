@@ -2059,6 +2059,21 @@ const POSView: React.FC = () => {
             </div>
           </div>
 
+          {cart.length > 0 && (
+            <button
+              onClick={() => {
+                if (confirm(t.cancelOrderConfirm || 'Are you sure you want to cancel this order?')) {
+                  setCart([]);
+                  setSelectedCustomer(null);
+                }
+              }}
+              disabled={isProcessing}
+              className="w-full py-3 mb-3 rounded-xl bg-red-50 border-2 border-red-200 text-red-600 font-black text-xs uppercase flex items-center justify-center gap-2 disabled:opacity-50 transition-colors hover:bg-red-100"
+            >
+              <X size={18} /> {t.cancelOrder || 'Cancel Order'}
+            </button>
+          )}
+
           <div className="grid grid-cols-2 gap-3">
             <button onClick={() => setShowCashModal(true)} disabled={cart.length === 0 || isProcessing} className="py-4 rounded-xl bg-white  text-black  font-black text-xs uppercase flex items-center justify-center gap-2 disabled:opacity-50 transition-colors">
               <Banknote size={18} /> {t.cash}
