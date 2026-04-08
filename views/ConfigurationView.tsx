@@ -1663,6 +1663,26 @@ NOTIFY pgrst, 'reload schema';
     rows.push(row);
     return rows.filter(r => r.some(cell => cell.trim() !== ''));
   };
+  const detectDelimitedFormat = (text: string) => {
+    const normalizedText = text.replace(/^\uFEFF/, '');
+    const lines = normalizedText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const separatorDirective = lines[0]?.match(/^sep=(.)$/i);
+
+    if (separatorDirective) {
+      return {
+        text: normalizedText.replace(/^sep=.\r?\n/i, ''),
+        delimiter: separatorDirective[1]
+      };
+    }
+
+    const headerLine = lines[0] || '';
+    const candidates = [',', ';', '\t'];
+    const delimiter = candidates
+      .map(candidate => ({ candidate, count: headerLine.split(candidate).length - 1 }))
+      .sort((a, b) => b.count - a.count)[0]?.candidate || ',';
+
+    return { text: normalizedText, delimiter };
+  };
   const parseBoolean = (value: string) => ['true', '1', 'yes', 'y'].includes(value.trim().toLowerCase());
   const parseJsonValue = (value: string) => {
     if (!value.trim()) return null;
@@ -1766,15 +1786,11 @@ NOTIFY pgrst, 'reload schema';
       if (!isSupportedTextFile) throw new Error('unsupported_format');
 
       const text = await file.text();
-      console.log('Import file content length:', text.length);
-      const firstLine = text.split(/\r?\n/)[0] || '';
-      const delimiter = firstLine.split('\t').length > firstLine.split(',').length ? '\t' : ',';
-      console.log('Using delimiter:', delimiter === '\t' ? 'TAB' : 'COMMA');
-      const rows = parseDelimited(text, delimiter);
-      console.log('Parsed rows:', rows.length);
+      const { text: normalizedText, delimiter } = detectDelimitedFormat(text);
+      const rows = parseDelimited(normalizedText, delimiter);
       if (rows.length < 2) throw new Error('empty');
       const headers = rows[0].map(h => h.trim().toLowerCase());
-      console.log('Headers:', headers);
+      if (!headers.includes('name')) throw new Error('missing_name_header');
       const getValue = (row: string[], key: string) => {
         const idx = headers.indexOf(key);
         return idx >= 0 ? row[idx] ?? '' : '';
@@ -1836,26 +1852,24 @@ NOTIFY pgrst, 'reload schema';
         if (!missingCols.has('template_id')) payload.template_id = getValue(row, 'template_id') || null;
         return payload;
       }).filter(Boolean) as any[];
-      console.log('Payloads to import:', payloads.length);
       if (!payloads.length) throw new Error('empty');
       const { error } = await supabase
         .from('product_definitions')
         .upsert(payloads, { onConflict: 'sku' });
-      if (error) {
-        console.error('Supabase import error:', error);
-        throw error;
-      }
+      if (error) throw error;
       await fetchInitialData();
       setSuccessMsg(t.importSuccess.replace('{count}', String(payloads.length)));
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (error: any) {
-      console.error('Import error:', error);
       if (error instanceof Error && error.message === 'unsupported_format') {
         alert(t.importUnsupportedFormat);
+      } else if (error instanceof Error && error.message === 'missing_name_header') {
+        alert(t.importMissingHeader);
       } else if (error instanceof Error && error.message === 'empty') {
         alert(t.importEmpty || 'No valid products found in file');
       } else {
+        console.error('Catalog import failed', error);
         alert((t.importError || 'Import failed') + ': ' + (error.message || ''));
       }
     } finally {
