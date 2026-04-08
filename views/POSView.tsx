@@ -960,12 +960,16 @@ const POSView: React.FC = () => {
         .single();
 
       if (reqError) throw reqError;
+      const requestItems = Array.isArray(request?.items) ? request.items : [];
 
       // REQ-007: Log approval/rejection action
       console.log(`[LOG] Return ${status}: ${requestId} by ${user?.name || 'Manager'}`);
 
       if (approved) {
-        const returnLocationId = request.items[0]?.locationId || selectedLocationId;
+        if (requestItems.length === 0) {
+          throw new Error('Return request has no items to restock');
+        }
+        const returnLocationId = requestItems[0]?.locationId || requestItems[0]?.location_id || selectedLocationId;
         const { data: locInv } = await supabase
           .from('inventory_items')
           .select('*')
@@ -979,7 +983,7 @@ const POSView: React.FC = () => {
           additions.set(itemId, (additions.get(itemId) || 0) + qty);
         };
 
-        for (const item of request.items) {
+        for (const item of requestItems) {
           if (item.type !== 'BEVERAGE') {
             const qty = Math.max(0, Number(item.quantity) || 0);
             let dbItem = item.productId ? invByProductId.get(item.productId) : undefined;
