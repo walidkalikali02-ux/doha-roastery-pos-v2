@@ -1761,12 +1761,20 @@ NOTIFY pgrst, 'reload schema';
   const handleImportCatalog = async (file: File) => {
     setIsImportingCatalog(true);
     try {
+      const fileName = file.name.toLowerCase();
+      const isSupportedTextFile = ['.csv', '.tsv', '.txt'].some(ext => fileName.endsWith(ext));
+      if (!isSupportedTextFile) throw new Error('unsupported_format');
+
       const text = await file.text();
+      console.log('Import file content length:', text.length);
       const firstLine = text.split(/\r?\n/)[0] || '';
       const delimiter = firstLine.split('\t').length > firstLine.split(',').length ? '\t' : ',';
+      console.log('Using delimiter:', delimiter === '\t' ? 'TAB' : 'COMMA');
       const rows = parseDelimited(text, delimiter);
+      console.log('Parsed rows:', rows.length);
       if (rows.length < 2) throw new Error('empty');
       const headers = rows[0].map(h => h.trim().toLowerCase());
+      console.log('Headers:', headers);
       const getValue = (row: string[], key: string) => {
         const idx = headers.indexOf(key);
         return idx >= 0 ? row[idx] ?? '' : '';
@@ -1828,17 +1836,28 @@ NOTIFY pgrst, 'reload schema';
         if (!missingCols.has('template_id')) payload.template_id = getValue(row, 'template_id') || null;
         return payload;
       }).filter(Boolean) as any[];
+      console.log('Payloads to import:', payloads.length);
       if (!payloads.length) throw new Error('empty');
       const { error } = await supabase
         .from('product_definitions')
         .upsert(payloads, { onConflict: 'sku' });
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase import error:', error);
+        throw error;
+      }
       await fetchInitialData();
       setSuccessMsg(t.importSuccess.replace('{count}', String(payloads.length)));
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
-    } catch {
-      alert(t.importError);
+    } catch (error: any) {
+      console.error('Import error:', error);
+      if (error instanceof Error && error.message === 'unsupported_format') {
+        alert(t.importUnsupportedFormat);
+      } else if (error instanceof Error && error.message === 'empty') {
+        alert(t.importEmpty || 'No valid products found in file');
+      } else {
+        alert((t.importError || 'Import failed') + ': ' + (error.message || ''));
+      }
     } finally {
       setIsImportingCatalog(false);
       if (catalogImportRef.current) catalogImportRef.current.value = '';
@@ -2416,23 +2435,24 @@ NOTIFY pgrst, 'reload schema';
             <input
               ref={catalogImportRef}
               type="file"
-              accept=".csv,.tsv,.txt,.xls,.xlsx"
+              accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
               className="hidden"
               onChange={e => {
                 const file = e.target.files?.[0];
                 if (file) handleImportCatalog(file);
               }}
             />
-            <button onClick={() => handleExportCatalogCsv(filteredProducts)} className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2">
+            <button type="button" onClick={() => handleExportCatalogCsv(filteredProducts)} className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2">
               <DatabaseZap size={16} /> {t.exportCsv}
             </button>
-            <button onClick={() => handleExportCatalogExcel(filteredProducts)} className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2">
+            <button type="button" onClick={() => handleExportCatalogExcel(filteredProducts)} className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2">
               <FileText size={16} /> {t.exportExcel}
             </button>
-            <button onClick={handleDownloadCatalogTemplate} className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2">
+            <button type="button" onClick={handleDownloadCatalogTemplate} className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2">
               <FileText size={16} /> {t.downloadTemplate}
             </button>
             <button
+              type="button"
               onClick={() => catalogImportRef.current?.click()}
               disabled={isImportingCatalog}
               className="px-4 py-3 rounded-xl font-bold text-xs bg-orange-600 text-white flex items-center gap-2 disabled:opacity-60"
