@@ -8,7 +8,7 @@ import {
   ExternalLink, Layers, Search, FlaskConical, Milk, Droplets, Utensils,
   Edit3, Beaker, Archive, HardDrive, Trash, Code2, ClipboardCheck,
   CheckCircle, DatabaseZap, Activity, Terminal, XCircle, FileText, ToggleLeft, ToggleRight,
-  PlusCircle, MinusCircle, Calculator
+  PlusCircle, MinusCircle, Calculator, Package
 } from 'lucide-react';
 import { useLanguage, useTheme } from '../App';
 import { PackageTemplate, ProductDefinition, RoastingLevel, UserRole, Recipe, RecipeIngredient, AddOn, InventoryItem, SystemSettings, Location, RoastProfile } from '../types';
@@ -65,6 +65,16 @@ const ConfigurationView: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | ProductDefinition['productStatus']>('ALL');
 
   const [templates, setTemplates] = useState<PackageTemplate[]>([]);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState<string | null>(null);
+  const [templateForm, setTemplateForm] = useState({
+    sizeLabel: '',
+    weightInKg: '',
+    unitCost: '',
+    shelfLifeDays: '180',
+    skuPrefix: '',
+    isActive: true
+  });
   const [products, setProducts] = useState<ProductDefinition[]>([]);
   const [roastProfiles, setRoastProfiles] = useState<RoastProfile[]>([]);
   const [greenBeans, setGreenBeans] = useState<{ id: string; label: string }[]>([]);
@@ -2091,6 +2101,65 @@ NOTIFY pgrst, 'reload schema';
     setProductAddOns([]);
   };
 
+  const resetTemplateForm = () => {
+    setEditingTemplateId(null);
+    setTemplateForm({
+      sizeLabel: '',
+      weightInKg: '',
+      unitCost: '',
+      shelfLifeDays: '180',
+      skuPrefix: '',
+      isActive: true
+    });
+  };
+
+  const handleSaveTemplate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const payload: any = {
+        size_label: templateForm.sizeLabel,
+        weight_in_kg: parseFloat(templateForm.weightInKg) || 0,
+        unit_cost: parseFloat(templateForm.unitCost) || 0,
+        shelf_life_days: parseInt(templateForm.shelfLifeDays) || 180,
+        sku_prefix: templateForm.skuPrefix,
+        is_active: templateForm.isActive
+      };
+      if (editingTemplateId) payload.id = editingTemplateId;
+
+      const { error } = await supabase.from('package_templates').upsert([payload]);
+      if (error) throw error;
+
+      const { data } = await supabase.from('package_templates').select('*').order('created_at', { ascending: false });
+      if (data) setTemplates(data.map(mapTemplateFromDB));
+
+      setShowTemplateModal(false);
+      resetTemplateForm();
+      setSuccessMsg(t.saveSuccess);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteTemplate = async (id: string) => {
+    if (!confirm(t.confirmDelete || 'Are you sure?')) return;
+    try {
+      const { error } = await supabase.from('package_templates').delete().eq('id', id);
+      if (error) throw error;
+      const { data } = await supabase.from('package_templates').select('*').order('created_at', { ascending: false });
+      if (data) setTemplates(data.map(mapTemplateFromDB));
+      setSuccessMsg(t.deleteSuccess || 'Deleted successfully');
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000);
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
   const addIngredient = () => setRecipeIngredients([...recipeIngredients, { ingredient_id: '', name: '', amount: 0, unit: 'g' }]);
   const updateIngredient = (idx: number, field: string, value: any) => {
     const newIng = [...recipeIngredients];
@@ -2445,6 +2514,11 @@ NOTIFY pgrst, 'reload schema';
             <Plus size={18} /> {t.addGreenBean || 'Add Green Bean'}
           </button>
         )}
+        {activeSubTab === 'templates' && (
+          <button onClick={() => { resetTemplateForm(); setShowTemplateModal(true); }} className="w-full md:w-auto bg-orange-600 text-white px-8 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover">
+            <Plus size={18} /> {t.addTemplate || 'Add Template'}
+          </button>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-4 bg-white/50 p-2 rounded-2xl w-full md:w-fit mb-10 overflow-x-auto no-scrollbar">
@@ -2599,6 +2673,65 @@ NOTIFY pgrst, 'reload schema';
                 </div>
               )
             })}
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === 'templates' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {templates.map(template => (
+              <div key={template.id} className="bg-white rounded-[24px] p-5 border border-orange-100 shadow-sm">
+                <div className="flex items-start justify-between mb-3">
+                  <div>
+                    <h4 className="font-bold text-black">{template.sizeLabel}</h4>
+                    <p className="text-xs text-black opacity-60">{template.weightInKg} kg</p>
+                  </div>
+                  <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${template.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                    {template.isActive ? t.active : t.inactive}
+                  </span>
+                </div>
+                <div className="space-y-1 text-xs text-black">
+                  <p><span className="font-bold">SKU Prefix:</span> {template.skuPrefix || '-'}</p>
+                  <p><span className="font-bold">Unit Cost:</span> {template.unitCost} QAR</p>
+                  <p><span className="font-bold">Shelf Life:</span> {template.shelf_life_days} days</p>
+                </div>
+                <div className="flex gap-2 mt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingTemplateId(template.id);
+                      setTemplateForm({
+                        sizeLabel: template.sizeLabel,
+                        weightInKg: template.weightInKg.toString(),
+                        unitCost: template.unitCost.toString(),
+                        shelfLifeDays: template.shelf_life_days.toString(),
+                        skuPrefix: template.skuPrefix,
+                        isActive: template.isActive
+                      });
+                      setShowTemplateModal(true);
+                    }}
+                    className="flex-1 py-2 rounded-xl bg-orange-50 text-black font-bold text-xs flex items-center justify-center gap-1"
+                  >
+                    <Edit3 size={14} /> {t.edit}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteTemplate(template.id)}
+                    className="px-4 py-2 rounded-xl bg-red-50 text-red-600 font-bold text-xs flex items-center justify-center gap-1"
+                  >
+                    <Trash2 size={14} /> {t.delete}
+                  </button>
+                </div>
+              </div>
+            ))}
+            {templates.length === 0 && (
+              <div className="col-span-full text-center py-12 text-black opacity-50">
+                <Package size={48} className="mx-auto mb-3 opacity-50" />
+                <p className="font-bold">{t.noTemplatesYet || 'No package templates yet'}</p>
+                <p className="text-xs mt-1">{t.addTemplateToStart || 'Add a template to get started'}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -3293,29 +3426,52 @@ NOTIFY pgrst, 'reload schema';
                       </div>
                     </div>
                   ) : productForm.type === 'PACKAGED_COFFEE' ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.chooseTemplate}</label>
-                        <select required value={productForm.templateId} onChange={e => setProductForm({ ...productForm, templateId: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
-                          <option value="">-- {t.chooseTemplate} --</option>
-                          {templates.map(tpl => <option key={tpl.id} value={tpl.id}>{tpl.sizeLabel}</option>)}
-                        </select>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.chooseTemplate}</label>
+                          <select required value={productForm.templateId} onChange={e => {
+                            const selected = templates.find(tpl => tpl.id === e.target.value);
+                            setProductForm({ 
+                              ...productForm, 
+                              templateId: e.target.value,
+                              variantSize: selected ? selected.sizeLabel : productForm.variantSize
+                            });
+                          }} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
+                            <option value="">-- {t.chooseTemplate} --</option>
+                            {templates.filter(t => t.isActive).map(tpl => (
+                              <option key={tpl.id} value={tpl.id}>{tpl.sizeLabel} ({tpl.weightInKg}kg)</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.roastLevel}</label>
+                          <select value={productForm.roastLevel} onChange={e => setProductForm({ ...productForm, roastLevel: e.target.value as RoastingLevel })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
+                            <option value={RoastingLevel.LIGHT}>{t.light}</option>
+                            <option value={RoastingLevel.MEDIUM}>{t.medium}</option>
+                            <option value={RoastingLevel.DARK}>{t.dark}</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.selectBean || 'Bean Type'}</label>
+                          <select value={productForm.beanId} onChange={e => setProductForm({ ...productForm, beanId: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
+                            <option value="">-- {t.selectBean || 'Select Bean'} --</option>
+                            {greenBeans.map(bean => <option key={bean.id} value={bean.id}>{bean.label}</option>)}
+                          </select>
+                        </div>
                       </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.roastLevel}</label>
-                        <select value={productForm.roastLevel} onChange={e => setProductForm({ ...productForm, roastLevel: e.target.value as RoastingLevel })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
-                          <option value={RoastingLevel.LIGHT}>{t.light}</option>
-                          <option value={RoastingLevel.MEDIUM}>{t.medium}</option>
-                          <option value={RoastingLevel.DARK}>{t.dark}</option>
-                        </select>
-                      </div>
-                      <div className="space-y-2">
-                        <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.selectBean || 'Bean Type'}</label>
-                        <select value={productForm.beanId} onChange={e => setProductForm({ ...productForm, beanId: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
-                          <option value="">-- {t.selectBean || 'Select Bean'} --</option>
-                          {greenBeans.map(bean => <option key={bean.id} value={bean.id}>{bean.label}</option>)}
-                        </select>
-                      </div>
+                      {productForm.templateId && (() => {
+                        const selectedTemplate = templates.find(t => t.id === productForm.templateId);
+                        if (!selectedTemplate) return null;
+                        return (
+                          <div className="bg-orange-50 rounded-2xl p-4 flex flex-wrap gap-4 text-xs">
+                            <div><span className="font-bold">Weight:</span> {selectedTemplate.weightInKg} kg</div>
+                            <div><span className="font-bold">Unit Cost:</span> {selectedTemplate.unitCost} QAR</div>
+                            <div><span className="font-bold">Shelf Life:</span> {selectedTemplate.shelf_life_days} days</div>
+                            <div><span className="font-bold">SKU Prefix:</span> {selectedTemplate.skuPrefix || '-'}</div>
+                          </div>
+                        );
+                      })()}
                     </div>
                   ) : null}
                   {productForm.type !== 'BEVERAGE' && (
@@ -3418,6 +3574,116 @@ NOTIFY pgrst, 'reload schema';
                 <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-4 sm:py-5 font-black text-black uppercase tracking-widest hover">{t.cancel}</button>
                 <button type="submit" disabled={isSaving} className="flex-[3] bg-orange-600 text-white py-4 sm:py-5 rounded-[24px] font-black shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 sm:gap-4 text-lg sm:text-xl">
                   {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Save size={24} />} {editingId ? t.saveChanges : t.addProduct}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showTemplateModal && (
+        <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-white/60 backdrop-blur-md">
+          <div className="bg-white rounded-[40px] max-w-lg w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8 sm:mb-10 border-b border-orange-50 pb-6 sm:pb-8">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-orange-50 text-black rounded-2xl"><Package size={32} /></div>
+                <h3 className="text-xl sm:text-2xl font-bold">{editingTemplateId ? t.editTemplate : t.newTemplate}</h3>
+              </div>
+              <button onClick={() => setShowTemplateModal(false)} className="p-2 rounded-full transition-colors text-black"><X size={36} /></button>
+            </div>
+
+            <form onSubmit={handleSaveTemplate} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.sizeLabel}</label>
+                <input
+                  type="text"
+                  required
+                  value={templateForm.sizeLabel}
+                  onChange={e => setTemplateForm({ ...templateForm, sizeLabel: e.target.value })}
+                  className="w-full bg-orange-50 border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                  placeholder="e.g., 250g, 500g, 1kg"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.weightInKg}</label>
+                  <input
+                    type="number"
+                    step="0.001"
+                    required
+                    value={templateForm.weightInKg}
+                    onChange={e => setTemplateForm({ ...templateForm, weightInKg: e.target.value })}
+                    className="w-full bg-orange-50 border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                    placeholder="0.25"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.unitCost}</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    value={templateForm.unitCost}
+                    onChange={e => setTemplateForm({ ...templateForm, unitCost: e.target.value })}
+                    className="w-full bg-orange-50 border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                    placeholder="0.00"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.shelfLifeDays}</label>
+                  <input
+                    type="number"
+                    required
+                    value={templateForm.shelfLifeDays}
+                    onChange={e => setTemplateForm({ ...templateForm, shelfLifeDays: e.target.value })}
+                    className="w-full bg-orange-50 border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                    placeholder="180"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.skuPrefix}</label>
+                  <input
+                    type="text"
+                    value={templateForm.skuPrefix}
+                    onChange={e => setTemplateForm({ ...templateForm, skuPrefix: e.target.value })}
+                    className="w-full bg-orange-50 border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                    placeholder="PKG"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.status}</label>
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={templateForm.isActive}
+                      onChange={() => setTemplateForm({ ...templateForm, isActive: true })}
+                      className="h-5 w-5 accent-orange-600"
+                    />
+                    <span className="text-sm font-bold">{t.active}</span>
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      checked={!templateForm.isActive}
+                      onChange={() => setTemplateForm({ ...templateForm, isActive: false })}
+                      className="h-5 w-5 accent-orange-600"
+                    />
+                    <span className="text-sm font-bold">{t.inactive}</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="pt-4 flex flex-col sm:flex-row gap-4 sm:gap-6 border-t border-orange-50">
+                <button type="button" onClick={() => setShowTemplateModal(false)} className="flex-1 py-4 sm:py-5 font-black text-black uppercase tracking-widest hover">{t.cancel}</button>
+                <button type="submit" disabled={isSaving} className="flex-[3] bg-orange-600 text-white py-4 sm:py-5 rounded-[24px] font-black shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3">
+                  {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Save size={24} />} {editingTemplateId ? t.saveChanges : t.addTemplate}
                 </button>
               </div>
             </form>
