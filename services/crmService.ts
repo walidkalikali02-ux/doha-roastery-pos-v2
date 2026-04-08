@@ -13,8 +13,9 @@ export const crmService = {
       .order('created_at', { ascending: false })
       .range(from, to);
 
-    if (searchQuery) {
-      query = query.or(`phone.ilike.%${searchQuery}%,full_name.ilike.%${searchQuery}%`);
+    const normalizedSearch = searchQuery.trim();
+    if (normalizedSearch) {
+      query = query.or(`phone.ilike.%${normalizedSearch}%,full_name.ilike.%${normalizedSearch}%`);
     }
 
     const { data, count, error } = await query;
