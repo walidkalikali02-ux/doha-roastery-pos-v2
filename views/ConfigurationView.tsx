@@ -1692,6 +1692,13 @@ NOTIFY pgrst, 'reload schema';
       return null;
     }
   };
+  const chunkArray = <T,>(items: T[], size: number) => {
+    const chunks: T[][] = [];
+    for (let i = 0; i < items.length; i += size) {
+      chunks.push(items.slice(i, i + size));
+    }
+    return chunks;
+  };
   const escapeCsvValue = (value: string) => `"${value.replace(/"/g, '""')}"`;
   const productCatalogHeaders = [
     'name',
@@ -1786,15 +1793,21 @@ NOTIFY pgrst, 'reload schema';
       if (!isSupportedTextFile) throw new Error('unsupported_format');
 
       const text = await file.text();
+      console.log('Import file content length:', text.length);
       const { text: normalizedText, delimiter } = detectDelimitedFormat(text);
+      console.log('Delimiter detected:', delimiter === '\t' ? 'TAB' : delimiter);
       const rows = parseDelimited(normalizedText, delimiter);
+      console.log('Parsed rows:', rows.length);
       if (rows.length < 2) throw new Error('empty');
       const headers = rows[0].map(h => h.trim().toLowerCase());
+      console.log('Headers:', headers);
       if (!headers.includes('name')) throw new Error('missing_name_header');
+      
       const getValue = (row: string[], key: string) => {
         const idx = headers.indexOf(key);
         return idx >= 0 ? row[idx] ?? '' : '';
       };
+      
       const payloads = rows.slice(1).map(row => {
         const name = getValue(row, 'name').trim();
         if (!name) return null;
@@ -1852,24 +1865,33 @@ NOTIFY pgrst, 'reload schema';
         if (!missingCols.has('template_id')) payload.template_id = getValue(row, 'template_id') || null;
         return payload;
       }).filter(Boolean) as any[];
+      
+      console.log('Payloads to import:', payloads.length);
       if (!payloads.length) throw new Error('empty');
+
+      // Simple upsert by SKU - this will insert new products or update existing ones
       const { error } = await supabase
         .from('product_definitions')
         .upsert(payloads, { onConflict: 'sku' });
-      if (error) throw error;
+      
+      if (error) {
+        console.error('Supabase upsert error:', error);
+        throw error;
+      }
+
       await fetchInitialData();
       setSuccessMsg(t.importSuccess.replace('{count}', String(payloads.length)));
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (error: any) {
+      console.error('Import error details:', error);
       if (error instanceof Error && error.message === 'unsupported_format') {
         alert(t.importUnsupportedFormat);
-      } else if (error instanceof Error && error.message === 'missing_name_header') {
-        alert(t.importMissingHeader);
       } else if (error instanceof Error && error.message === 'empty') {
         alert(t.importEmpty || 'No valid products found in file');
+      } else if (error instanceof Error && error.message === 'missing_name_header') {
+        alert(t.importMissingHeader || 'File must have a "name" column');
       } else {
-        console.error('Catalog import failed', error);
         alert((t.importError || 'Import failed') + ': ' + (error.message || ''));
       }
     } finally {
