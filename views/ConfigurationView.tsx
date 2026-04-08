@@ -1869,14 +1869,53 @@ NOTIFY pgrst, 'reload schema';
       console.log('Payloads to import:', payloads.length);
       if (!payloads.length) throw new Error('empty');
 
-      // Simple upsert by SKU - this will insert new products or update existing ones
-      const { error } = await supabase
+      // Check which SKUs already exist in the database
+      const skuList = payloads.map(p => p.sku).filter(Boolean);
+      const { data: existingProducts } = await supabase
         .from('product_definitions')
-        .upsert(payloads, { onConflict: 'sku' });
+        .select('id, sku')
+        .in('sku', skuList);
       
-      if (error) {
-        console.error('Supabase upsert error:', error);
-        throw error;
+      const existingSkuMap = new Map((existingProducts || []).map(p => [p.sku, p.id]));
+      
+      // Separate into inserts and updates
+      const insertPayloads: any[] = [];
+      const updatePayloads: { id: string; payload: any }[] = [];
+      
+      for (const payload of payloads) {
+        const existingId = existingSkuMap.get(payload.sku);
+        if (existingId) {
+          updatePayloads.push({ id: existingId, payload });
+        } else {
+          insertPayloads.push(payload);
+        }
+      }
+      
+      console.log(`Importing: ${insertPayloads.length} new, ${updatePayloads.length} existing`);
+      
+      // Insert new products
+      if (insertPayloads.length > 0) {
+        const { error: insertError } = await supabase
+          .from('product_definitions')
+          .insert(insertPayloads);
+        if (insertError) {
+          console.error('Insert error:', insertError);
+          throw insertError;
+        }
+      }
+      
+      // Update existing products
+      if (updatePayloads.length > 0) {
+        for (const item of updatePayloads) {
+          const { error: updateError } = await supabase
+            .from('product_definitions')
+            .update(item.payload)
+            .eq('id', item.id);
+          if (updateError) {
+            console.error('Update error for', item.id, updateError);
+            throw updateError;
+          }
+        }
       }
 
       await fetchInitialData();
