@@ -279,14 +279,29 @@ const POSView: React.FC = () => {
       const { data } = await supabase.from('locations').select('*').eq('is_active', true);
       if (data) {
         setLocations(data);
-        // Default to first branch if not set
+        // Default to user's profile location if set, otherwise first branch
         if (!selectedLocationId && data.length > 0) {
-          const branch = data.find(l => l.type === 'BRANCH') || data[0];
-          setSelectedLocationId(branch.id);
+          let defaultLocationId: string | null = null;
+          
+          // First check if user has a profile location
+          if (user?.location_id) {
+            const userLocation = data.find(l => l.id === user.location_id);
+            if (userLocation) {
+              defaultLocationId = userLocation.id;
+            }
+          }
+          
+          // Fall back to first branch if no user location found
+          if (!defaultLocationId) {
+            const branch = data.find(l => l.type === 'BRANCH') || data[0];
+            defaultLocationId = branch.id;
+          }
+          
+          setSelectedLocationId(defaultLocationId);
         }
       }
     } catch (err) { console.error(err); }
-  }, [selectedLocationId]);
+  }, [selectedLocationId, user?.location_id]);
 
   useEffect(() => { fetchLocations(); }, [fetchLocations]);
 
