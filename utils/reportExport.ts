@@ -83,3 +83,152 @@ export const exportPdfPrint = (title: string, sections: ExportSection[]) => {
   printWindow.focus();
   setTimeout(() => printWindow.print(), 250);
 };
+
+export type InvoiceExportPeriod = 'day' | 'week' | 'month';
+
+export interface InvoiceExportData {
+  invoiceNumber: string;
+  date: string;
+  time: string;
+  cashierName: string;
+  customerName: string;
+  items: string;
+  subtotal: number;
+  vatAmount: number;
+  discountAmount: number;
+  total: number;
+  paymentMethod: string;
+  branchName: string;
+  status: string;
+}
+
+const getDateRange = (period: InvoiceExportPeriod, referenceDate?: Date): { start: Date; end: Date } => {
+  const now = referenceDate || new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  
+  switch (period) {
+    case 'day':
+      return { start: today, end: new Date(today.getTime() + 24 * 60 * 60 * 1000 - 1) };
+    case 'week': {
+      const dayOfWeek = today.getDay();
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - dayOfWeek);
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6);
+      endOfWeek.setHours(23, 59, 59, 999);
+      return { start: startOfWeek, end: endOfWeek };
+    }
+    case 'month': {
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      endOfMonth.setHours(23, 59, 59, 999);
+      return { start: startOfMonth, end: endOfMonth };
+    }
+  }
+};
+
+const formatInvoiceItems = (items: any[]): string => {
+  return items.map(item => {
+    const qty = item.quantity || 1;
+    const name = item.name || 'Unknown';
+    const price = (item.price || 0) * qty;
+    const customizations = item.selectedCustomizations 
+      ? ` (${item.selectedCustomizations.size || ''} ${item.selectedCustomizations.milkType || ''} ${item.selectedCustomizations.sugarLevel || ''})`
+      : '';
+    return `${qty}x ${name}${customizations} - ${price.toFixed(2)}`;
+  }).join(' | ');
+};
+
+export const prepareInvoiceExportData = (transactions: any[]): InvoiceExportData[] => {
+  return transactions
+    .filter(tx => !tx.is_returned)
+    .map(tx => ({
+      invoiceNumber: tx.id || '-',
+      date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : (tx.created_at ? new Date(tx.created_at).toLocaleDateString() : '-'),
+      time: tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString() : (tx.created_at ? new Date(tx.created_at).toLocaleTimeString() : '-'),
+      cashierName: tx.cashier_name || '-',
+      customerName: tx.customer_name || '-',
+      items: formatInvoiceItems(tx.items || []),
+      subtotal: tx.subtotal || tx.total || 0,
+      vatAmount: tx.vat_amount || 0,
+      discountAmount: tx.discount_amount || 0,
+      total: tx.total || 0,
+      paymentMethod: tx.paymentMethod || tx.payment_method || '-',
+      branchName: tx.branch_name || '-',
+      status: tx.is_returned ? 'Returned' : 'Completed'
+    }));
+};
+
+export const exportInvoicesToExcel = (
+  filename: string,
+  transactions: any[],
+  periodLabel: string
+) => {
+  const data = prepareInvoiceExportData(transactions);
+  
+  const sections: ExportSection[] = [{
+    title: `${periodLabel}`,
+    columns: [
+      { label: 'Invoice #' },
+      { label: 'Date' },
+      { label: 'Time' },
+      { label: 'Cashier' },
+      { label: 'Customer' },
+      { label: 'Items' },
+      { label: 'Subtotal' },
+      { label: 'VAT' },
+      { label: 'Discount' },
+      { label: 'Total' },
+      { label: 'Payment' },
+      { label: 'Branch' },
+      { label: 'Status' }
+    ],
+    rows: data.map(inv => [
+      inv.invoiceNumber,
+      inv.date,
+      inv.time,
+      inv.cashierName,
+      inv.customerName,
+      inv.items,
+      inv.subtotal.toFixed(2),
+      inv.vatAmount.toFixed(2),
+      inv.discountAmount.toFixed(2),
+      inv.total.toFixed(2),
+      inv.paymentMethod,
+      inv.branchName,
+      inv.status
+    ])
+  }];
+
+  const title = `Invoices - ${periodLabel}`;
+  const html = buildHtml(title, sections);
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+};
+
+export const fetchInvoicesByPeriod = async (
+  supabase: any,
+  period: InvoiceExportPeriod,
+  referenceDate?: Date
+): Promise<any[]> => {
+  const { start, end } = getDateRange(period, referenceDate);
+  
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .gte('created_at', start.toISOString())
+    .lte('created_at', end.toISOString())
+    .order('created_at', { ascending: false });
+  
+  if (error) throw error;
+  return data || [];
+};
+
+export const getPeriodDateRange = getDateRange;

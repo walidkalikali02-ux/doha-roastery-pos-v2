@@ -8,12 +8,13 @@ import {
   ExternalLink, Layers, Search, FlaskConical, Milk, Droplets, Utensils,
   Edit3, Beaker, Archive, HardDrive, Trash, Code2, ClipboardCheck,
   CheckCircle, DatabaseZap, Activity, Terminal, XCircle, FileText, ToggleLeft, ToggleRight,
-  PlusCircle, MinusCircle, Calculator, Package
+  PlusCircle, MinusCircle, Calculator, Package, FileDown
 } from 'lucide-react';
 import { useLanguage, useTheme } from '../App';
 import { PackageTemplate, ProductDefinition, RoastingLevel, UserRole, Recipe, RecipeIngredient, AddOn, InventoryItem, SystemSettings, Location, RoastProfile } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { exportInvoicesToExcel, fetchInvoicesByPeriod, InvoiceExportPeriod } from '../utils/reportExport';
 
 const FULL_SCHEMA_COLUMNS = [
   'id', 'name', 'description', 'category', 'roast_level', 'template_id',
@@ -57,7 +58,7 @@ const ConfigurationView: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
 
-  const [activeSubTab, setActiveSubTab] = useState<'catalog' | 'templates' | 'roastProfiles' | 'greenBeans' | 'database' | 'profile' | 'settings'>('catalog');
+  const [activeSubTab, setActiveSubTab] = useState<'catalog' | 'templates' | 'roastProfiles' | 'greenBeans' | 'database' | 'profile' | 'settings' | 'invoices'>('catalog');
   const [searchTerm, setSearchTerm] = useState('');
   const [skuFilter, setSkuFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -99,6 +100,10 @@ const ConfigurationView: React.FC = () => {
   const [copyingSql, setCopyingSql] = useState(false);
   const [isImportingCatalog, setIsImportingCatalog] = useState(false);
   const catalogImportRef = useRef<HTMLInputElement | null>(null);
+
+  const [invoiceExportPeriod, setInvoiceExportPeriod] = useState<InvoiceExportPeriod>('day');
+  const [invoiceExportLoading, setInvoiceExportLoading] = useState(false);
+  const [invoiceExportError, setInvoiceExportError] = useState<string | null>(null);
 
   const [missingCols, setMissingCols] = useState<Set<string>>(new Set());
   const [dbStatus, setDbStatus] = useState<'checking' | 'ready' | 'needs_update'>('checking');
@@ -2522,7 +2527,7 @@ NOTIFY pgrst, 'reload schema';
       </div>
 
       <div className="flex flex-wrap gap-4 bg-white/50 p-2 rounded-2xl w-full md:w-fit mb-10 overflow-x-auto no-scrollbar">
-        {['catalog', 'templates', 'roastProfiles', 'greenBeans', 'settings', 'database', 'profile'].map(tab => (
+        {['catalog', 'templates', 'roastProfiles', 'greenBeans', 'settings', 'database', 'profile', 'invoices'].map(tab => (
           <button
             key={tab} onClick={() => setActiveSubTab(tab as any)}
             className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${activeSubTab === tab ? 'bg-white  text-black  shadow-sm border border-orange-100 ' : 'text-black hover'}`}
@@ -2539,7 +2544,9 @@ NOTIFY pgrst, 'reload schema';
                       ? 'SQL'
                       : tab === 'settings'
                         ? t.printerSettings
-                        : t.profile}
+                        : tab === 'invoices'
+                          ? (t.exportInvoices || 'Export Invoices')
+                          : t.profile}
           </button>
         ))}
       </div>
@@ -3097,6 +3104,115 @@ NOTIFY pgrst, 'reload schema';
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {activeSubTab === 'invoices' && user?.permissions.includes('can_export_invoices') && (
+        <div className="animate-in slide-in-from-bottom-4">
+          <div className="bg-white rounded-[40px] p-8 md:p-10 border border-orange-100 shadow-sm">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="p-4 bg-orange-50 text-orange-600 rounded-2xl">
+                <FileDown size={32} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black">{t.exportInvoices || 'Export Invoices'}</h3>
+                <p className="text-sm text-stone-500">{(t as any).exportInvoicesDesc || 'Download all invoices for a specific period in Excel format'}</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">{(t as any).selectPeriod || 'Select Period'}</label>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setInvoiceExportPeriod('day')}
+                    className={`px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+                      invoiceExportPeriod === 'day'
+                        ? 'bg-orange-600 text-white shadow-sm'
+                        : 'bg-orange-50 text-orange-900 hover:bg-orange-100'
+                    }`}
+                  >
+                    {(t as any).today || 'Today'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInvoiceExportPeriod('week')}
+                    className={`px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+                      invoiceExportPeriod === 'week'
+                        ? 'bg-orange-600 text-white shadow-sm'
+                        : 'bg-orange-50 text-orange-900 hover:bg-orange-100'
+                    }`}
+                  >
+                    {(t as any).thisWeek || 'This Week'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInvoiceExportPeriod('month')}
+                    className={`px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+                      invoiceExportPeriod === 'month'
+                        ? 'bg-orange-600 text-white shadow-sm'
+                        : 'bg-orange-50 text-orange-900 hover:bg-orange-100'
+                    }`}
+                  >
+                    {(t as any).thisMonth || 'This Month'}
+                  </button>
+                </div>
+              </div>
+
+              {invoiceExportError && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-bold">
+                  {invoiceExportError}
+                </div>
+              )}
+
+              <div className="pt-4">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setInvoiceExportLoading(true);
+                    setInvoiceExportError(null);
+                    try {
+                      const transactions = await fetchInvoicesByPeriod(supabase, invoiceExportPeriod);
+                      const periodLabels = {
+                        day: (t as any).today || 'Today',
+                        week: (t as any).thisWeek || 'This Week',
+                        month: (t as any).thisMonth || 'This Month'
+                      };
+                      const filename = `invoices_${invoiceExportPeriod}_${new Date().toISOString().slice(0, 10)}.xls`;
+                      exportInvoicesToExcel(filename, transactions, periodLabels[invoiceExportPeriod]);
+                    } catch (err: any) {
+                      setInvoiceExportError((t as any).exportFailed || 'Failed to export invoices: ' + err.message);
+                    } finally {
+                      setInvoiceExportLoading(false);
+                    }
+                  }}
+                  disabled={invoiceExportLoading}
+                  className="bg-orange-600 text-white px-8 py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all flex items-center gap-3 disabled:opacity-60"
+                >
+                  {invoiceExportLoading ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    <FileDown size={20} />
+                  )}
+                  {(t as any).downloadInvoices || 'Download Invoices'}
+                </button>
+              </div>
+
+              <div className="pt-4 border-t border-orange-100">
+                <p className="text-xs text-stone-500">
+                  {(t as any).exportInvoicesNote || 'Exported file will include invoice number, date, time, cashier, customer, items, subtotal, VAT, discount, total, payment method, branch, and status.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === 'invoices' && !user?.permissions.includes('can_export_invoices') && (
+        <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700">
+          <p className="font-bold">{(t as any).accessDenied || 'Access Denied'}</p>
+          <p className="text-sm">{(t as any).noExportPermission || 'You do not have permission to export invoices.'}</p>
         </div>
       )}
 

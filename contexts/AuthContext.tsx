@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const getPermissionsForRole = (role: UserRole): string[] => {
     switch (role) {
       case UserRole.ADMIN:
-        return ['can_delete', 'can_edit_stock', 'can_roast', 'can_sell', 'can_view_reports'];
+        return ['can_delete', 'can_edit_stock', 'can_roast', 'can_sell', 'can_view_reports', 'can_export_invoices'];
       case UserRole.MANAGER:
         return ['can_edit_stock', 'can_roast', 'can_sell', 'can_view_reports'];
       case UserRole.HR:
