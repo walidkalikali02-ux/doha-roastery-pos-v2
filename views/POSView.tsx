@@ -712,7 +712,6 @@ const POSView: React.FC = () => {
         location_id: selectedLocationId || null,
         items: enrichedItems,
         subtotal: totals.subtotal,
-        discount_amount: discountAmount,
         vat_amount: totals.vat,
         total: totals.total,
         payment_method: paymentMethod,
