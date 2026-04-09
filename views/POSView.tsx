@@ -659,7 +659,6 @@ const POSView: React.FC = () => {
       const transactionData = {
         id: crypto.randomUUID(),
         location_id: selectedLocationId || null,
-        branch_name: locations.find(l => l.id === selectedLocationId)?.name || null,
         items: enrichedItems,
         subtotal: totals.subtotal,
         vat_amount: totals.vat,
