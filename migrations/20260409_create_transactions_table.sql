@@ -26,14 +26,27 @@ CREATE TABLE IF NOT EXISTS public.transactions (
 -- Enable RLS
 ALTER TABLE public.transactions ENABLE ROW LEVEL SECURITY;
 
--- Create policies
-CREATE POLICY "Enable insert access for authenticated users" 
-  ON public.transactions FOR INSERT 
-  WITH CHECK (auth.role() = 'authenticated');
+-- Create policies (only if they don't exist)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE tablename = 'transactions' AND policyname = 'Enable insert access for authenticated users'
+  ) THEN
+    CREATE POLICY "Enable insert access for authenticated users" 
+      ON public.transactions FOR INSERT 
+      WITH CHECK (auth.role() = 'authenticated');
+  END IF;
 
-CREATE POLICY "Enable read access for authenticated users" 
-  ON public.transactions FOR SELECT 
-  USING (auth.role() = 'authenticated');
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies 
+    WHERE tablename = 'transactions' AND policyname = 'Enable read access for authenticated users'
+  ) THEN
+    CREATE POLICY "Enable read access for authenticated users" 
+      ON public.transactions FOR SELECT 
+      USING (auth.role() = 'authenticated');
+  END IF;
+END $$;
 
 -- Create index for faster queries
 CREATE INDEX IF NOT EXISTS idx_transactions_location_id ON public.transactions(location_id);
