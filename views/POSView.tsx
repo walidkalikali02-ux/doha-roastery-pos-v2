@@ -656,9 +656,14 @@ const POSView: React.FC = () => {
         };
       });
 
+      // Get branch name from selected location
+      const selectedLocation = locations.find(l => l.id === selectedLocationId);
+      const branchName = selectedLocation?.name || null;
+
       const transactionData = {
         id: crypto.randomUUID(),
         location_id: selectedLocationId || null,
+        branch_name: branchName,
         items: enrichedItems,
         subtotal: totals.subtotal,
         vat_amount: totals.vat,
