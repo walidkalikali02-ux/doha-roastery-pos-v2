@@ -1219,10 +1219,6 @@ const POSView: React.FC = () => {
                 <span className="opacity-70">{t.date}:</span>
                 <span>{lastTransaction ? new Date(lastTransaction.created_at).toLocaleString(lang === 'ar' ? 'ar-QA' : 'en-US') : ''}</span>
               </div>
-              <div className="flex justify-between">
-                <span className="opacity-70">{t.cashierLabel}:</span>
-                <span>{lastTransaction?.cashier_name}</span>
-              </div>
             </div>
 
             <div className="border-b-2 border-dashed border-orange-600 mb-3"></div>
