@@ -1119,7 +1119,6 @@ const POSView: React.FC = () => {
             </div>
           </div>
           <div className={`${settings.printer_width === '58mm' ? 'text-lg' : 'text-xl'} font-black uppercase mb-1`}>{settings.store_name || t.appName}</div>
-          <div className="text-[10px] opacity-80">{settings.store_address || t.storeAddress}</div>
           <div className="text-[10px] opacity-80">{t.storeCity} | {settings.store_phone || t.storePhone}</div>
 
           {lastReturnRequest && (
