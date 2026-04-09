@@ -2244,6 +2244,18 @@ const POSView: React.FC = () => {
             </div>
 
             <div className="space-y-4 mb-8">
+              {/* Branch Selector */}
+              <select
+                value={selectedLocationId}
+                onChange={e => setSelectedLocationId(e.target.value)}
+                className="w-full p-4 bg-white rounded-2xl font-bold text-sm border border-orange-100 outline-none focus:border-orange-600 transition-all text-black"
+              >
+                <option value="" disabled>-- {t.selectBranch || 'Select Branch'} --</option>
+                {locations.filter(l => l.is_active).map(loc => (
+                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+                ))}
+              </select>
+
               <input
                 type="number"
                 autoFocus
@@ -2256,7 +2268,7 @@ const POSView: React.FC = () => {
 
             <button
               onClick={handleStartShift}
-              disabled={!startCash || isProcessing}
+              disabled={!startCash || !selectedLocationId || isProcessing}
               className="w-full py-5 bg-orange-600 text-white rounded-[24px] font-black text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-3 border-2 border-orange-600 hover"
             >
               {isProcessing ? <Loader2 className="animate-spin" /> : <CheckCircle2 />} {t.openDrawer}
