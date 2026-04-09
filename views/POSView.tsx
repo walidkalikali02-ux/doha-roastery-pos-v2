@@ -291,8 +291,12 @@ const POSView: React.FC = () => {
       const { data } = await supabase.from('locations').select('*').eq('is_active', true);
       if (data) {
         setLocations(data);
-        // Default to user's profile location if set, otherwise first branch
-        if (!selectedLocationId && data.length > 0) {
+        
+        // Check if user already has a saved location in localStorage
+        const savedLocation = typeof window !== 'undefined' ? localStorage.getItem('pos_selected_location') : null;
+        
+        // Default to user's profile location if set, otherwise first branch, or saved location
+        if ((!selectedLocationId || !savedLocation) && data.length > 0) {
           let defaultLocationId: string | null = null;
           
           // First check if user has a profile location
@@ -303,20 +307,31 @@ const POSView: React.FC = () => {
             }
           }
           
-          // Fall back to first branch if no user location found
+          // Fall back to saved location if no user location found
+          if (!defaultLocationId && savedLocation) {
+            const savedLoc = data.find(l => l.id === savedLocation);
+            if (savedLoc) {
+              defaultLocationId = savedLoc.id;
+            }
+          }
+          
+          // Fall back to first branch if no saved location found
           if (!defaultLocationId) {
             const branch = data.find(l => l.type === 'BRANCH') || data[0];
             defaultLocationId = branch.id;
           }
           
-          // Only set if we have a valid default and current is empty
+          // Only set if we have a valid default
           if (defaultLocationId) {
-            persistLocation(defaultLocationId);
+            setSelectedLocationId(defaultLocationId);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('pos_selected_location', defaultLocationId);
+            }
           }
         }
       }
     } catch (err) { console.error(err); }
-  }, [selectedLocationId, user?.location_id]);
+  }, [user?.location_id]);
 
   useEffect(() => { fetchLocations(); }, [fetchLocations]);
 
