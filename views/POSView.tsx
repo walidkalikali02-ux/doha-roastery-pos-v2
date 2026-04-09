@@ -87,7 +87,19 @@ const POSView: React.FC = () => {
 
   // Location Management State
   const [locations, setLocations] = useState<Location[]>([]);
-  const [selectedLocationId, setSelectedLocationId] = useState<string>('');
+  const [selectedLocationId, setSelectedLocationId] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('pos_selected_location') || '';
+    }
+    return '';
+  });
+
+  const persistLocation = (id: string) => {
+    setSelectedLocationId(id);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('pos_selected_location', id);
+    }
+  };
 
   // Checkout & Results State
   const [showSuccess, setShowSuccess] = useState(false);
@@ -297,7 +309,10 @@ const POSView: React.FC = () => {
             defaultLocationId = branch.id;
           }
           
-          setSelectedLocationId(defaultLocationId);
+          // Only set if we have a valid default and current is empty
+          if (defaultLocationId) {
+            persistLocation(defaultLocationId);
+          }
         }
       }
     } catch (err) { console.error(err); }
@@ -1571,7 +1586,7 @@ const POSView: React.FC = () => {
             <div className="relative">
               <select
                 value={selectedLocationId}
-                onChange={e => setSelectedLocationId(e.target.value)}
+                onChange={e => persistLocation(e.target.value)}
                 className="appearance-none p-4 pr-10 bg-white rounded-2xl font-bold text-xs flex items-center gap-2 border border-orange-100 outline-none focus:border-orange-600 transition-all min-w-[160px]"
               >
                 <option value="" disabled>-- {t.locationName || 'Location'} --</option>
@@ -2247,7 +2262,7 @@ const POSView: React.FC = () => {
               {/* Branch Selector */}
               <select
                 value={selectedLocationId}
-                onChange={e => setSelectedLocationId(e.target.value)}
+                onChange={e => persistLocation(e.target.value)}
                 className="w-full p-4 bg-white rounded-2xl font-bold text-sm border border-orange-100 outline-none focus:border-orange-600 transition-all text-black"
               >
                 <option value="" disabled>-- {t.selectBranch || 'Select Branch'} --</option>
