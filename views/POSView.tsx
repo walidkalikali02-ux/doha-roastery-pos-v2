@@ -656,14 +656,9 @@ const POSView: React.FC = () => {
         };
       });
 
-      // Get branch name from selected location
-      const selectedLocation = locations.find(l => l.id === selectedLocationId);
-      const branchName = selectedLocation?.name || null;
-
       const transactionData = {
         id: crypto.randomUUID(),
         location_id: selectedLocationId || null,
-        branch_name: branchName,
         items: enrichedItems,
         subtotal: totals.subtotal,
         vat_amount: totals.vat,
@@ -1124,9 +1119,6 @@ const POSView: React.FC = () => {
             </div>
           </div>
           <div className={`${settings.printer_width === '58mm' ? 'text-lg' : 'text-xl'} font-black uppercase mb-1`}>{settings.store_name || t.appName}</div>
-          {(lastTransaction?.branch_name || lastReturnRequest) && (
-            <div className="text-[10px] font-bold mb-1">{lastTransaction?.branch_name || locations.find(l => l.id === selectedLocationId)?.name}</div>
-          )}
           <div className="text-[10px] opacity-80">{settings.store_address || t.storeAddress}</div>
           <div className="text-[10px] opacity-80">{t.storeCity} | {settings.store_phone || t.storePhone}</div>
 
