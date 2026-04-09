@@ -240,6 +240,8 @@ export interface Transaction {
   return_id?: string;
   customer_id?: string;
   customer_name?: string;
+  location_id?: string;
+  branch_name?: string;
 }
 
 export interface Customer {
