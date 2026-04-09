@@ -6,7 +6,7 @@ import {
   LayoutGrid, ShoppingCart, Check, Smartphone,
   Receipt, Printer, Scissors, PlusCircle,
   Clock, User as UserIcon, History, ChevronDown,
-  SearchX, RefreshCw
+  SearchX, RefreshCw, Percent
 } from 'lucide-react';
 import { InventoryItem, CartItem, AddOn, PaymentMethod, PaymentBreakdown, SystemSettings, Shift, Location, ReturnRequest, BeverageCustomization } from '../types';
 import { useLanguage } from '../App';
@@ -124,6 +124,10 @@ const POSView: React.FC = () => {
   const [splitBreakdown, setSplitBreakdown] = useState<PaymentBreakdown>({ cash: 0, card: 0, mobile: 0, card_reference: '' });
   const [cardReference, setCardReference] = useState(''); // REQ-003: State for card reference
   const [showCardInput, setShowCardInput] = useState(false); // UI state for single card payment reference input
+
+  // Discount State
+  const [discountPercent, setDiscountPercent] = useState<number>(0);
+  const [showDiscountInput, setShowDiscountInput] = useState(false);
 
   // Shift Management State
   const [currentShift, setCurrentShift] = useState<Shift | null>(null);
@@ -664,10 +668,12 @@ const POSView: React.FC = () => {
 
   const totals = useMemo(() => {
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const vat = subtotal * settings.vat_rate;
-    const total = subtotal + vat;
-    return { subtotal, vat, total };
-  }, [cart, settings.vat_rate]);
+    const discountAmount = subtotal * (discountPercent / 100);
+    const discountedSubtotal = subtotal - discountAmount;
+    const vat = discountedSubtotal * settings.vat_rate;
+    const total = discountedSubtotal + vat;
+    return { subtotal, discountAmount, discountedSubtotal, vat, total };
+  }, [cart, settings.vat_rate, discountPercent]);
 
   const handleCheckout = async (paymentMethod: PaymentMethod, breakdown?: PaymentBreakdown, receivedAmount?: number) => {
     if (cart.length === 0 || isProcessing) return;
@@ -707,6 +713,8 @@ const POSView: React.FC = () => {
         location_id: selectedLocationId || null,
         items: enrichedItems,
         subtotal: totals.subtotal,
+        discount_percent: discountPercent,
+        discount_amount: totals.discountAmount,
         vat_amount: totals.vat,
         total: totals.total,
         payment_method: paymentMethod,
@@ -818,6 +826,8 @@ const POSView: React.FC = () => {
       setShowCardInput(false);
       setCashReceived('');
       setCardReference('');
+      setDiscountPercent(0);
+      setShowDiscountInput(false);
       fetchInventory();
       checkShift(); // Update shift totals
     } catch (error) {
@@ -1314,8 +1324,8 @@ const POSView: React.FC = () => {
                 </div>
               )}
               {lastTransaction?.discount_amount > 0 && (
-                <div className="flex justify-between text-black">
-                  <span className="opacity-70">{t.discount}</span>
+                <div className="flex justify-between text-green-600">
+                  <span className="opacity-70">{t.discount || 'Discount'} ({lastTransaction.discount_percent || discountPercent}%)</span>
                   <span className="font-bold">-{lastTransaction.discount_amount.toFixed(2)} {t.currency}</span>
                 </div>
               )}
@@ -2095,6 +2105,46 @@ const POSView: React.FC = () => {
               <span>{t.subtotal}</span>
               <span>{totals.subtotal.toFixed(2)}</span>
             </div>
+            
+            {/* Discount Section */}
+            {discountPercent > 0 && (
+              <div className="flex justify-between text-xs font-bold text-green-600">
+                <span>{t.discount || 'Discount'} ({discountPercent}%)</span>
+                <span>-{totals.discountAmount.toFixed(2)}</span>
+              </div>
+            )}
+            
+            {/* Discount Input Toggle */}
+            <button
+              onClick={() => setShowDiscountInput(!showDiscountInput)}
+              className="w-full py-2 text-xs font-bold text-orange-600 flex items-center justify-center gap-1 hover:bg-orange-50 rounded-lg transition-colors"
+            >
+              <Percent size={14} />
+              {discountPercent > 0 ? (t.editDiscount || 'Edit Discount') : (t.addDiscount || 'Add Discount')}
+            </button>
+            
+            {/* Discount Input */}
+            {showDiscountInput && (
+              <div className="flex gap-2 items-center bg-orange-50 p-2 rounded-xl animate-in slide-in-from-top-2">
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={discountPercent || ''}
+                  onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
+                  className="w-20 px-3 py-2 text-sm font-bold rounded-lg border border-orange-200 outline-none focus:border-orange-600"
+                  placeholder="0"
+                />
+                <span className="text-sm font-bold text-black">%</span>
+                <button
+                  onClick={() => { setDiscountPercent(0); setShowDiscountInput(false); }}
+                  className="ml-auto px-3 py-1 text-xs font-bold bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
+                >
+                  {t.clear || 'Clear'}
+                </button>
+              </div>
+            )}
+            
             <div className="flex justify-between items-center pt-3 border-t border-dashed border-orange-100 ">
               <span className="text-sm font-black uppercase">{t.total}</span>
               <span className="text-3xl font-black font-mono">{totals.total.toFixed(2)} <span className="text-xs font-bold opacity-50">{t.currency}</span></span>
@@ -2107,6 +2157,8 @@ const POSView: React.FC = () => {
                 if (confirm(t.cancelOrderConfirm || 'Are you sure you want to cancel this order?')) {
                   setCart([]);
                   setSelectedCustomer(null);
+                  setDiscountPercent(0);
+                  setShowDiscountInput(false);
                 }
               }}
               disabled={isProcessing}
