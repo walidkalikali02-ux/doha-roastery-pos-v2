@@ -15,6 +15,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { shiftService } from '../services/shiftService';
 import { crmService } from '../services/crmService';
 import { Customer } from '../types';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface TransactionData {
   id: string;
@@ -1330,17 +1331,18 @@ const POSView: React.FC = () => {
             </div>
           )}
 
-          <div className="flex justify-center mb-6">
+          <div className="flex justify-center mb-4">
             <div className="p-2 bg-white border-2 border-orange-600 rounded-xl">
-              <img
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${lastTransaction?.id}`}
-                className="w-24 h-24 grayscale"
-                alt="QR"
+              <QRCodeSVG
+                value="https://doharoastery.com"
+                size={96}
+                level="M"
+                includeMargin={false}
               />
             </div>
           </div>
 
-          <div className="text-[9px] font-black opacity-40 uppercase tracking-[0.2em] mb-2">www.doharoastery.com</div>
+          <div className="text-[9px] font-black opacity-40 uppercase tracking-[0.2em] mb-2">doharoastery.com</div>
           <div className="text-[8px] opacity-30 mb-4 font-mono">ID: {lastTransaction?.id}</div>
 
           <div className="border-t border-orange-100 pt-4 text-[8px] opacity-40 uppercase italic font-bold">
