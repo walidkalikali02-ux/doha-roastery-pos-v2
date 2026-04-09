@@ -216,16 +216,23 @@ export const exportInvoicesToExcel = (
 export const fetchInvoicesByPeriod = async (
   supabase: any,
   period: InvoiceExportPeriod,
-  referenceDate?: Date
+  referenceDate?: Date,
+  locationId?: string
 ): Promise<any[]> => {
   const { start, end } = getDateRange(period, referenceDate);
   
-  const { data, error } = await supabase
+  let query = supabase
     .from('transactions')
     .select('*')
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString())
     .order('created_at', { ascending: false });
+  
+  if (locationId) {
+    query = query.eq('location_id', locationId);
+  }
+  
+  const { data, error } = await query;
   
   if (error) throw error;
   return data || [];

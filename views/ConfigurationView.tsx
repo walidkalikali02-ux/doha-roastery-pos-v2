@@ -104,6 +104,7 @@ const ConfigurationView: React.FC = () => {
   const [invoiceExportPeriod, setInvoiceExportPeriod] = useState<InvoiceExportPeriod>('day');
   const [invoiceExportLoading, setInvoiceExportLoading] = useState(false);
   const [invoiceExportError, setInvoiceExportError] = useState<string | null>(null);
+  const [invoiceExportBranch, setInvoiceExportBranch] = useState<string>('');
 
   const [missingCols, setMissingCols] = useState<Set<string>>(new Set());
   const [dbStatus, setDbStatus] = useState<'checking' | 'ready' | 'needs_update'>('checking');
@@ -3160,6 +3161,20 @@ NOTIFY pgrst, 'reload schema';
                 </div>
               </div>
 
+              <div className="space-y-3">
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">{(t as any).selectBranch || 'Select Branch'}</label>
+                <select
+                  value={invoiceExportBranch}
+                  onChange={(e) => setInvoiceExportBranch(e.target.value)}
+                  className="w-full md:w-64 bg-orange-50 border-none rounded-xl px-4 py-3 font-bold text-sm"
+                >
+                  <option value="">{(t as any).allBranches || 'All Branches'}</option>
+                  {locations.filter(l => l.is_active).map(loc => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+              </div>
+
               {invoiceExportError && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-sm font-bold">
                   {invoiceExportError}
@@ -3173,14 +3188,18 @@ NOTIFY pgrst, 'reload schema';
                     setInvoiceExportLoading(true);
                     setInvoiceExportError(null);
                     try {
-                      const transactions = await fetchInvoicesByPeriod(supabase, invoiceExportPeriod);
+                      const transactions = await fetchInvoicesByPeriod(supabase, invoiceExportPeriod, undefined, invoiceExportBranch || undefined);
                       const periodLabels = {
                         day: (t as any).today || 'Today',
                         week: (t as any).thisWeek || 'This Week',
                         month: (t as any).thisMonth || 'This Month'
                       };
-                      const filename = `invoices_${invoiceExportPeriod}_${new Date().toISOString().slice(0, 10)}.xls`;
-                      exportInvoicesToExcel(filename, transactions, periodLabels[invoiceExportPeriod]);
+                      const branchLabel = invoiceExportBranch ? `_${locations.find(l => l.id === invoiceExportBranch)?.name.replace(/\s+/g, '_') || ''}` : '';
+                      const filename = `invoices_${invoiceExportPeriod}${branchLabel}_${new Date().toISOString().slice(0, 10)}.xls`;
+                      const fullPeriodLabel = invoiceExportBranch 
+                        ? `${periodLabels[invoiceExportPeriod]} - ${locations.find(l => l.id === invoiceExportBranch)?.name || ''}`
+                        : periodLabels[invoiceExportPeriod];
+                      exportInvoicesToExcel(filename, transactions, fullPeriodLabel);
                     } catch (err: any) {
                       setInvoiceExportError((t as any).exportFailed || 'Failed to export invoices: ' + err.message);
                     } finally {
