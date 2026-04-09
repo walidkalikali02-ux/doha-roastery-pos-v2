@@ -126,7 +126,7 @@ const POSView: React.FC = () => {
   const [showCardInput, setShowCardInput] = useState(false); // UI state for single card payment reference input
 
   // Discount State
-  const [discountPercent, setDiscountPercent] = useState<number>(0);
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
   const [showDiscountInput, setShowDiscountInput] = useState(false);
 
   // Shift Management State
@@ -668,12 +668,11 @@ const POSView: React.FC = () => {
 
   const totals = useMemo(() => {
     const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const discountAmount = subtotal * (discountPercent / 100);
-    const discountedSubtotal = subtotal - discountAmount;
+    const discountedSubtotal = Math.max(0, subtotal - discountAmount);
     const vat = discountedSubtotal * settings.vat_rate;
     const total = discountedSubtotal + vat;
     return { subtotal, discountAmount, discountedSubtotal, vat, total };
-  }, [cart, settings.vat_rate, discountPercent]);
+  }, [cart, settings.vat_rate, discountAmount]);
 
   const handleCheckout = async (paymentMethod: PaymentMethod, breakdown?: PaymentBreakdown, receivedAmount?: number) => {
     if (cart.length === 0 || isProcessing) return;
@@ -713,8 +712,7 @@ const POSView: React.FC = () => {
         location_id: selectedLocationId || null,
         items: enrichedItems,
         subtotal: totals.subtotal,
-        discount_percent: discountPercent,
-        discount_amount: totals.discountAmount,
+        discount_amount: discountAmount,
         vat_amount: totals.vat,
         total: totals.total,
         payment_method: paymentMethod,
@@ -826,7 +824,7 @@ const POSView: React.FC = () => {
       setShowCardInput(false);
       setCashReceived('');
       setCardReference('');
-      setDiscountPercent(0);
+      setDiscountAmount(0);
       setShowDiscountInput(false);
       fetchInventory();
       checkShift(); // Update shift totals
@@ -1325,7 +1323,7 @@ const POSView: React.FC = () => {
               )}
               {lastTransaction?.discount_amount > 0 && (
                 <div className="flex justify-between text-green-600">
-                  <span className="opacity-70">{t.discount || 'Discount'} ({lastTransaction.discount_percent || discountPercent}%)</span>
+                  <span className="opacity-70">{t.discount || 'Discount'}</span>
                   <span className="font-bold">-{lastTransaction.discount_amount.toFixed(2)} {t.currency}</span>
                 </div>
               )}
@@ -2107,10 +2105,10 @@ const POSView: React.FC = () => {
             </div>
             
             {/* Discount Section */}
-            {discountPercent > 0 && (
+            {discountAmount > 0 && (
               <div className="flex justify-between text-xs font-bold text-green-600">
-                <span>{t.discount || 'Discount'} ({discountPercent}%)</span>
-                <span>-{totals.discountAmount.toFixed(2)}</span>
+                <span>{t.discount || 'Discount'}</span>
+                <span>-{discountAmount.toFixed(2)}</span>
               </div>
             )}
             
@@ -2119,8 +2117,8 @@ const POSView: React.FC = () => {
               onClick={() => setShowDiscountInput(!showDiscountInput)}
               className="w-full py-2 text-xs font-bold text-orange-600 flex items-center justify-center gap-1 hover:bg-orange-50 rounded-lg transition-colors"
             >
-              <Percent size={14} />
-              {discountPercent > 0 ? (t.editDiscount || 'Edit Discount') : (t.addDiscount || 'Add Discount')}
+              <Banknote size={14} />
+              {discountAmount > 0 ? (t.editDiscount || 'Edit Discount') : (t.addDiscount || 'Add Discount')}
             </button>
             
             {/* Discount Input */}
@@ -2129,15 +2127,15 @@ const POSView: React.FC = () => {
                 <input
                   type="number"
                   min="0"
-                  max="100"
-                  value={discountPercent || ''}
-                  onChange={(e) => setDiscountPercent(Math.min(100, Math.max(0, parseInt(e.target.value) || 0)))}
-                  className="w-20 px-3 py-2 text-sm font-bold rounded-lg border border-orange-200 outline-none focus:border-orange-600"
-                  placeholder="0"
+                  step="0.01"
+                  value={discountAmount || ''}
+                  onChange={(e) => setDiscountAmount(Math.max(0, parseFloat(e.target.value) || 0))}
+                  className="w-24 px-3 py-2 text-sm font-bold rounded-lg border border-orange-200 outline-none focus:border-orange-600"
+                  placeholder="0.00"
                 />
-                <span className="text-sm font-bold text-black">%</span>
+                <span className="text-sm font-bold text-black">{t.currency}</span>
                 <button
-                  onClick={() => { setDiscountPercent(0); setShowDiscountInput(false); }}
+                  onClick={() => { setDiscountAmount(0); setShowDiscountInput(false); }}
                   className="ml-auto px-3 py-1 text-xs font-bold bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
                 >
                   {t.clear || 'Clear'}
@@ -2157,7 +2155,7 @@ const POSView: React.FC = () => {
                 if (confirm(t.cancelOrderConfirm || 'Are you sure you want to cancel this order?')) {
                   setCart([]);
                   setSelectedCustomer(null);
-                  setDiscountPercent(0);
+                  setDiscountAmount(0);
                   setShowDiscountInput(false);
                 }
               }}
