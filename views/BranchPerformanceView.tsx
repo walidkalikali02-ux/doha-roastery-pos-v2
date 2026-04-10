@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useLanguage } from '../App';
-import { TrendingUp, TrendingDown, BarChart3, PieChart, Users, DollarSign, Coffee, ArrowUpDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, PieChart, Users, DollarSign, Coffee, ArrowUpDown, ArrowRightLeft, X, Loader2 } from 'lucide-react';
 
 interface BranchStats {
   id: string;
@@ -22,6 +22,13 @@ const BranchPerformanceView: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('month');
   const [sortBy, setSortBy] = useState<'sales' | 'transactions' | 'growth'>('sales');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  
+  const [locations, setLocations] = useState<any[]>([]);
+  const [showConvertModal, setShowConvertModal] = useState(false);
+  const [sourceBranch, setSourceBranch] = useState<string>('');
+  const [targetBranch, setTargetBranch] = useState<string>('');
+  const [isConverting, setIsConverting] = useState(false);
+  const [convertResult, setConvertResult] = useState<{ success: boolean; count: number } | null>(null);
 
   useEffect(() => {
     fetchBranchPerformance();
@@ -31,6 +38,10 @@ const BranchPerformanceView: React.FC = () => {
     setIsLoading(true);
     try {
       const { data: locations } = await supabase.from('locations').select('*').order('name');
+      
+      if (locations) {
+        setLocations(locations);
+      }
       
       if (!locations) {
         setBranchStats([]);
@@ -191,6 +202,43 @@ const BranchPerformanceView: React.FC = () => {
     }
   };
 
+  const handleConvertTransactions = async () => {
+    if (!sourceBranch || !targetBranch || sourceBranch === targetBranch) {
+      return;
+    }
+
+    setIsConverting(true);
+    setConvertResult(null);
+
+    try {
+      const sourceLocation = locations.find(l => l.id === sourceBranch);
+      const targetLocation = locations.find(l => l.id === targetBranch);
+
+      const { data, error } = await supabase
+        .from('transactions')
+        .update({ 
+          location_id: targetBranch,
+          branch_name: targetLocation?.name 
+        })
+        .eq('location_id', sourceBranch)
+        .select('id');
+
+      if (error) throw error;
+
+      const count = data?.length || 0;
+      setConvertResult({ success: true, count });
+      
+      setTimeout(() => {
+        fetchBranchPerformance();
+      }, 500);
+    } catch (error) {
+      console.error('Error converting transactions:', error);
+      setConvertResult({ success: false, count: 0 });
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -222,6 +270,14 @@ const BranchPerformanceView: React.FC = () => {
             </button>
           ))}
         </div>
+        
+        <button
+          onClick={() => setShowConvertModal(true)}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-colors"
+        >
+          <ArrowRightLeft size={16} />
+          {t.convertTransactions || 'Convert Transactions'}
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -410,6 +466,83 @@ const BranchPerformanceView: React.FC = () => {
           </div>
         ))}
       </div>
+
+      {/* Convert Transactions Modal */}
+      {showConvertModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-[24px] p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-black">{t.convertTransactions || 'Convert Transactions'}</h3>
+              <button onClick={() => setShowConvertModal(false)} className="p-2 hover:bg-gray-100 rounded-full">
+                <X size={24} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-6">
+              {t.convertTransactionsDesc || 'Move all transactions from one branch to another. This action cannot be undone.'}
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">{t.sourceBranch || 'Source Branch'}</label>
+                <select
+                  value={sourceBranch}
+                  onChange={e => setSourceBranch(e.target.value)}
+                  className="w-full p-3 border border-gray-200 rounded-xl text-black"
+                >
+                  <option value="">{t.selectBranch || 'Select Branch'}</option>
+                  {locations.filter(l => l.is_active !== false).map(loc => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">{t.targetBranch || 'Target Branch'}</label>
+                <select
+                  value={targetBranch}
+                  onChange={e => setTargetBranch(e.target.value)}
+                  className="w-full p-3 border border-gray-200 rounded-xl text-black"
+                >
+                  <option value="">{t.selectBranch || 'Select Branch'}</option>
+                  {locations.filter(l => l.is_active !== false).map(loc => (
+                    <option key={loc.id} value={loc.id}>{loc.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {convertResult && (
+              <div className={`mt-4 p-4 rounded-xl ${convertResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {convertResult.success 
+                  ? `${t.successConverted || 'Successfully converted'} ${convertResult.count} ${t.transactions || 'transactions'}`
+                  : (t.conversionFailed || 'Conversion failed')}
+              </div>
+            )}
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setShowConvertModal(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"
+              >
+                {t.cancel || 'Cancel'}
+              </button>
+              <button
+                onClick={handleConvertTransactions}
+                disabled={!sourceBranch || !targetBranch || sourceBranch === targetBranch || isConverting}
+                className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isConverting ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    {t.converting || 'Converting...'}
+                  </>
+                ) : t.convert || 'Convert'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
