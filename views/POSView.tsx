@@ -296,6 +296,18 @@ const POSView: React.FC = () => {
       if (data) {
         setLocations(data);
         
+        // For CASHIER users, always use their assigned location_id
+        if (user?.role === 'CASHIER' && user?.location_id) {
+          const cashierLocation = data.find(l => l.id === user.location_id);
+          if (cashierLocation) {
+            setSelectedLocationId(cashierLocation.id);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('pos_selected_location', cashierLocation.id);
+            }
+            return; // Exit early for cashiers
+          }
+        }
+        
         // Check if user already has a saved location in localStorage
         const savedLocation = typeof window !== 'undefined' ? localStorage.getItem('pos_selected_location') : null;
         
@@ -335,7 +347,7 @@ const POSView: React.FC = () => {
         }
       }
     } catch (err) { console.error(err); }
-  }, [user?.location_id]);
+  }, [user?.location_id, user?.role]);
 
   useEffect(() => { fetchLocations(); }, [fetchLocations]);
 
