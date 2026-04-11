@@ -214,6 +214,8 @@ const BranchPerformanceView: React.FC = () => {
       const sourceLocation = locations.find(l => l.id === sourceBranch);
       const targetLocation = locations.find(l => l.id === targetBranch);
 
+      console.log('Converting transactions:', { sourceBranch, targetBranch, sourceLocation, targetLocation });
+
       const { data, error } = await supabase
         .from('transactions')
         .update({ 
@@ -223,14 +225,23 @@ const BranchPerformanceView: React.FC = () => {
         .eq('location_id', sourceBranch)
         .select('id');
 
-      if (error) throw error;
+      console.log('Convert result:', { data, error });
 
-      const count = data?.length || 0;
-      setConvertResult({ success: true, count });
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      const convertedCount = data?.length || 0;
+      setConvertResult({ success: true, count: convertedCount });
+      
+      setSourceBranch('');
+      setTargetBranch('');
       
       setTimeout(() => {
+        setShowConvertModal(false);
         fetchBranchPerformance();
-      }, 500);
+      }, 1000);
     } catch (error) {
       console.error('Error converting transactions:', error);
       setConvertResult({ success: false, count: 0 });
