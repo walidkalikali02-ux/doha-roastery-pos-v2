@@ -163,32 +163,30 @@ const formatPaymentBreakdown = (breakdown: any): string => {
 };
 
 export const prepareInvoiceExportData = (transactions: any[]): InvoiceExportData[] => {
-  return transactions
-    .filter(tx => !tx.is_returned)
-    .map(tx => ({
-      invoiceNumber: tx.id || '-',
-      date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : (tx.created_at ? new Date(tx.created_at).toLocaleDateString() : '-'),
-      time: tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString() : (tx.created_at ? new Date(tx.created_at).toLocaleTimeString() : '-'),
-      cashierName: tx.cashier_name || '-',
-      cashierId: tx.user_id || '-',
-      customerId: tx.customer_id || '-',
-      customerName: tx.customer_name || '-',
-      locationId: tx.location_id || '-',
-      branchName: tx.branch_name || '-',
-      items: formatInvoiceItems(tx.items || []),
-      subtotal: tx.subtotal || tx.total || 0,
-      vatAmount: tx.vat_amount || 0,
-      discountPercent: tx.discount_percent || 0,
-      discountAmount: tx.discount_amount || 0,
-      total: tx.total || 0,
-      paymentMethod: tx.paymentMethod || tx.payment_method || '-',
-      paymentBreakdown: formatPaymentBreakdown(tx.payment_breakdown),
-      cardReference: tx.card_reference || '-',
-      receivedAmount: tx.received_amount || 0,
-      changeAmount: tx.change_amount || 0,
-      returnId: tx.return_id || '-',
-      status: tx.is_returned ? 'Returned' : 'Completed'
-    }));};
+  return transactions.map(tx => ({
+    invoiceNumber: tx.id || '-',
+    date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : (tx.created_at ? new Date(tx.created_at).toLocaleDateString() : '-'),
+    time: tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString() : (tx.created_at ? new Date(tx.created_at).toLocaleTimeString() : '-'),
+    cashierName: tx.cashier_name || '-',
+    cashierId: tx.user_id || '-',
+    customerId: tx.customer_id || '-',
+    customerName: tx.customer_name || '-',
+    locationId: tx.location_id || '-',
+    branchName: tx.branch_name || '-',
+    items: formatInvoiceItems(tx.items || []),
+    subtotal: tx.subtotal || tx.total || 0,
+    vatAmount: tx.vat_amount || 0,
+    discountPercent: tx.discount_percent || 0,
+    discountAmount: tx.discount_amount || 0,
+    total: tx.total || 0,
+    paymentMethod: tx.paymentMethod || tx.payment_method || '-',
+    paymentBreakdown: formatPaymentBreakdown(tx.payment_breakdown),
+    cardReference: tx.card_reference || '-',
+    receivedAmount: tx.received_amount || 0,
+    changeAmount: tx.change_amount || 0,
+    returnId: tx.return_id || '-',
+    status: tx.is_returned ? 'Returned' : 'Completed'
+  }));};
 
 export const exportInvoicesToExcel = (
   filename: string,
