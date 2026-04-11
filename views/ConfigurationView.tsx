@@ -58,7 +58,7 @@ const ConfigurationView: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
 
-  const [activeSubTab, setActiveSubTab] = useState<'catalog' | 'templates' | 'roastProfiles' | 'greenBeans' | 'database' | 'profile' | 'settings' | 'invoices'>('catalog');
+  const [activeSubTab, setActiveSubTab] = useState<'catalog' | 'templates' | 'roastProfiles' | 'greenBeans' | 'database' | 'branches' | 'settings' | 'invoices'>('catalog');
   const [searchTerm, setSearchTerm] = useState('');
   const [skuFilter, setSkuFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
@@ -2528,7 +2528,7 @@ NOTIFY pgrst, 'reload schema';
       </div>
 
       <div className="flex flex-wrap gap-4 bg-white/50 p-2 rounded-2xl w-full md:w-fit mb-10 overflow-x-auto no-scrollbar">
-        {['catalog', 'templates', 'roastProfiles', 'greenBeans', 'settings', 'database', 'profile', 'invoices'].map(tab => (
+        {['catalog', 'templates', 'roastProfiles', 'greenBeans', 'settings', 'database', 'branches', 'invoices'].map(tab => (
           <button
             key={tab} onClick={() => setActiveSubTab(tab as any)}
             className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${activeSubTab === tab ? 'bg-white  text-black  shadow-sm border border-orange-100 ' : 'text-black hover'}`}
@@ -2547,7 +2547,9 @@ NOTIFY pgrst, 'reload schema';
                         ? t.printerSettings
                         : tab === 'invoices'
                           ? (t.exportInvoices || 'Export Invoices')
-                          : t.profile}
+                          : tab === 'branches'
+                            ? (t.branches || 'Branches')
+                            : t.profile}
           </button>
         ))}
       </div>
@@ -3236,6 +3238,54 @@ NOTIFY pgrst, 'reload schema';
         <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700">
           <p className="font-bold">{(t as any).accessDenied || 'Access Denied'}</p>
           <p className="text-sm">{(t as any).noExportPermission || 'You do not have permission to export invoices.'}</p>
+        </div>
+      )}
+
+      {activeSubTab === 'branches' && (
+        <div className="animate-in slide-in-from-bottom-4">
+          <div className="bg-white rounded-[40px] p-8 md:p-10 border border-orange-100 shadow-sm">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <div className="p-4 bg-orange-50 text-orange-600 rounded-2xl">
+                  <HardDrive size={32} />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black">{t.branches || 'Branches'}</h3>
+                  <p className="text-sm text-stone-500">{t.manageBranchesDesc || 'Manage your branch locations'}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {locations.length === 0 ? (
+                <p className="text-stone-500">{(t as any).noBranchesYet || 'No branches found'}</p>
+              ) : (
+                locations.map(loc => (
+                  <div key={loc.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-2xl">
+                    <div>
+                      <p className="font-bold text-black">{loc.name}</p>
+                      <p className="text-xs text-stone-500">{loc.address || '-'}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        if (!confirm((t as any).confirmDeleteBranch || `Delete branch "${loc.name}"? This cannot be undone.`)) return;
+                        try {
+                          await supabase.from('locations').delete().eq('id', loc.id);
+                          setLocations(locations.filter(l => l.id !== loc.id));
+                        } catch (err) {
+                          console.error('Failed to delete branch:', err);
+                          alert((t as any).failedToDeleteBranch || 'Failed to delete branch');
+                        }
+                      }}
+                      className="p-2 text-red-600 hover:bg-red-100 rounded-full transition-colors"
+                    >
+                      <Trash size={18} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
 
