@@ -1517,15 +1517,21 @@ const InventoryView: React.FC = () => {
     if (!confirm(t.confirmDeleteLocation || 'Delete this branch?')) return;
     setIsSaving(true);
     try {
-      const { error: txError } = await supabase
-        .from('transactions')
-        .update({ location_id: null })
-        .eq('location_id', loc.id);
-      console.log('Update transactions result:', { txError });
-      if (txError) {
-        console.error('Update transactions error:', txError);
-        alert((t as any).actionFailed + ': ' + txError.message);
-        throw txError;
+      const tablesWithLocationFK = ['transactions', 'inventory_items', 'staff', 'green_beans', 'green_bean_movements'];
+      
+      for (const table of tablesWithLocationFK) {
+        const { error: updateError } = await supabase
+          .from(table)
+          .update({ location_id: null })
+          .eq('location_id', loc.id);
+        console.log(`Update ${table} result:`, { updateError });
+        if (updateError) {
+          const { error: deleteError } = await supabase
+            .from(table)
+            .delete()
+            .eq('location_id', loc.id);
+          console.log(`Delete ${table} result:`, { deleteError });
+        }
       }
 
       const { error } = await supabase.from('locations').delete().eq('id', loc.id);
