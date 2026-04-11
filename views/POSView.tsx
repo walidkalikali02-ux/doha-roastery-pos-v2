@@ -1609,10 +1609,16 @@ const POSView: React.FC = () => {
               <select
                 value={selectedLocationId}
                 onChange={e => persistLocation(e.target.value)}
-                className="appearance-none p-4 pr-10 bg-white rounded-2xl font-bold text-xs flex items-center gap-2 border border-orange-100 outline-none focus:border-orange-600 transition-all min-w-[160px]"
+                disabled={user?.role === 'CASHIER'}
+                className="appearance-none p-4 pr-10 bg-white rounded-2xl font-bold text-xs flex items-center gap-2 border border-orange-100 outline-none focus:border-orange-600 transition-all min-w-[160px] disabled:bg-orange-50 disabled:cursor-not-allowed"
               >
                 <option value="" disabled>-- {t.locationName || 'Location'} --</option>
-                {locations.map(loc => (
+                {locations.filter(loc => {
+                  if (user?.role === 'CASHIER' && user?.location_id) {
+                    return loc.id === user.location_id;
+                  }
+                  return true;
+                }).map(loc => (
                   <option key={loc.id} value={loc.id}>{loc.name} {loc.type === 'BRANCH' ? '(Branch)' : ''}</option>
                 ))}
               </select>
