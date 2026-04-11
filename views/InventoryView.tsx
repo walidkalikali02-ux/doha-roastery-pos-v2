@@ -1513,36 +1513,20 @@ const InventoryView: React.FC = () => {
   };
 
   const handleDeleteLocation = async (loc: Location) => {
-    console.log('Delete location called:', loc);
-    if (!confirm(t.confirmDeleteLocation || 'Delete this branch?')) return;
+    if (!confirm(t.confirmDeleteLocation || 'Mark this branch as inactive?')) return;
     setIsSaving(true);
     try {
-      const tablesWithLocationFK = ['transactions', 'inventory_items', 'staff', 'green_beans', 'green_bean_movements'];
-      
-      for (const table of tablesWithLocationFK) {
-        const { error: updateError } = await supabase
-          .from(table)
-          .update({ location_id: null })
-          .eq('location_id', loc.id);
-        console.log(`Update ${table} result:`, { updateError });
-        if (updateError) {
-          const { error: deleteError } = await supabase
-            .from(table)
-            .delete()
-            .eq('location_id', loc.id);
-          console.log(`Delete ${table} result:`, { deleteError });
-        }
-      }
-
-      const { error } = await supabase.from('locations').delete().eq('id', loc.id);
-      console.log('Delete result:', { error });
+      const { error } = await supabase
+        .from('locations')
+        .update({ is_active: false, status: 'permanently_closed' })
+        .eq('id', loc.id);
+      console.log('Soft delete result:', { error });
       if (error) {
-        console.error('Delete error details:', error);
         alert((t as any).actionFailed + ': ' + error.message);
         throw error;
       }
       setLocations(prev => prev.filter(l => l.id !== loc.id));
-      setSuccessMsg(t.locationDeleted || 'Location deleted');
+      setSuccessMsg(t.locationDeleted || 'Location marked as inactive');
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 2500);
     } catch (err: any) {
