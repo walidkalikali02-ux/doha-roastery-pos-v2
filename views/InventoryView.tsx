@@ -1519,14 +1519,17 @@ const InventoryView: React.FC = () => {
     try {
       const { error } = await supabase.from('locations').delete().eq('id', loc.id);
       console.log('Delete result:', { error });
-      if (error) throw error;
+      if (error) {
+        console.error('Delete error details:', error);
+        alert((t as any).actionFailed + ': ' + error.message);
+        throw error;
+      }
       setLocations(prev => prev.filter(l => l.id !== loc.id));
       setSuccessMsg(t.locationDeleted || 'Location deleted');
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 2500);
     } catch (err: any) {
       console.error(err);
-      alert(t.actionFailed);
     } finally {
       setIsSaving(false);
     }
