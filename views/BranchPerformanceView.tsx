@@ -219,8 +219,7 @@ const BranchPerformanceView: React.FC = () => {
       const { data, error } = await supabase
         .from('transactions')
         .update({ 
-          location_id: targetBranch,
-          branch_name: targetLocation?.name 
+          location_id: targetBranch
         })
         .eq('location_id', sourceBranch)
         .select('id');
