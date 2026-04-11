@@ -84,25 +84,34 @@ export const exportPdfPrint = (title: string, sections: ExportSection[]) => {
   setTimeout(() => printWindow.print(), 250);
 };
 
-export type InvoiceExportPeriod = 'day' | 'week' | 'month';
+export type InvoiceExportPeriod = 'day' | 'week' | 'month' | 'all';
 
 export interface InvoiceExportData {
   invoiceNumber: string;
   date: string;
   time: string;
   cashierName: string;
+  cashierId: string;
+  customerId: string;
   customerName: string;
+  locationId: string;
+  branchName: string;
   items: string;
   subtotal: number;
   vatAmount: number;
+  discountPercent: number;
   discountAmount: number;
   total: number;
   paymentMethod: string;
-  branchName: string;
+  paymentBreakdown: string;
+  cardReference: string;
+  receivedAmount: number;
+  changeAmount: number;
+  returnId: string;
   status: string;
 }
 
-const getDateRange = (period: InvoiceExportPeriod, referenceDate?: Date): { start: Date; end: Date } => {
+const getDateRange = (period: InvoiceExportPeriod, referenceDate?: Date): { start: Date | null; end: Date | null } => {
   const now = referenceDate || new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   
@@ -124,6 +133,8 @@ const getDateRange = (period: InvoiceExportPeriod, referenceDate?: Date): { star
       endOfMonth.setHours(23, 59, 59, 999);
       return { start: startOfMonth, end: endOfMonth };
     }
+    case 'all':
+      return { start: null, end: null };
   }
 };
 
@@ -139,6 +150,18 @@ const formatInvoiceItems = (items: any[]): string => {
   }).join(' | ');
 };
 
+const formatPaymentBreakdown = (breakdown: any): string => {
+  if (!breakdown) return '-';
+  try {
+    if (typeof breakdown === 'object') {
+      return JSON.stringify(breakdown);
+    }
+    return String(breakdown);
+  } catch {
+    return '-';
+  }
+};
+
 export const prepareInvoiceExportData = (transactions: any[]): InvoiceExportData[] => {
   return transactions
     .filter(tx => !tx.is_returned)
@@ -147,17 +170,25 @@ export const prepareInvoiceExportData = (transactions: any[]): InvoiceExportData
       date: tx.timestamp ? new Date(tx.timestamp).toLocaleDateString() : (tx.created_at ? new Date(tx.created_at).toLocaleDateString() : '-'),
       time: tx.timestamp ? new Date(tx.timestamp).toLocaleTimeString() : (tx.created_at ? new Date(tx.created_at).toLocaleTimeString() : '-'),
       cashierName: tx.cashier_name || '-',
+      cashierId: tx.user_id || '-',
+      customerId: tx.customer_id || '-',
       customerName: tx.customer_name || '-',
+      locationId: tx.location_id || '-',
+      branchName: tx.branch_name || '-',
       items: formatInvoiceItems(tx.items || []),
       subtotal: tx.subtotal || tx.total || 0,
       vatAmount: tx.vat_amount || 0,
+      discountPercent: tx.discount_percent || 0,
       discountAmount: tx.discount_amount || 0,
       total: tx.total || 0,
       paymentMethod: tx.paymentMethod || tx.payment_method || '-',
-      branchName: tx.branch_name || '-',
+      paymentBreakdown: formatPaymentBreakdown(tx.payment_breakdown),
+      cardReference: tx.card_reference || '-',
+      receivedAmount: tx.received_amount || 0,
+      changeAmount: tx.change_amount || 0,
+      returnId: tx.return_id || '-',
       status: tx.is_returned ? 'Returned' : 'Completed'
-    }));
-};
+    }));};
 
 export const exportInvoicesToExcel = (
   filename: string,
@@ -173,14 +204,23 @@ export const exportInvoicesToExcel = (
       { label: 'Date' },
       { label: 'Time' },
       { label: 'Cashier' },
+      { label: 'Cashier ID' },
+      { label: 'Customer ID' },
       { label: 'Customer' },
+      { label: 'Location ID' },
+      { label: 'Branch' },
       { label: 'Items' },
       { label: 'Subtotal' },
       { label: 'VAT' },
+      { label: 'Discount %' },
       { label: 'Discount' },
       { label: 'Total' },
-      { label: 'Payment' },
-      { label: 'Branch' },
+      { label: 'Payment Method' },
+      { label: 'Payment Breakdown' },
+      { label: 'Card Reference' },
+      { label: 'Received' },
+      { label: 'Change' },
+      { label: 'Return ID' },
       { label: 'Status' }
     ],
     rows: data.map(inv => [
@@ -188,14 +228,23 @@ export const exportInvoicesToExcel = (
       inv.date,
       inv.time,
       inv.cashierName,
+      inv.cashierId,
+      inv.customerId,
       inv.customerName,
+      inv.locationId,
+      inv.branchName,
       inv.items,
       inv.subtotal,
       inv.vatAmount,
+      inv.discountPercent,
       inv.discountAmount,
       inv.total,
       inv.paymentMethod,
-      inv.branchName,
+      inv.paymentBreakdown,
+      inv.cardReference,
+      inv.receivedAmount,
+      inv.changeAmount,
+      inv.returnId,
       inv.status
     ])
   }];
@@ -224,9 +273,12 @@ export const fetchInvoicesByPeriod = async (
   let query = supabase
     .from('transactions')
     .select('*')
-    .gte('created_at', start.toISOString())
-    .lte('created_at', end.toISOString())
     .order('created_at', { ascending: false });
+  
+  // Only apply date filters if not exporting all
+  if (start && end) {
+    query = query.gte('created_at', start.toISOString()).lte('created_at', end.toISOString());
+  }
   
   if (locationId) {
     query = query.eq('location_id', locationId);

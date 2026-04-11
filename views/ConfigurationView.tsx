@@ -3160,6 +3160,17 @@ NOTIFY pgrst, 'reload schema';
                   >
                     {(t as any).thisMonth || 'This Month'}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setInvoiceExportPeriod('all')}
+                    className={`px-6 py-3 rounded-xl font-bold text-sm transition-all ${
+                      invoiceExportPeriod === 'all'
+                        ? 'bg-orange-600 text-white shadow-sm'
+                        : 'bg-orange-50 text-orange-900 hover:bg-orange-100'
+                    }`}
+                  >
+                    {(t as any).allTime || 'All Time'}
+                  </button>
                 </div>
               </div>
 
@@ -3195,10 +3206,11 @@ NOTIFY pgrst, 'reload schema';
                         setInvoiceExportError(t.noDataForPeriod || 'No invoices found for the selected period');
                         return;
                       }
-                      const periodLabels = {
+                      const periodLabels: Record<string, string> = {
                         day: (t as any).today || 'Today',
                         week: (t as any).thisWeek || 'This Week',
-                        month: (t as any).thisMonth || 'This Month'
+                        month: (t as any).thisMonth || 'This Month',
+                        all: (t as any).allTime || 'All Time'
                       };
                       const branchLabel = invoiceExportBranch ? `_${locations.find(l => l.id === invoiceExportBranch)?.name.replace(/\s+/g, '_') || ''}` : '';
                       const filename = `invoices_${invoiceExportPeriod}${branchLabel}_${new Date().toISOString().slice(0, 10)}.xls`;
@@ -3226,7 +3238,7 @@ NOTIFY pgrst, 'reload schema';
 
               <div className="pt-4 border-t border-orange-100">
                 <p className="text-xs text-stone-500">
-                  {(t as any).exportInvoicesNote || 'Exported file will include invoice number, date, time, cashier, customer, items, subtotal, VAT, discount, total, payment method, branch, and status.'}
+                  {(t as any).exportInvoicesNote || 'Exported file includes all invoice data: invoice #, date, time, cashier, cashier ID, customer ID, customer name, location ID, branch, items, subtotal, VAT, discount %, discount amount, total, payment method, payment breakdown, card reference, received amount, change amount, return ID, and status.'}
                 </p>
               </div>
             </div>
