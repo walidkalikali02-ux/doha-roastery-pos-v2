@@ -1513,10 +1513,12 @@ const InventoryView: React.FC = () => {
   };
 
   const handleDeleteLocation = async (loc: Location) => {
+    console.log('Delete location called:', loc);
     if (!confirm(t.confirmDeleteLocation || 'Delete this branch?')) return;
     setIsSaving(true);
     try {
       const { error } = await supabase.from('locations').delete().eq('id', loc.id);
+      console.log('Delete result:', { error });
       if (error) throw error;
       setLocations(prev => prev.filter(l => l.id !== loc.id));
       setSuccessMsg(t.locationDeleted || 'Location deleted');
