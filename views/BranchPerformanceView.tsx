@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useLanguage } from '../App';
-import { TrendingUp, TrendingDown, BarChart3, PieChart, Users, DollarSign, Coffee, ArrowUpDown, ArrowRightLeft, X, Loader2 } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, PieChart, Users, DollarSign, Coffee, ArrowUpDown, ArrowRightLeft, X, Loader2, FileDown } from 'lucide-react';
+import { fetchInvoicesByPeriod, exportInvoicesToExcel, InvoiceExportPeriod } from '../utils/reportExport';
 
 interface BranchStats {
   id: string;
@@ -29,6 +30,7 @@ const BranchPerformanceView: React.FC = () => {
   const [targetBranch, setTargetBranch] = useState<string>('');
   const [isConverting, setIsConverting] = useState(false);
   const [convertResult, setConvertResult] = useState<{ success: boolean; count: number } | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     fetchBranchPerformance();
@@ -249,6 +251,49 @@ const BranchPerformanceView: React.FC = () => {
     }
   };
 
+  const handleExportInvoices = async (branchId?: string) => {
+    setIsExporting(true);
+    try {
+      const periodMap: Record<string, InvoiceExportPeriod> = {
+        day: 'day',
+        week: 'week',
+        month: 'month',
+        year: 'all'
+      };
+      const exportPeriod = periodMap[selectedPeriod] || 'month';
+      
+      const transactions = await fetchInvoicesByPeriod(supabase, exportPeriod, undefined, branchId);
+      
+      if (!transactions || transactions.length === 0) {
+        alert(t.noDataForPeriod || 'No invoices found for the selected period');
+        return;
+      }
+      
+      const periodLabels: Record<string, string> = {
+        day: t.day || 'Day',
+        week: t.week || 'Week',
+        month: t.month || 'Month',
+        year: t.year || 'Year',
+        all: 'All Time'
+      };
+      
+      const branchLabel = branchId 
+        ? `_${locations.find(l => l.id === branchId)?.name.replace(/\s+/g, '_') || ''}`
+        : '_All_Branches';
+      const filename = `invoices${branchLabel}_${selectedPeriod}_${new Date().toISOString().slice(0, 10)}.xls`;
+      const fullPeriodLabel = branchId 
+        ? `${periodLabels[exportPeriod]} - ${locations.find(l => l.id === branchId)?.name || ''}`
+        : `${periodLabels[exportPeriod]} - All Branches`;
+      
+      exportInvoicesToExcel(filename, transactions, fullPeriodLabel);
+    } catch (error: any) {
+      console.error('Export error:', error);
+      alert((t as any).exportFailed || 'Failed to export invoices: ' + error.message);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -287,6 +332,15 @@ const BranchPerformanceView: React.FC = () => {
         >
           <ArrowRightLeft size={16} />
           {t.convertTransactions || 'Convert Transactions'}
+        </button>
+        
+        <button
+          onClick={() => handleExportInvoices()}
+          disabled={isExporting}
+          className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl text-xs font-bold hover:bg-green-700 transition-colors disabled:opacity-60"
+        >
+          {isExporting ? <Loader2 size={16} className="animate-spin" /> : <FileDown size={16} />}
+          {(t as any).exportInvoices || 'Export Invoices'}
         </button>
       </div>
 
@@ -365,12 +419,13 @@ const BranchPerformanceView: React.FC = () => {
                   </div>
                 </th>
                 <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.staff || 'Staff'}</th>
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{(t as any).actions || 'Actions'}</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center">
+                  <td colSpan={7} className="p-8 text-center">
                     <div className="flex justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
@@ -378,7 +433,7 @@ const BranchPerformanceView: React.FC = () => {
                 </tr>
               ) : sortedStats.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="p-8 text-center text-gray-500">
+                  <td colSpan={7} className="p-8 text-center text-gray-500">
                     {'No data available'}
                   </td>
                 </tr>
@@ -417,6 +472,18 @@ const BranchPerformanceView: React.FC = () => {
                         <Users size={16} />
                         <span className="font-bold">{branch.staffCount}</span>
                       </div>
+                    </td>
+                    <td className="p-4">
+                      {branch.id !== 'all' && (
+                        <button
+                          onClick={() => handleExportInvoices(branch.id)}
+                          disabled={isExporting}
+                          className="flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors disabled:opacity-50"
+                        >
+                          <FileDown size={14} />
+                          {(t as any).export || 'Export'}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))
