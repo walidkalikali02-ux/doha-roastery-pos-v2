@@ -3189,6 +3189,10 @@ NOTIFY pgrst, 'reload schema';
                     setInvoiceExportError(null);
                     try {
                       const transactions = await fetchInvoicesByPeriod(supabase, invoiceExportPeriod, undefined, invoiceExportBranch || undefined);
+                      if (!transactions || transactions.length === 0) {
+                        setInvoiceExportError(t.noDataForPeriod || 'No invoices found for the selected period');
+                        return;
+                      }
                       const periodLabels = {
                         day: (t as any).today || 'Today',
                         week: (t as any).thisWeek || 'This Week',

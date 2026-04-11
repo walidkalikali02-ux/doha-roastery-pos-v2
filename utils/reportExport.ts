@@ -190,10 +190,10 @@ export const exportInvoicesToExcel = (
       inv.cashierName,
       inv.customerName,
       inv.items,
-      inv.subtotal.toFixed(2),
-      inv.vatAmount.toFixed(2),
-      inv.discountAmount.toFixed(2),
-      inv.total.toFixed(2),
+      inv.subtotal,
+      inv.vatAmount,
+      inv.discountAmount,
+      inv.total,
       inv.paymentMethod,
       inv.branchName,
       inv.status
@@ -202,14 +202,14 @@ export const exportInvoicesToExcel = (
 
   const title = `Invoices - ${periodLabel}`;
   const html = buildHtml(title, sections);
-  const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
+  const blob = new Blob([html], { type: 'application/vnd.ms-excel;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
   document.body.appendChild(link);
   link.click();
-  link.remove();
+  document.body.removeChild(link);
   URL.revokeObjectURL(url);
 };
 
