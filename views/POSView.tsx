@@ -294,20 +294,16 @@ const POSView: React.FC = () => {
     try {
       const { data } = await supabase.from('locations').select('*').eq('is_active', true);
       if (data) {
-        // For specific user mohammed-dabit@doharoastery.com, only show Rawdat Al Hamama
-        const isRestrictedUser = user?.email === 'mohammed-dabit@doharoastery.com';
-        const filteredData = isRestrictedUser 
-          ? data.filter(l => l.name === 'Rawdat Al Hamama (Branch)')
+        // For CASHIER users, only show their assigned branch
+        const filteredData = (user?.role === 'CASHIER' && user?.location_id)
+          ? data.filter(l => l.id === user.location_id)
           : data;
         
         setLocations(filteredData);
         
-        // For CASHIER users or restricted user, always use their assigned location_id
-        if ((user?.role === 'CASHIER' && user?.location_id) || isRestrictedUser) {
-          const targetLocationId = isRestrictedUser 
-            ? 'a1b2c3d4-e5f6-4a5b-8c9d-0e1f2a3b4c5d' 
-            : user?.location_id;
-          const cashierLocation = data.find(l => l.id === targetLocationId);
+        // For CASHIER users, always use their assigned location_id
+        if (user?.role === 'CASHIER' && user?.location_id) {
+          const cashierLocation = data.find(l => l.id === user.location_id);
           if (cashierLocation) {
             setSelectedLocationId(cashierLocation.id);
             if (typeof window !== 'undefined') {
@@ -356,7 +352,7 @@ const POSView: React.FC = () => {
         }
       }
     } catch (err) { console.error(err); }
-  }, [user?.location_id, user?.role, user?.email]);
+  }, [user?.location_id, user?.role]);
 
   useEffect(() => { fetchLocations(); }, [fetchLocations]);
 
@@ -1630,16 +1626,12 @@ const POSView: React.FC = () => {
               <select
                 value={selectedLocationId}
                 onChange={e => persistLocation(e.target.value)}
-                disabled={user?.email === 'mohammed-dabit@doharoastery.com'}
+                disabled={user?.role === 'CASHIER'}
                 className="appearance-none p-4 pr-10 bg-white rounded-2xl font-bold text-xs flex items-center gap-2 border border-orange-100 outline-none focus:border-orange-600 transition-all min-w-[160px] disabled:bg-orange-50 disabled:cursor-not-allowed"
               >
                 <option value="" disabled>-- {t.locationName || 'Location'} --</option>
                 {locations.filter(loc => {
-                  // For specific user mohammed-dabit@doharoastery.com, only show Rawdat Al Hamama
-                  if (user?.email === 'mohammed-dabit@doharoastery.com') {
-                    return loc.name === 'Rawdat Al Hamama (Branch)';
-                  }
-                  // For other CASHIER users, show only their assigned branch
+                  // For CASHIER users, show only their assigned branch
                   if (user?.role === 'CASHIER' && user?.location_id) {
                     return loc.id === user.location_id;
                   }
