@@ -294,13 +294,13 @@ const POSView: React.FC = () => {
     try {
       const { data } = await supabase.from('locations').select('*').eq('is_active', true);
       if (data) {
-        // Only show waqod road North branch for all users in POS
-        const filteredData = data.filter(l => l.name === 'waqod road North');
+        // Only show Al mina Doha branch for all users in POS
+        const filteredData = data.filter(l => l.name === 'Al mina Doha');
         
         setLocations(filteredData);
         
-        // Always use waqod road North
-        const waqodLocation = data.find(l => l.name === 'waqod road North');
+        // Always use Al mina Doha
+        const waqodLocation = data.find(l => l.name === 'Al mina Doha');
         if (waqodLocation) {
           setSelectedLocationId(waqodLocation.id);
           if (typeof window !== 'undefined') {
