@@ -294,23 +294,19 @@ const POSView: React.FC = () => {
     try {
       const { data } = await supabase.from('locations').select('*').eq('is_active', true);
       if (data) {
-        // For CASHIER users, only show their assigned branch
-        const filteredData = (user?.role === 'CASHIER' && user?.location_id)
-          ? data.filter(l => l.id === user.location_id)
-          : data;
+        // Only show waqod road North branch for all users in POS
+        const filteredData = data.filter(l => l.name === 'waqod road North');
         
         setLocations(filteredData);
         
-        // For CASHIER users, always use their assigned location_id
-        if (user?.role === 'CASHIER' && user?.location_id) {
-          const cashierLocation = data.find(l => l.id === user.location_id);
-          if (cashierLocation) {
-            setSelectedLocationId(cashierLocation.id);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('pos_selected_location', cashierLocation.id);
-            }
-            return; // Exit early
+        // Always use waqod road North
+        const waqodLocation = data.find(l => l.name === 'waqod road North');
+        if (waqodLocation) {
+          setSelectedLocationId(waqodLocation.id);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('pos_selected_location', waqodLocation.id);
           }
+          return; // Exit early
         }
         
         // Check if user already has a saved location in localStorage
@@ -1626,17 +1622,11 @@ const POSView: React.FC = () => {
               <select
                 value={selectedLocationId}
                 onChange={e => persistLocation(e.target.value)}
-                disabled={user?.role === 'CASHIER'}
+                disabled={true}
                 className="appearance-none p-4 pr-10 bg-white rounded-2xl font-bold text-xs flex items-center gap-2 border border-orange-100 outline-none focus:border-orange-600 transition-all min-w-[160px] disabled:bg-orange-50 disabled:cursor-not-allowed"
               >
                 <option value="" disabled>-- {t.locationName || 'Location'} --</option>
-                {locations.filter(loc => {
-                  // For CASHIER users, show only their assigned branch
-                  if (user?.role === 'CASHIER' && user?.location_id) {
-                    return loc.id === user.location_id;
-                  }
-                  return true;
-                }).map(loc => (
+                {locations.map(loc => (
                   <option key={loc.id} value={loc.id}>{loc.name} {loc.type === 'BRANCH' ? '(Branch)' : ''}</option>
                 ))}
               </select>
