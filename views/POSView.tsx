@@ -294,7 +294,24 @@ const POSView: React.FC = () => {
     try {
       const { data } = await supabase.from('locations').select('*').eq('is_active', true);
       if (data) {
-        setLocations(data);
+        // For CASHIER users, only show their assigned branch
+        const filteredData = (user?.role === 'CASHIER' && user?.location_id)
+          ? data.filter(l => l.id === user.location_id)
+          : data;
+        
+        setLocations(filteredData);
+        
+        // For CASHIER users, always use their assigned location
+        if (user?.role === 'CASHIER' && user?.location_id) {
+          const cashierLocation = data.find(l => l.id === user.location_id);
+          if (cashierLocation) {
+            setSelectedLocationId(cashierLocation.id);
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('pos_selected_location', cashierLocation.id);
+            }
+            return;
+          }
+        }
         
         // Check if user already has a saved location in localStorage
         const savedLocation = typeof window !== 'undefined' ? localStorage.getItem('pos_selected_location') : null;
@@ -1608,7 +1625,8 @@ const POSView: React.FC = () => {
               <select
                 value={selectedLocationId}
                 onChange={e => persistLocation(e.target.value)}
-                className="appearance-none px-3 py-2 pr-8 bg-gray-50 rounded-lg font-medium text-xs border border-gray-200 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
+                disabled={user?.role === 'CASHIER'}
+                className={`appearance-none px-3 py-2 pr-8 rounded-lg font-medium text-xs border outline-none transition-all ${user?.role === 'CASHIER' ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : 'bg-gray-50 border-gray-200 focus:ring-2 focus:ring-orange-500'}`}
               >
                 <option value="" disabled>{t.locationName || 'Location'}</option>
                 {locations.map(loc => (
