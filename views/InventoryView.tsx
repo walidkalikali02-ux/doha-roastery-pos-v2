@@ -1803,7 +1803,7 @@ const InventoryView: React.FC = () => {
                 </select>
               </div>
             </div>
-             <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm min-w-[1100px]`}>
+             <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
                <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
                  <tr>
                     <th className="px-8 py-5">{t.date}</th>
@@ -1868,7 +1868,7 @@ const InventoryView: React.FC = () => {
           </div>
         ) : activeTab === 'purchases' ? (
           <div className="overflow-x-auto">
-            <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm min-w-[1000px]`}>
+            <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
               <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
                 <tr>
                   <th className="px-8 py-5">{t.date}</th>
@@ -1921,7 +1921,7 @@ const InventoryView: React.FC = () => {
         ) : activeTab === 'counts' ? (
           <div className="flex flex-col gap-8">
             <div className="overflow-x-auto">
-              <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm min-w-[1000px]`}>
+              <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
                 <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
                   <tr>
                     <th className="px-8 py-5">{t.taskName}</th>
@@ -1957,7 +1957,7 @@ const InventoryView: React.FC = () => {
             </div>
             <div className="overflow-x-auto">
               <div className="px-8 pt-2 text-xs font-black uppercase tracking-widest text-black">{t.countResults}</div>
-              <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm min-w-[1300px] mt-4`}>
+              <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
                 <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
                   <tr>
                     <th className="px-8 py-5">{t.date}</th>
@@ -2133,7 +2133,7 @@ const InventoryView: React.FC = () => {
             <div className="mx-10 bg-white border border-orange-100 rounded-3xl px-6 py-4">
               <div className="text-xs font-black uppercase tracking-widest text-black mb-4">{t.totalAcrossLocations}</div>
               <div className="overflow-x-auto">
-                <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm min-w-[800px]`}>
+                <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
                   <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
                     <tr>
                       <th className="px-4 py-3">{t.product}</th>
@@ -2162,7 +2162,7 @@ const InventoryView: React.FC = () => {
             <div className="mx-10 bg-white border border-orange-100 rounded-3xl px-6 py-4">
               <div className="text-xs font-black uppercase tracking-widest text-black mb-4">{t.productLocationSummary}</div>
               <div className="overflow-x-auto">
-                <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm min-w-[800px]`}>
+                <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
                   <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
                     <tr>
                       <th className="px-4 py-3">{t.product}</th>
@@ -2191,7 +2191,7 @@ const InventoryView: React.FC = () => {
             </div>
 
             <div className="overflow-x-auto">
-            <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm min-w-[1000px]`}>
+            <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
               <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
                 <tr>
                    <th className="px-8 py-5">{t.product}</th>
@@ -2239,7 +2239,7 @@ const InventoryView: React.FC = () => {
         </div>
         ) : (
           <div className="overflow-x-auto">
-             <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm min-w-[1000px]`}>
+             <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
               <thead className="bg-white  text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50 ">
                 <tr>
                    <th className="px-8 py-5">التاريخ</th>
@@ -2724,7 +2724,7 @@ const InventoryView: React.FC = () => {
 
             <div className="space-y-6">
               <div className="overflow-x-auto">
-                <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm min-w-[700px]`}>
+                <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
                   <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
                     <tr>
                       <th className="px-4 py-3">{t.product}</th>
@@ -2950,7 +2950,7 @@ const InventoryView: React.FC = () => {
                   </div>
 
                   <div className="hidden md:block overflow-x-auto">
-                    <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm min-w-[900px]`}>
+                    <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
                       <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
                         <tr>
                           <th className="px-4 py-3">{t.date}</th>

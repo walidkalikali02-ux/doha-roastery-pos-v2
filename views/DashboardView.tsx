@@ -225,7 +225,7 @@ const DashboardView: React.FC = () => {
           <button className="text-black text-sm font-semibold hover:underline">{t.viewAll}</button>
         </div>
         <div className="overflow-x-auto">
-          <table className={`w-full ${t.dir === 'rtl' ? 'text-right' : 'text-left'} min-w-[600px]`}>
+          <table className={`w-full ${t.dir === 'rtl' ? 'text-right' : 'text-left'}`}>
             <thead>
               <tr className="bg-white text-black text-sm uppercase tracking-wider">
                 <th className="px-6 py-4 font-bold">{t.batchId}</th>

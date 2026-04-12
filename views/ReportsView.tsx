@@ -711,7 +711,7 @@ const ReportsView: React.FC = () => {
                 <div className="text-sm text-stone-500">{t.noItemsFound}</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className={`w-full ${t.dir === 'rtl' ? 'text-right' : 'text-left'} text-sm min-w-[700px]`}>
+                  <table className={`w-full ${t.dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
                     <thead className="text-[10px] font-black uppercase tracking-widest text-stone-500 border-b border-stone-200">
                       <tr>
                         <th className="py-3">{t.roaster}</th>
@@ -758,7 +758,7 @@ const ReportsView: React.FC = () => {
                 <div className="text-sm text-stone-500">{t.noItemsFound}</div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className={`w-full ${t.dir === 'rtl' ? 'text-right' : 'text-left'} text-sm min-w-[520px]`}>
+                  <table className={`w-full ${t.dir === 'rtl' ? 'text-right' : 'text-left'} text-sm`}>
                     <thead className="text-[10px] font-black uppercase tracking-widest text-stone-500 border-b border-stone-200">
                       <tr>
                         <th className="py-3">{t.date}</th>
