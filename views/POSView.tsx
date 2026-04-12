@@ -355,9 +355,8 @@ const POSView: React.FC = () => {
   const fetchInventory = useCallback(async () => {
     setIsLoading(true);
     try {
-      const inventoryQuery = selectedLocationId
-        ? supabase.from('inventory_items').select('*').eq('location_id', selectedLocationId)
-        : supabase.from('inventory_items').select('*');
+      // Fetch all inventory items regardless of location
+      const inventoryQuery = supabase.from('inventory_items').select('*');
 
       const [prodRes, invRes, settingsRes] = await Promise.all([
         supabase.from('product_definitions').select('*'),
