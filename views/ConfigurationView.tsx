@@ -4011,6 +4011,172 @@ NOTIFY pgrst, 'reload schema';
           </div>
         </div>
       )}
+
+      {showCostAnalysis && costAnalysisData && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-[32px] max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="p-6 border-b border-orange-100">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-red-50 text-red-600 rounded-2xl">
+                    <AlertTriangle size={24} />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-black text-black">{(t as any).smartCostAnalysis || 'Smart Cost Analysis'}</h2>
+                    <p className="text-sm text-stone-500">{costAnalysisData.productName}</p>
+                  </div>
+                </div>
+                <button onClick={() => setShowCostAnalysis(false)} className="p-2 hover:bg-stone-100 rounded-full">
+                  <X size={24} />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="bg-orange-50 rounded-2xl p-4">
+                <h3 className="text-sm font-black text-black mb-3">{(t as any).financialOverview || 'Financial Overview'}</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center">
+                    <p className="text-xs text-stone-500 uppercase">{(t as any).totalRevenue || 'Total Revenue'}</p>
+                    <p className="text-xl font-black text-green-600">{costAnalysisData.totalRevenue.toFixed(2)} QAR</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-stone-500 uppercase">{(t as any).totalCost || 'Total Cost'}</p>
+                    <p className="text-xl font-black text-red-600">{costAnalysisData.totalCost.toFixed(2)} QAR</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-stone-500 uppercase">{(t as any).grossProfit || 'Gross Profit'}</p>
+                    <p className="text-xl font-black text-black">{costAnalysisData.totalProfit.toFixed(2)} QAR</p>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-xs text-stone-500 uppercase">{(t as any).margin || 'Margin'}</p>
+                    <p className={`text-xl font-black ${costAnalysisData.marginPct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {costAnalysisData.marginPct.toFixed(1)}%
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 rounded-2xl p-4">
+                <h3 className="text-sm font-black text-black mb-3">{(t as any).salesMetrics || 'Sales Metrics (Last 30 Days)'}</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-xs text-stone-500 uppercase">{(t as any).transactions || 'Transactions'}</p>
+                    <p className="text-2xl font-black">{costAnalysisData.totalTransactions}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-stone-500 uppercase">{(t as any).quantitySold || 'Quantity Sold'}</p>
+                    <p className="text-2xl font-black">{costAnalysisData.totalQuantitySold}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-stone-500 uppercase">{(t as any).lastSold || 'Last Sold'}</p>
+                    <p className="text-lg font-bold">{costAnalysisData.lastSoldDate ? new Date(costAnalysisData.lastSoldDate).toLocaleDateString() : 'Never'}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-purple-50 rounded-2xl p-4">
+                <h3 className="text-sm font-black text-black mb-3">{(t as any).inventoryStatus || 'Inventory Status'}</h3>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm font-bold">{(t as any).currentStock || 'Current Stock'}</p>
+                    <p className={`text-2xl font-black ${costAnalysisData.currentStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {costAnalysisData.currentStock}
+                    </p>
+                  </div>
+                  {costAnalysisData.stockByLocation.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-purple-200">
+                      <p className="text-xs font-bold text-stone-600 mb-1">{(t as any).stockByLocation || 'Stock by Location'}</p>
+                      {costAnalysisData.stockByLocation.map((loc, idx) => (
+                        <div key={idx} className="flex justify-between text-sm">
+                          <span>{loc.locationName}</span>
+                          <span className="font-bold">{loc.stock}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {costAnalysisData.monthlyTrend.length > 0 && (
+                <div className="bg-stone-50 rounded-2xl p-4">
+                  <h3 className="text-sm font-black text-black mb-3">{(t as any).monthlyRevenueTrend || 'Monthly Revenue Trend'}</h3>
+                  <div className="flex items-end gap-2 h-20">
+                    {costAnalysisData.monthlyTrend.slice(-6).map((month, idx) => {
+                      const maxRevenue = Math.max(...costAnalysisData.monthlyTrend.map(m => m.revenue), 1);
+                      const height = (month.revenue / maxRevenue) * 100;
+                      return (
+                        <div key={idx} className="flex flex-col items-center flex-1">
+                          <div 
+                            className="w-full bg-orange-500 rounded-t" 
+                            style={{ height: `${Math.max(height, 2)}%`, minHeight: '4px' }}
+                          />
+                          <p className="text-[8px] text-stone-500 mt-1">{month.month.slice(5)}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+                  <div>
+                    <h4 className="font-bold text-red-800">{(t as any).warningDeleteProduct || 'Warning: Deleting this Product'}</h4>
+                    <ul className="text-sm text-red-700 mt-2 space-y-1">
+                      <li>• {(t as any).deleteWarning1 || 'All sales history for this product will remain in the system'}</li>
+                      <li>• {(t as any).deleteWarning2 || 'Existing inventory stock will be preserved'}</li>
+                      <li>• {(t as any).deleteWarning3 || 'Product will be marked as DISABLED (not permanently deleted)'}</li>
+                      <li>• {(t as any).deleteWarning4 || 'You can re-enable the product later if needed'}</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-orange-100 flex gap-4">
+              <button
+                onClick={() => setShowCostAnalysis(false)}
+                className="flex-1 py-4 px-6 bg-stone-100 text-black font-bold rounded-2xl hover:bg-stone-200 transition-all"
+              >
+                {(t as any).keepProduct || 'Keep Product'}
+              </button>
+              <button
+                onClick={async () => {
+                  setIsSaving(true);
+                  try {
+                    const { error } = await supabase
+                      .from('product_definitions')
+                      .update({ product_status: 'DISABLED', is_active: false })
+                      .eq('id', costAnalysisData.productId);
+                    if (error) throw error;
+                    setProducts(products.map(p => 
+                      p.id === costAnalysisData.productId 
+                        ? { ...p, productStatus: 'DISABLED', isActive: false }
+                        : p
+                    ));
+                    setShowCostAnalysis(false);
+                    setShowSuccess(true);
+                    setSuccessMsg(t.changesSaved || 'Changes saved');
+                    setTimeout(() => setShowSuccess(false), 2000);
+                  } catch (error: any) {
+                    console.error('Error disabling product:', error);
+                    alert(error?.message || (t as any).disableFailed || 'Failed to disable product');
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }}
+                disabled={isSaving}
+                className="flex-1 py-4 px-6 bg-red-600 text-white font-black rounded-2xl hover:bg-red-700 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+              >
+                {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Trash2 size={20} />}
+                {(t as any).disableProduct || 'Disable Product'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
