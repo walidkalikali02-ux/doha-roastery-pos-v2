@@ -180,7 +180,8 @@ const ConfigurationView: React.FC = () => {
     roastingOverhead: '0',
     estimatedGreenBeanCost: '0',
     allBranches: true,
-    selectedBranchIds: [] as string[]
+    selectedBranchIds: [] as string[],
+    branchStock: {} as Record<string, string>
   });
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredient[]>([]);
   const [bomComponents, setBomComponents] = useState<RecipeIngredient[]>([]);
@@ -189,6 +190,22 @@ const ConfigurationView: React.FC = () => {
   const [newIngredientUnit, setNewIngredientUnit] = useState('g');
   const [newIngredientCost, setNewIngredientCost] = useState('');
   const [isAddingIngredient, setIsAddingIngredient] = useState(false);
+  const [showCostAnalysis, setShowCostAnalysis] = useState(false);
+  const [costAnalysisData, setCostAnalysisData] = useState<{
+    productId: string;
+    productName: string;
+    totalRevenue: number;
+    totalCost: number;
+    totalProfit: number;
+    marginPct: number;
+    totalTransactions: number;
+    totalQuantitySold: number;
+    currentStock: number;
+    stockByLocation: { locationName: string; stock: number }[];
+    lastSoldDate: string | null;
+    monthlyTrend: { month: string; revenue: number }[];
+  } | null>(null);
+  const [isLoadingCostAnalysis, setIsLoadingCostAnalysis] = useState(false);
 
   const checkSchemaIntegrity = useCallback(async () => {
     const missing = new Set<string>();
@@ -2046,7 +2063,7 @@ NOTIFY pgrst, 'reload schema';
         const inventoryItems = branchesToUpdate.map(branchId => ({
           product_id: productData.id,
           location_id: branchId,
-          stock: 0,
+          stock: parseFloat(productForm.branchStock[branchId] || '0'),
           reserved_stock: 0,
           damaged_stock: 0,
           created_at: new Date().toISOString()
@@ -2100,7 +2117,7 @@ NOTIFY pgrst, 'reload schema';
       mainCategory: '', subCategory: '', variantOf: '', variantLabel: '', variantSize: '', variantFlavor: '', unit: 'piece', templateId: '', basePrice: '', image: '', sku: '', supplier: '', isActive: true, productStatus: 'ACTIVE', isPerishable: false, expiryDate: '', type: 'PACKAGED_COFFEE',
       beanId: '',
       laborCost: '0', roastingOverhead: '0', estimatedGreenBeanCost: '0',
-      allBranches: true, selectedBranchIds: []
+      allBranches: true, selectedBranchIds: [], branchStock: {}
     });
     setRecipeIngredients([]);
     setBomComponents([]);
@@ -2412,6 +2429,76 @@ NOTIFY pgrst, 'reload schema';
     }
   };
 
+  const fetchProductCostAnalysis = async (productId: string, productName: string) => {
+    setIsLoadingCostAnalysis(true);
+    try {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      const twelveMonthsAgo = new Date();
+      twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+      const [inventoryRes, transactionsRes, profitabilityRes, monthlyRes] = await Promise.all([
+        supabase.from('inventory_items').select('stock, location_id, locations(name)').eq('product_id', productId),
+        supabase.from('transactions').select('id, total, items, created_at').gte('created_at', thirtyDaysAgo.toISOString()),
+        supabase.from('product_profitability_report').select('total_revenue, total_cost, gross_profit').eq('product_name', productName),
+        supabase.from('product_profitability_report').select('period_month, total_revenue').eq('product_name', productName).gte('period_month', twelveMonthsAgo.toISOString().slice(0, 7)).order('period_month', { ascending: true })
+      ]);
+
+      const stock = (inventoryRes.data || []).reduce((sum: number, item: any) => sum + (Number(item.stock) || 0), 0);
+      const stockByLocation = (inventoryRes.data || []).map((item: any) => ({
+        locationName: item.locations?.name || 'Unknown',
+        stock: Number(item.stock) || 0
+      }));
+
+      let totalQuantitySold = 0;
+      let lastSoldDate: string | null = null;
+      let productTransactions = 0;
+      
+      (transactionsRes.data || []).forEach((tx: any) => {
+        const items = tx.items || [];
+        const matchingItems = items.filter((item: any) => item.name === productName || item.productId === productId);
+        if (matchingItems.length > 0) {
+          productTransactions++;
+          totalQuantitySold += matchingItems.reduce((sum: number, item: any) => sum + (Number(item.quantity) || 1), 0);
+          if (!lastSoldDate || tx.created_at > lastSoldDate) {
+            lastSoldDate = tx.created_at;
+          }
+        }
+      });
+
+      const profitability = (profitabilityRes.data || [])[0] || { total_revenue: 0, total_cost: 0, gross_profit: 0 };
+      const totalRevenue = Number(profitability.total_revenue) || 0;
+      const totalCost = Number(profitability.total_cost) || 0;
+      const totalProfit = Number(profitability.gross_profit) || 0;
+      const marginPct = totalRevenue > 0 ? (totalProfit / totalRevenue) * 100 : 0;
+
+      const monthlyTrend = (monthlyRes.data || []).map((row: any) => ({
+        month: row.period_month,
+        revenue: Number(row.total_revenue) || 0
+      }));
+
+      setCostAnalysisData({
+        productId,
+        productName,
+        totalRevenue,
+        totalCost,
+        totalProfit,
+        marginPct,
+        totalTransactions: productTransactions,
+        totalQuantitySold,
+        currentStock: stock,
+        stockByLocation,
+        lastSoldDate,
+        monthlyTrend
+      });
+      setShowCostAnalysis(true);
+    } catch (error) {
+      console.error('Error fetching cost analysis:', error);
+    } finally {
+      setIsLoadingCostAnalysis(false);
+    }
+  };
+
   const openQuickAdjustment = (bean: GreenBeanRecord) => {
     setSelectedBeanForAdjustment(bean);
     setAdjustmentForm({
@@ -2663,7 +2750,7 @@ NOTIFY pgrst, 'reload schema';
                         )}
                       </div>
                     </div>
-                    <div className="mt-auto flex justify-end">
+                    <div className="mt-auto flex justify-end gap-2">
                       <button onClick={() => {
                         setEditingId(product.id);
                         setProductForm({
@@ -2671,13 +2758,20 @@ NOTIFY pgrst, 'reload schema';
                           templateId: product.templateId || '', basePrice: product.basePrice.toString(), image: product.image || '', sku: product.sku || '', supplier: product.supplier || '', isActive: product.productStatus === 'ACTIVE', productStatus: product.productStatus || (product.isActive ? 'ACTIVE' : 'DISABLED'), isPerishable: product.isPerishable || false, expiryDate: product.expiryDate || '', type: product.type || 'PACKAGED_COFFEE',
                           beanId: product.beanId || '',
                           laborCost: (product.laborCost || 0).toString(), roastingOverhead: (product.roastingOverhead || 0).toString(), estimatedGreenBeanCost: (product.estimatedGreenBeanCost || 0).toString(),
-                          allBranches: true, selectedBranchIds: []
+                          allBranches: true, selectedBranchIds: [], branchStock: {}
                         });
                         setRecipeIngredients(product.recipe?.ingredients || []);
                         setBomComponents(product.bom || []);
                         setProductAddOns(product.add_ons || []);
                         setShowProductModal(true);
                       }} className="p-2.5 text-black  rounded-xl transition-all"><Edit3 size={18} /></button>
+                      <button 
+                        onClick={() => fetchProductCostAnalysis(product.id, product.name)} 
+                        className="p-2.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all"
+                        title={(t as any).smartCostAnalysis || 'Smart Cost Analysis'}
+                      >
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -3461,6 +3555,32 @@ NOTIFY pgrst, 'reload schema';
                     {!productForm.allBranches && productForm.selectedBranchIds.length === 0 && (
                       <p className="text-xs text-red-500 font-bold">{t.selectAtLeastOneBranch || 'Select at least one branch'}</p>
                     )}
+                    
+                    {/* Stock per branch inputs */}
+                    <div className="space-y-2 mt-4">
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.initialStock || 'Initial Stock by Branch'}</label>
+                      <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar p-3 bg-orange-50 rounded-2xl">
+                        {(productForm.allBranches 
+                          ? locations.filter(l => l.type === 'BRANCH' || l.is_roastery) 
+                          : locations.filter(l => productForm.selectedBranchIds.includes(l.id))
+                        ).map(loc => (
+                          <div key={loc.id} className="flex flex-col gap-1">
+                            <span className="text-xs font-bold text-gray-700 truncate">{loc.name}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={productForm.branchStock[loc.id] || '0'}
+                              onChange={e => setProductForm({
+                                ...productForm,
+                                branchStock: { ...productForm.branchStock, [loc.id]: e.target.value }
+                              })}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono"
+                              placeholder="0"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
