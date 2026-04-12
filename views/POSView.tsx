@@ -1614,15 +1614,15 @@ const POSView: React.FC = () => {
       {/* Main Catalog or History View */}
       <div className="flex-1 flex flex-col gap-4 overflow-hidden h-full">
         {/* Top Bar: Search & Categories */}
-        <div className="bg-white  p-4 rounded-[32px] border border-orange-100  shadow-sm flex flex-col gap-4 shrink-0">
-          <div className="flex items-center gap-4">
+        <div className="bg-white  p-2 sm:p-4 rounded-[20px] sm:rounded-[32px] border border-orange-100  shadow-sm flex flex-col gap-2 sm:gap-4 shrink-0">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
             {/* Location Selector */}
             <div className="relative">
               <select
                 value={selectedLocationId}
                 onChange={e => persistLocation(e.target.value)}
                 disabled={true}
-                className="appearance-none p-4 pr-10 bg-white rounded-2xl font-bold text-xs flex items-center gap-2 border border-orange-100 outline-none focus:border-orange-600 transition-all min-w-[160px] disabled:bg-orange-50 disabled:cursor-not-allowed"
+                className="appearance-none p-3 sm:p-4 pr-10 bg-white rounded-xl sm:rounded-2xl font-bold text-xs flex items-center gap-2 border border-orange-100 outline-none focus:border-orange-600 transition-all w-full sm:w-auto min-w-0 sm:min-w-[160px] disabled:bg-orange-50 disabled:cursor-not-allowed"
               >
                 <option value="" disabled>-- {t.locationName || 'Location'} --</option>
                 {locations.map(loc => (
@@ -1640,7 +1640,7 @@ const POSView: React.FC = () => {
                   setShowShiftDetails(true);
                 }
               }}
-              className="p-4 bg-white  rounded-2xl font-bold text-xs flex items-center gap-2   transition-all shrink-0"
+              className="p-3 sm:p-4 bg-white  rounded-xl sm:rounded-2xl font-bold text-xs flex items-center justify-center gap-2   transition-all shrink-0"
             >
               <Banknote size={20} />
               <span className="hidden sm:inline">{t.drawer}</span>
@@ -1652,31 +1652,31 @@ const POSView: React.FC = () => {
                 placeholder={activeTab === 'HISTORY' ? t.history : t.searchProduct}
                 value={activeTab === 'HISTORY' ? historySearch : searchTerm}
                 onChange={e => activeTab === 'HISTORY' ? setHistorySearch(e.target.value) : setSearchTerm(e.target.value)}
-                className="w-full bg-white  border-none rounded-2xl px-12 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600 text-base transition-all text-black  placeholder-stone-400"
+                className="w-full bg-white  border-none rounded-xl sm:rounded-2xl px-12 py-3 sm:py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600 text-sm sm:text-base transition-all text-black  placeholder-stone-400"
               />
             </div>
 
             {activeTab === 'HISTORY' && (
-              <div className="flex items-center gap-2">
-                <div className="flex items-center gap-2 bg-white  px-4 py-3 rounded-2xl border border-orange-50 ">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+                <div className="flex flex-col sm:flex-row items-center gap-2 bg-white px-3 sm:px-4 py-2 sm:py-3 rounded-xl sm:rounded-2xl border border-orange-50 w-full sm:w-auto">
                   <input
                     type="date"
-                    className="bg-transparent border-none outline-none text-xs font-bold text-black "
+                    className="bg-transparent border-none outline-none text-xs font-bold text-black w-full sm:w-auto"
                     value={dateRange.start}
                     onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
                   />
-                  <span className="text-black">→</span>
+                  <span className="text-black hidden sm:inline">→</span>
                   <input
                     type="date"
-                    className="bg-transparent border-none outline-none text-xs font-bold text-black "
+                    className="bg-transparent border-none outline-none text-xs font-bold text-black w-full sm:w-auto"
                     value={dateRange.end}
                     onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
                   />
                   {(dateRange.start || dateRange.end) && (
-                    <button onClick={() => setDateRange({ start: '', end: '' })} className="text-black hover"><X size={14} /></button>
+                    <button onClick={() => setDateRange({ start: '', end: '' })} className="text-black hover mt-1 sm:mt-0"><X size={14} /></button>
                   )}
                 </div>
-                <button onClick={fetchHistory} className="p-3 bg-orange-600 text-white rounded-xl  transition-all border-2 border-orange-600"><RefreshCw size={20} /></button>
+                <button onClick={fetchHistory} className="p-3 bg-orange-600 text-white rounded-xl  transition-all border-2 border-orange-600 w-full sm:w-auto"><RefreshCw size={20} /></button>
               </div>
             )}
           </div>
@@ -1984,7 +1984,7 @@ const POSView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4 animate-in fade-in duration-500">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3 lg:gap-4 animate-in fade-in duration-500">
               {isLoading ? (
                 Array.from({ length: 8 }).map((_, i) => (
                   <div key={i} className="bg-white  rounded-[32px] aspect-[4/5] animate-pulse"></div>
@@ -1993,22 +1993,22 @@ const POSView: React.FC = () => {
                 <button
                   key={item.id}
                   onClick={() => openCustomization(item)}
-                  className="group bg-white  p-3 rounded-[32px] border border-orange-100  shadow-sm hover:shadow-xl hover/10 transition-all flex flex-col h-full active:scale-95 relative overflow-hidden"
+                  className="group bg-white  p-2 sm:p-3 rounded-[20px] sm:rounded-[32px] border border-orange-100  shadow-sm hover:shadow-xl hover/10 transition-all flex flex-col h-full active:scale-95 relative overflow-hidden"
                 >
-                  <div className="aspect-square rounded-[24px] overflow-hidden mb-3 bg-white relative">
+                  <div className="aspect-square rounded-[16px] sm:rounded-[24px] overflow-hidden mb-2 sm:mb-3 bg-white relative">
                     <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.name} />
                     <div className="absolute inset-0 bg-white/0 group-hover/5 transition-colors" />
                   </div>
                   <div className="flex-1 flex flex-col px-1">
-                    <h4 className="font-bold text-black  text-sm line-clamp-2 mb-2 leading-tight text-center h-10">{item.name}</h4>
+                    <h4 className="font-bold text-black  text-xs sm:text-sm line-clamp-2 mb-1 sm:mb-2 leading-tight text-center h-8 sm:h-10">{item.name}</h4>
                     {(item.type === 'PACKAGED_COFFEE' || item.category === 'PACKAGED') && (
-                      <div className="text-[10px] font-bold text-black/60 text-center leading-tight mb-2 line-clamp-2">
+                      <div className="text-[8px] sm:text-[10px] font-bold text-black/60 text-center leading-tight mb-1 sm:mb-2 line-clamp-2">
                         {[item.bean_origin, item.roast_level, item.roast_date].filter(Boolean).join(' • ')}
                       </div>
                     )}
-                    <div className="mt-auto flex justify-between items-center bg-white  p-2 rounded-2xl group- group- transition-colors">
-                      <span className="font-black text-lg font-mono px-2">{item.price}<span className="text-[10px] ml-1 opacity-60 font-sans">{t.currency}</span></span>
-                      <div className="w-8 h-8 bg-white  text-black  rounded-xl flex items-center justify-center shadow-sm"><Plus size={16} strokeWidth={3} /></div>
+                    <div className="mt-auto flex justify-between items-center bg-white  p-1.5 sm:p-2 rounded-xl sm:rounded-2xl group- group- transition-colors">
+                      <span className="font-black text-sm sm:text-lg font-mono px-1 sm:px-2">{item.price}<span className="text-[8px] sm:text-[10px] ml-1 opacity-60 font-sans">{t.currency}</span></span>
+                      <div className="w-7 h-7 sm:w-8 sm:h-8 bg-white  text-black  rounded-lg sm:rounded-xl flex items-center justify-center shadow-sm"><Plus size={14} strokeWidth={3} /></div>
                     </div>
                   </div>
                 </button>
@@ -2669,6 +2669,17 @@ const POSView: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Mobile Cart Floating Button */}
+      {cart.length > 0 && !showMobileCart && (
+        <button
+          onClick={() => setShowMobileCart(true)}
+          className="lg:hidden fixed bottom-6 right-6 z-[90] bg-orange-600 text-white p-4 rounded-full shadow-2xl flex items-center gap-2"
+        >
+          <ShoppingCart size={24} />
+          <span className="bg-white text-orange-600 rounded-full px-2 py-0.5 text-xs font-bold">{cart.length}</span>
+        </button>
       )}
 
     </div>
