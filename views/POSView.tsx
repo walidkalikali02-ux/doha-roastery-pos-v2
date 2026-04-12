@@ -1137,7 +1137,7 @@ const POSView: React.FC = () => {
   const splitRemaining = totals.total - (splitBreakdown.cash + splitBreakdown.card + splitBreakdown.mobile);
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-140px)] gap-6 animate-in fade-in duration-500 relative" dir={t.dir}>
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-100px)] md:h-[calc(100vh-120px)] gap-2 md:gap-4 animate-in fade-in duration-500 relative p-2 md:p-4" dir={t.dir}>
 
       {/* Thermal Receipt Styling */}
       <style>
@@ -1614,22 +1614,22 @@ const POSView: React.FC = () => {
       {/* Main Catalog or History View */}
       <div className="flex-1 flex flex-col gap-4 overflow-hidden h-full">
         {/* Top Bar: Search & Categories */}
-        <div className="bg-white  p-2 sm:p-4 rounded-[20px] sm:rounded-[32px] border border-orange-100  shadow-sm flex flex-col gap-2 sm:gap-4 shrink-0">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4">
+        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2 shrink-0">
+          <div className="flex items-center gap-2">
             {/* Location Selector */}
-            <div className="relative">
+            <div className="relative hidden md:block">
               <select
                 value={selectedLocationId}
                 onChange={e => persistLocation(e.target.value)}
                 disabled={true}
-                className="appearance-none p-3 sm:p-4 pr-10 bg-white rounded-xl sm:rounded-2xl font-bold text-xs flex items-center gap-2 border border-orange-100 outline-none focus:border-orange-600 transition-all w-full sm:w-auto min-w-0 sm:min-w-[160px] disabled:bg-orange-50 disabled:cursor-not-allowed"
+                className="appearance-none px-3 py-2 pr-8 bg-gray-50 rounded-lg font-medium text-xs border border-gray-200 outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
               >
-                <option value="" disabled>-- {t.locationName || 'Location'} --</option>
+                <option value="" disabled>{t.locationName || 'Location'}</option>
                 {locations.map(loc => (
-                  <option key={loc.id} value={loc.id}>{loc.name} {loc.type === 'BRANCH' ? '(Branch)' : ''}</option>
+                  <option key={loc.id} value={loc.id}>{loc.name}</option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" size={16} />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-40" size={14} />
             </div>
 
             <button
@@ -1640,19 +1640,19 @@ const POSView: React.FC = () => {
                   setShowShiftDetails(true);
                 }
               }}
-              className="p-3 sm:p-4 bg-white  rounded-xl sm:rounded-2xl font-bold text-xs flex items-center justify-center gap-2   transition-all shrink-0"
+              className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors shrink-0"
             >
-              <Banknote size={20} />
-              <span className="hidden sm:inline">{t.drawer}</span>
+              <Banknote size={18} className="text-gray-600" />
             </button>
+            
             <div className="relative flex-1">
-              <Search className={`absolute ${t.dir === 'rtl' ? 'right-5' : 'left-5'} top-1/2 -translate-y-1/2 text-black`} size={20} />
+              <Search className={`absolute ${t.dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-gray-400`} size={16} />
               <input
                 type="text"
                 placeholder={activeTab === 'HISTORY' ? t.history : t.searchProduct}
                 value={activeTab === 'HISTORY' ? historySearch : searchTerm}
                 onChange={e => activeTab === 'HISTORY' ? setHistorySearch(e.target.value) : setSearchTerm(e.target.value)}
-                className="w-full bg-white  border-none rounded-xl sm:rounded-2xl px-12 py-3 sm:py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600 text-sm sm:text-base transition-all text-black  placeholder-stone-400"
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
               />
             </div>
 
@@ -1681,7 +1681,7 @@ const POSView: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
             {[
               { id: 'ALL', label: t.all, icon: LayoutGrid },
               { id: 'DRINKS', label: t.drinks, icon: Coffee },
@@ -1692,12 +1692,12 @@ const POSView: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-2 px-5 py-3 rounded-xl text-xs font-black transition-all whitespace-nowrap ${activeTab === tab.id
-                  ? 'bg-orange-600 text-white shadow-lg'
-                  : 'bg-white  text-black  '
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${activeTab === tab.id
+                  ? 'bg-orange-600 text-white shadow-sm'
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
                   }`}
               >
-                <tab.icon size={16} /> {tab.label}
+                <tab.icon size={14} /> {tab.label}
               </button>
             ))}
           </div>
@@ -1984,31 +1984,32 @@ const POSView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3 lg:gap-4 animate-in fade-in duration-500">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 animate-in fade-in duration-500">
               {isLoading ? (
-                Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="bg-white  rounded-[32px] aspect-[4/5] animate-pulse"></div>
+                Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="bg-white rounded-2xl aspect-square animate-pulse"></div>
                 ))
               ) : filteredItems.map(item => (
                 <button
                   key={item.id}
                   onClick={() => openCustomization(item)}
-                  className="group bg-white  p-2 sm:p-3 rounded-[20px] sm:rounded-[32px] border border-orange-100  shadow-sm hover:shadow-xl hover/10 transition-all flex flex-col h-full active:scale-95 relative overflow-hidden"
+                  className="group bg-white p-3 rounded-2xl border border-orange-100 shadow-sm hover:shadow-lg transition-all flex flex-col h-full active:scale-95"
                 >
-                  <div className="aspect-square rounded-[16px] sm:rounded-[24px] overflow-hidden mb-2 sm:mb-3 bg-white relative">
-                    <img src={item.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={item.name} />
-                    <div className="absolute inset-0 bg-white/0 group-hover/5 transition-colors" />
+                  <div className="aspect-square rounded-xl overflow-hidden mb-2 bg-gray-50 relative">
+                    <img 
+                      src={item.image} 
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" 
+                      alt={item.name}
+                      loading="lazy"
+                    />
                   </div>
-                  <div className="flex-1 flex flex-col px-1">
-                    <h4 className="font-bold text-black  text-xs sm:text-sm line-clamp-2 mb-1 sm:mb-2 leading-tight text-center h-8 sm:h-10">{item.name}</h4>
-                    {(item.type === 'PACKAGED_COFFEE' || item.category === 'PACKAGED') && (
-                      <div className="text-[8px] sm:text-[10px] font-bold text-black/60 text-center leading-tight mb-1 sm:mb-2 line-clamp-2">
-                        {[item.bean_origin, item.roast_level, item.roast_date].filter(Boolean).join(' • ')}
+                  <div className="flex-1 flex flex-col">
+                    <h4 className="font-bold text-sm text-gray-800 line-clamp-2 mb-1 leading-tight">{item.name}</h4>
+                    <div className="mt-auto flex items-center justify-between">
+                      <span className="font-bold text-orange-600">{item.price} <span className="text-xs">{t.currency}</span></span>
+                      <div className="w-8 h-8 bg-orange-600 text-white rounded-lg flex items-center justify-center shadow-sm">
+                        <Plus size={16} strokeWidth={2.5} />
                       </div>
-                    )}
-                    <div className="mt-auto flex justify-between items-center bg-white  p-1.5 sm:p-2 rounded-xl sm:rounded-2xl group- group- transition-colors">
-                      <span className="font-black text-sm sm:text-lg font-mono px-1 sm:px-2">{item.price}<span className="text-[8px] sm:text-[10px] ml-1 opacity-60 font-sans">{t.currency}</span></span>
-                      <div className="w-7 h-7 sm:w-8 sm:h-8 bg-white  text-black  rounded-lg sm:rounded-xl flex items-center justify-center shadow-sm"><Plus size={14} strokeWidth={3} /></div>
                     </div>
                   </div>
                 </button>
@@ -2019,17 +2020,21 @@ const POSView: React.FC = () => {
       </div>
 
       {/* Cart Sidebar */}
-      <aside className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'left-0' : 'right-0'} z-[100] w-full sm:w-[450px] lg:w-[400px] transform transition-all duration-500 ease-in-out lg:static lg:translate-x-0 ${showMobileCart ? 'translate-x-0' : (t.dir === 'rtl' ? '-translate-x-full' : 'translate-x-full')} flex flex-col bg-white  border-l border-orange-100  shadow-2xl lg:shadow-none h-full`}>
+      <aside className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'left-0' : 'right-0'} z-[100] w-full md:w-[340px] lg:w-[320px] transform transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${showMobileCart ? 'translate-x-0' : (t.dir === 'rtl' ? '-translate-x-full' : 'translate-x-full')} flex flex-col bg-white border-l border-gray-200 shadow-xl lg:shadow-none h-full`}>
         {/* Header */}
-        <div className="p-6 border-b border-orange-50  flex justify-between items-center bg-white  z-10 shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-600 text-white rounded-xl flex items-center justify-center shadow-md"><ShoppingCart size={20} /></div>
+        <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white z-10 shrink-0">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 bg-orange-600 text-white rounded-lg flex items-center justify-center">
+              <ShoppingCart size={18} />
+            </div>
             <div>
-              <h3 className="text-lg font-black">{t.bill}</h3>
-              <span className="text-[10px] font-bold text-black uppercase tracking-widest">{cart.length} {t.items}</span>
+              <h3 className="text-base font-bold">{t.bill}</h3>
+              <span className="text-xs text-gray-500">{cart.length} {t.items}</span>
             </div>
           </div>
-          <button onClick={() => setShowMobileCart(false)} className="lg:hidden p-2  rounded-full"><X size={24} /></button>
+          <button onClick={() => setShowMobileCart(false)} className="lg:hidden p-2 hover:bg-gray-100 rounded-full">
+            <X size={20} />
+          </button>
         </div>
 
         {/* Customer Selection */}
