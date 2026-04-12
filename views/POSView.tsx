@@ -294,20 +294,7 @@ const POSView: React.FC = () => {
     try {
       const { data } = await supabase.from('locations').select('*').eq('is_active', true);
       if (data) {
-        // Only show Al mina Doha branch for all users in POS
-        const filteredData = data.filter(l => l.name === 'Al mina Doha');
-        
-        setLocations(filteredData);
-        
-        // Always use Al mina Doha
-        const waqodLocation = data.find(l => l.name === 'Al mina Doha');
-        if (waqodLocation) {
-          setSelectedLocationId(waqodLocation.id);
-          if (typeof window !== 'undefined') {
-            localStorage.setItem('pos_selected_location', waqodLocation.id);
-          }
-          return; // Exit early
-        }
+        setLocations(data);
         
         // Check if user already has a saved location in localStorage
         const savedLocation = typeof window !== 'undefined' ? localStorage.getItem('pos_selected_location') : null;
@@ -1617,12 +1604,11 @@ const POSView: React.FC = () => {
         <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2 shrink-0">
           <div className="flex items-center gap-2">
             {/* Location Selector */}
-            <div className="relative hidden md:block">
+            <div className="relative">
               <select
                 value={selectedLocationId}
                 onChange={e => persistLocation(e.target.value)}
-                disabled={true}
-                className="appearance-none px-3 py-2 pr-8 bg-gray-50 rounded-lg font-medium text-xs border border-gray-200 outline-none transition-all disabled:bg-gray-100 disabled:text-gray-500"
+                className="appearance-none px-3 py-2 pr-8 bg-gray-50 rounded-lg font-medium text-xs border border-gray-200 outline-none focus:ring-2 focus:ring-orange-500 transition-all"
               >
                 <option value="" disabled>{t.locationName || 'Location'}</option>
                 {locations.map(loc => (
