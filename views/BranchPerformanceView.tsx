@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useLanguage } from '../App';
+import { useAuth } from '../contexts/AuthContext';
 import { TrendingUp, TrendingDown, BarChart3, PieChart, Users, DollarSign, Coffee, ArrowUpDown, ArrowRightLeft, X, Loader2, FileDown, Trash2, AlertTriangle } from 'lucide-react';
 import { fetchInvoicesByPeriod, exportInvoicesToExcel, InvoiceExportPeriod } from '../utils/reportExport';
 
@@ -18,6 +19,7 @@ interface BranchStats {
 
 const BranchPerformanceView: React.FC = () => {
   const { t, lang } = useLanguage();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
   const [branchStats, setBranchStats] = useState<BranchStats[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('month');
@@ -304,19 +306,31 @@ const BranchPerformanceView: React.FC = () => {
       return;
     }
 
+    if (user?.role !== 'ADMIN') {
+      alert((t as any).deleteAdminOnly || 'Only administrators can delete transactions');
+      return;
+    }
+
     setIsDeleting(true);
     setDeleteResult(null);
 
     try {
+      console.log('Deleting transactions for branch:', deleteBranch);
+      
       const { data, error } = await supabase
         .from('transactions')
         .delete()
         .eq('location_id', deleteBranch)
         .select('id');
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase delete error:', error);
+        throw error;
+      }
 
       const deletedCount = data?.length || 0;
+      console.log('Deleted transactions count:', deletedCount);
+      
       setDeleteResult({ success: true, count: deletedCount });
       
       setDeleteBranch('');
@@ -328,6 +342,8 @@ const BranchPerformanceView: React.FC = () => {
       }, 1500);
     } catch (error: any) {
       console.error('Error deleting transactions:', error);
+      const errorMessage = error?.message || (t as any).deleteFailed || 'Delete failed';
+      alert(errorMessage);
       setDeleteResult({ success: false, count: 0 });
     } finally {
       setIsDeleting(false);
@@ -335,6 +351,10 @@ const BranchPerformanceView: React.FC = () => {
   };
 
   const openDeleteModal = (branchId: string) => {
+    if (user?.role !== 'ADMIN') {
+      alert((t as any).deleteAdminOnly || 'Only administrators can delete transactions');
+      return;
+    }
     setDeleteBranch(branchId);
     setDeleteConfirmText('');
     setDeleteResult(null);
