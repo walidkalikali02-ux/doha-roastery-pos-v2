@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useLanguage } from '../App';
-import { TrendingUp, TrendingDown, BarChart3, PieChart, Users, DollarSign, Coffee, ArrowUpDown, ArrowRightLeft, X, Loader2, FileDown } from 'lucide-react';
+import { TrendingUp, TrendingDown, BarChart3, PieChart, Users, DollarSign, Coffee, ArrowUpDown, ArrowRightLeft, X, Loader2, FileDown, Trash2, AlertTriangle } from 'lucide-react';
 import { fetchInvoicesByPeriod, exportInvoicesToExcel, InvoiceExportPeriod } from '../utils/reportExport';
 
 interface BranchStats {
@@ -31,6 +31,11 @@ const BranchPerformanceView: React.FC = () => {
   const [isConverting, setIsConverting] = useState(false);
   const [convertResult, setConvertResult] = useState<{ success: boolean; count: number } | null>(null);
   const [isExporting, setIsExporting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteBranch, setDeleteBranch] = useState<string>('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleteResult, setDeleteResult] = useState<{ success: boolean; count: number } | null>(null);
 
   useEffect(() => {
     fetchBranchPerformance();
@@ -294,6 +299,48 @@ const BranchPerformanceView: React.FC = () => {
     }
   };
 
+  const handleDeleteTransactions = async () => {
+    if (!deleteBranch || deleteConfirmText.toUpperCase() !== 'DELETE') {
+      return;
+    }
+
+    setIsDeleting(true);
+    setDeleteResult(null);
+
+    try {
+      const { data, error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('location_id', deleteBranch)
+        .select('id');
+
+      if (error) throw error;
+
+      const deletedCount = data?.length || 0;
+      setDeleteResult({ success: true, count: deletedCount });
+      
+      setDeleteBranch('');
+      setDeleteConfirmText('');
+      
+      setTimeout(() => {
+        setShowDeleteModal(false);
+        fetchBranchPerformance();
+      }, 1500);
+    } catch (error: any) {
+      console.error('Error deleting transactions:', error);
+      setDeleteResult({ success: false, count: 0 });
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const openDeleteModal = (branchId: string) => {
+    setDeleteBranch(branchId);
+    setDeleteConfirmText('');
+    setDeleteResult(null);
+    setShowDeleteModal(true);
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500 pb-20" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -475,14 +522,23 @@ const BranchPerformanceView: React.FC = () => {
                     </td>
                     <td className="p-4">
                       {branch.id !== 'all' && (
-                        <button
-                          onClick={() => handleExportInvoices(branch.id)}
-                          disabled={isExporting}
-                          className="flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors disabled:opacity-50"
-                        >
-                          <FileDown size={14} />
-                          {(t as any).export || 'Export'}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleExportInvoices(branch.id)}
+                            disabled={isExporting}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors disabled:opacity-50"
+                          >
+                            <FileDown size={14} />
+                            {(t as any).export || 'Export'}
+                          </button>
+                          <button
+                            onClick={() => openDeleteModal(branch.id)}
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors"
+                          >
+                            <Trash2 size={14} />
+                            {(t as any).delete || 'Delete'}
+                          </button>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -615,6 +671,78 @@ const BranchPerformanceView: React.FC = () => {
                     {t.converting || 'Converting...'}
                   </>
                 ) : t.convert || 'Convert'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Transactions Modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-[24px] p-8 max-w-md w-full mx-4 shadow-2xl">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-xl font-bold text-red-600 flex items-center gap-2">
+                <AlertTriangle size={24} />
+                {(t as any).deleteTransactions || 'Delete Transactions'}
+              </h3>
+              <button onClick={() => setShowDeleteModal(false)} className="p-2 hover:bg-gray-100 rounded-full">
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6">
+              <p className="text-sm text-red-800 font-medium">
+                {(t as any).deleteTransactionsWarning || 'This action is irreversible. All transactions for this branch will be permanently deleted.'}
+              </p>
+              <p className="text-sm text-red-700 mt-2">
+                <strong>{(t as any).branch || 'Branch'}:</strong> {locations.find(l => l.id === deleteBranch)?.name}
+              </p>
+            </div>
+
+            <p className="text-sm text-gray-600 mb-4">
+              {(t as any).typeDeleteConfirm || 'Type "DELETE" to confirm:'}
+            </p>
+
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={e => setDeleteConfirmText(e.target.value)}
+              className="w-full p-3 border border-gray-200 rounded-xl text-black mb-4"
+              placeholder="DELETE"
+            />
+
+            {deleteResult && (
+              <div className={`mb-4 p-4 rounded-xl ${deleteResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {deleteResult.success 
+                  ? `${(t as any).transactionsDeleted || 'Successfully deleted'} ${deleteResult.count} ${(t as any).transactions || 'transactions'}`
+                  : ((t as any).deleteFailed || 'Delete failed')}
+              </div>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl font-bold hover:bg-gray-200"
+              >
+                {t.cancel || 'Cancel'}
+              </button>
+              <button
+                onClick={handleDeleteTransactions}
+                disabled={deleteConfirmText.toUpperCase() !== 'DELETE' || isDeleting}
+                className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl font-bold hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    {(t as any).deleting || 'Deleting...'}
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={18} />
+                    {(t as any).delete || 'Delete'}
+                  </>
+                )}
               </button>
             </div>
           </div>
