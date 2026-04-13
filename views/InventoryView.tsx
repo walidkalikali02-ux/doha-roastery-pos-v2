@@ -425,6 +425,86 @@ const InventoryView: React.FC = () => {
     return rows.filter(row => row.productName.toLowerCase().includes(term));
   }, [packagedItems, searchTerm]);
 
+  const inventoryMatrix = useMemo(() => {
+    const activeLocations = locations
+      .filter(l => l.is_active !== false)
+      .sort((a, b) => {
+        if (a.type === 'WAREHOUSE' && b.type !== 'WAREHOUSE') return -1;
+        if (a.type !== 'WAREHOUSE' && b.type === 'WAREHOUSE') return 1;
+        if (a.type === 'ROASTERY' && b.type !== 'ROASTERY') return -1;
+        if (a.type !== 'ROASTERY' && b.type === 'ROASTERY') return 1;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    
+    const productMap = new Map<string, {
+      productKey: string;
+      productName: string;
+      stockByLocation: Map<string, { stock: number; available: number }>;
+      totalStock: number;
+      totalAvailable: number;
+      unit?: string;
+    }>();
+    
+    packagedItems.forEach(item => {
+      const productKey = item.productId || item.name;
+      const locId = item.location_id || 'central';
+      
+      let product = productMap.get(productKey);
+      if (!product) {
+        product = {
+          productKey,
+          productName: item.name,
+          stockByLocation: new Map(),
+          totalStock: 0,
+          totalAvailable: 0,
+          unit: item.unit
+        };
+        productMap.set(productKey, product);
+      }
+      
+      const stock = item.stock || 0;
+      const available = getAvailableStock(item);
+      product.totalStock += stock;
+      product.totalAvailable += available;
+      
+      const existing = product.stockByLocation.get(locId);
+      if (existing) {
+        existing.stock += stock;
+        existing.available += available;
+      } else {
+        product.stockByLocation.set(locId, { stock, available });
+      }
+    });
+    
+    const products = Array.from(productMap.values())
+      .sort((a, b) => a.productName.localeCompare(b.productName));
+    
+    const term = searchTerm.toLowerCase().trim();
+    const filteredProducts = term 
+      ? products.filter(p => p.productName.toLowerCase().includes(term))
+      : products;
+    
+    const locationTotals = new Map<string, number>();
+    activeLocations.forEach(loc => {
+      let total = 0;
+      filteredProducts.forEach(p => {
+        const locData = p.stockByLocation.get(loc.id);
+        if (locData) total += locData.stock;
+      });
+      locationTotals.set(loc.id, total);
+    });
+    
+    let grandTotal = 0;
+    filteredProducts.forEach(p => { grandTotal += p.totalStock; });
+    
+    return {
+      locations: activeLocations,
+      products: filteredProducts,
+      locationTotals,
+      grandTotal
+    };
+  }, [packagedItems, locations, searchTerm]);
+
   const filteredCountTasks = useMemo(() => {
     const term = String(searchTerm || '').toLowerCase();
     return countTasks.filter(task => {
@@ -2155,6 +2235,67 @@ const InventoryView: React.FC = () => {
                       </tr>
                     )}
                   </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="mx-10 bg-white border border-orange-100 rounded-3xl px-6 py-4">
+              <div className="text-xs font-black uppercase tracking-widest text-black mb-4">{t.inventoryMatrix || 'Inventory Distribution Matrix'}</div>
+              <div className="overflow-x-auto">
+                <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
+                  <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
+                    <tr>
+                      <th className="px-4 py-3 sticky left-0 bg-white z-10 min-w-[180px]">{t.product}</th>
+                      {inventoryMatrix.locations.map(loc => (
+                        <th key={loc.id} className="px-3 py-3 text-center whitespace-nowrap">
+                          <div className="font-bold">{loc.name}</div>
+                          <div className="text-[8px] font-normal text-stone-400">{loc.type}</div>
+                        </th>
+                      ))}
+                      <th className="px-4 py-3 text-center bg-orange-50">{t.total}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-orange-50">
+                    {inventoryMatrix.products.slice(0, 50).map(product => (
+                      <tr key={product.productKey} className="hover:bg-orange-50">
+                        <td className="px-4 py-3 font-bold sticky left-0 bg-white z-10">{product.productName}</td>
+                        {inventoryMatrix.locations.map(loc => {
+                          const locData = product.stockByLocation.get(loc.id);
+                          const stock = locData?.stock || 0;
+                          const isLow = stock > 0 && stock <= 5;
+                          return (
+                            <td key={loc.id} className={`px-3 py-3 text-center font-mono font-black ${isLow ? 'text-red-600' : ''}`}>
+                              {stock > 0 ? stock : '-'}
+                            </td>
+                          );
+                        })}
+                        <td className="px-4 py-3 text-center font-mono font-black bg-orange-50">{product.totalStock}</td>
+                      </tr>
+                    ))}
+                    {inventoryMatrix.products.length === 0 && (
+                      <tr>
+                        <td className="px-4 py-6 text-center text-sm text-black" colSpan={inventoryMatrix.locations.length + 2}>{t.noItemsFound}</td>
+                      </tr>
+                    )}
+                    {inventoryMatrix.products.length > 50 && (
+                      <tr>
+                        <td className="px-4 py-3 text-center text-xs text-stone-400 italic" colSpan={inventoryMatrix.locations.length + 2}>
+                          {t.showingFirst50 || 'Showing first 50 products...'}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot className="bg-stone-50 border-t-2 border-orange-200">
+                    <tr>
+                      <td className="px-4 py-3 font-black uppercase text-xs sticky left-0 bg-stone-50 z-10">{t.total}</td>
+                      {inventoryMatrix.locations.map(loc => (
+                        <td key={loc.id} className="px-3 py-3 text-center font-mono font-black">
+                          {inventoryMatrix.locationTotals.get(loc.id) || 0}
+                        </td>
+                      ))}
+                      <td className="px-4 py-3 text-center font-mono font-black bg-orange-100">{inventoryMatrix.grandTotal}</td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
