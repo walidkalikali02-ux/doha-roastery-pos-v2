@@ -1018,13 +1018,14 @@ const POSView: React.FC = () => {
       console.log(`[LOG] Return ${status}: ${requestId} by ${user?.name || 'Manager'}`);
 
       if (approved) {
-        const returnLocationId = request.items[0]?.locationId || selectedLocationId;
-        const { data: locInv } = await supabase
+        const returnLocationId = request.items[0]?.locationId || request.items[0]?.location_id || selectedLocationId;
+        const { data: locInv, error: locInvError } = await supabase
           .from('inventory_items')
           .select('*')
           .eq('location_id', returnLocationId);
+        if (locInvError) throw locInvError;
         const invById = new Map((locInv || []).map(inv => [inv.id, inv]));
-        const invByProductId = new Map((locInv || []).map(inv => [inv.productId, inv]));
+        const invByProductId = new Map((locInv || []).map((inv: any) => [inv.product_id || inv.productId, inv]));
         const invByName = new Map((locInv || []).map(inv => [inv.name, inv]));
         const additions = new Map<string, number>();
         const addRestock = (itemId: string | undefined, qty: number) => {
@@ -1103,7 +1104,9 @@ const POSView: React.FC = () => {
 
   const filteredItems = useMemo(() => {
     return inventoryItems.filter(item => {
-      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+      const itemName = String(item.name || '').toLowerCase();
+      const normalizedSearch = String(searchTerm || '').toLowerCase();
+      const matchesSearch = itemName.includes(normalizedSearch);
       const matchesTab = activeTab === 'ALL' || (activeTab === 'PACKAGED' && item.category === 'PACKAGED') || (activeTab === 'DRINKS' && item.type === 'BEVERAGE');
       return matchesSearch && matchesTab;
     });
@@ -1111,8 +1114,10 @@ const POSView: React.FC = () => {
 
   const filteredHistory = useMemo(() => {
     return pastTransactions.filter(tx => {
-      const matchesSearch = tx.id.toLowerCase().includes(historySearch.toLowerCase()) ||
-        tx.cashier_name?.toLowerCase().includes(historySearch.toLowerCase());
+      const normalizedSearch = String(historySearch || '').toLowerCase();
+      const txId = String(tx.id || '').toLowerCase();
+      const cashierName = String(tx.cashier_name || '').toLowerCase();
+      const matchesSearch = txId.includes(normalizedSearch) || cashierName.includes(normalizedSearch);
 
       const txDate = new Date(tx.created_at);
       const matchesStart = !dateRange.start || txDate >= new Date(dateRange.start);
