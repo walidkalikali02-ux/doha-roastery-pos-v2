@@ -3,7 +3,21 @@ import { supabase } from '../supabaseClient';
 import { useLanguage } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
-import { Users, Search, Plus, Phone, Mail, Star, ShoppingCart, TrendingUp, Edit, Trash2, X } from 'lucide-react';
+import {
+  Users,
+  Search,
+  Plus,
+  Phone,
+  Mail,
+  Star,
+  ShoppingCart,
+  TrendingUp,
+  Edit,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { useErrorToast } from '../hooks/useErrorToast';
+import { ConfirmationModal } from '../components/common/ConfirmationModal';
 
 interface Customer {
   id: string;
@@ -21,11 +35,14 @@ interface CRMViewProps {}
 const CRMView: React.FC<CRMViewProps> = () => {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
+  const { showError } = useErrorToast();
   const canDelete = user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [customerToDelete, setCustomerToDelete] = useState<string | null>(null);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [formData, setFormData] = useState<{
     name: string;
@@ -81,22 +98,22 @@ const CRMView: React.FC<CRMViewProps> = () => {
             notes: formData.notes || null,
           })
           .eq('id', editingCustomer.id);
-        
+
         if (error) {
           console.error('Update error details:', error);
           throw error;
         }
       } else {
-        const { error } = await supabase
-          .from('customers')
-          .insert([{
+        const { error } = await supabase.from('customers').insert([
+          {
             full_name: formData.name,
             phone: formData.phone,
             email: formData.email || null,
             notes: formData.notes || null,
             is_active: true,
-          }]);
-        
+          },
+        ]);
+
         if (error) {
           console.error('Insert error details:', error);
           throw error;
@@ -109,7 +126,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
       setFormData({ name: '', phone: '', email: '', notes: '' });
     } catch (error: any) {
       console.error('Error saving customer:', error?.message || error);
-      alert(error?.message || 'Failed to save customer. Check console for details.');
+      showError(error?.message || 'Failed to save customer. Check console for details.');
     }
   };
 
@@ -124,14 +141,19 @@ const CRMView: React.FC<CRMViewProps> = () => {
     setShowAddModal(true);
   };
 
-  const handleDeleteCustomer = async (id: string) => {
-    if (!confirm(t.confirmDelete || 'Are you sure you want to delete this customer?')) return;
-    
+  const handleDeleteCustomer = (id: string) => {
+    setCustomerToDelete(id);
+    setShowDeleteConfirm(true);
+  };
+
+  const confirmDeleteCustomer = async () => {
+    if (!customerToDelete) return;
+    setShowDeleteConfirm(false);
     try {
       const { error } = await supabase
         .from('customers')
         .update({ is_active: false })
-        .eq('id', id);
+        .eq('id', customerToDelete);
       if (error) {
         console.error('Delete error details:', error);
         throw error;
@@ -139,26 +161,27 @@ const CRMView: React.FC<CRMViewProps> = () => {
       fetchCustomers();
     } catch (error: any) {
       console.error('Error deleting customer:', error?.message || error);
-      alert(error?.message || 'Failed to delete customer. Check console for details.');
+      showError(error?.message || 'Failed to delete customer. Check console for details.');
+    } finally {
+      setCustomerToDelete(null);
     }
   };
 
-  const filteredCustomers = customers.filter(customer => {
+  const filteredCustomers = customers.filter((customer) => {
     const search = (searchQuery || '').toLowerCase();
     const name = (customer.name || '').toLowerCase();
     const phone = (customer.phone || '').toLowerCase();
     const email = (customer.email || '').toLowerCase();
-    return (
-      name.includes(search) ||
-      phone.includes(search) ||
-      email.includes(search)
-    );
+    return name.includes(search) || phone.includes(search) || email.includes(search);
   });
 
   const totalCustomers = customers.length;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+    <div
+      className="space-y-6 animate-in fade-in duration-500 pb-20"
+      dir={lang === 'ar' ? 'rtl' : 'ltr'}
+    >
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
           <div className="p-3 bg-gradient-to-br from-purple-600 to-purple-700 text-white rounded-[20px] shadow-lg">
@@ -166,10 +189,12 @@ const CRMView: React.FC<CRMViewProps> = () => {
           </div>
           <div>
             <h2 className="text-2xl font-bold text-black">{t.customers || 'Customers'}</h2>
-            <p className="text-xs text-black font-bold uppercase">{t.customerRelationship || 'Customer Relationship Management'}</p>
+            <p className="text-xs text-black font-bold uppercase">
+              {t.customerRelationship || 'Customer Relationship Management'}
+            </p>
           </div>
         </div>
-        
+
         <button
           onClick={() => {
             setEditingCustomer(null);
@@ -186,7 +211,9 @@ const CRMView: React.FC<CRMViewProps> = () => {
       <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold text-gray-500 uppercase">{t.totalCustomers || 'Total Customers'}</p>
+            <p className="text-xs font-bold text-gray-500 uppercase">
+              {t.totalCustomers || 'Total Customers'}
+            </p>
             <p className="text-2xl font-bold text-black mt-1">{totalCustomers}</p>
           </div>
           <div className="p-3 bg-purple-100 rounded-xl">
@@ -213,9 +240,15 @@ const CRMView: React.FC<CRMViewProps> = () => {
           <table className="w-full">
             <thead>
               <tr className="bg-gray-50">
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.customer || 'Customer'}</th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.contact || 'Contact'}</th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">{t.actions || 'Actions'}</th>
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">
+                  {t.customer || 'Customer'}
+                </th>
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">
+                  {t.contact || 'Contact'}
+                </th>
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">
+                  {t.actions || 'Actions'}
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -234,7 +267,7 @@ const CRMView: React.FC<CRMViewProps> = () => {
                   </td>
                 </tr>
               ) : (
-                filteredCustomers.map(customer => (
+                filteredCustomers.map((customer) => (
                   <tr key={customer.id} className="border-t border-gray-100 hover:bg-gray-50">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
@@ -291,16 +324,23 @@ const CRMView: React.FC<CRMViewProps> = () => {
           <div className="bg-white rounded-[32px] max-w-lg w-full p-6 shadow-2xl animate-in zoom-in-95">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-xl font-bold">
-                {editingCustomer ? (t.editCustomer || 'Edit Customer') : (t.addCustomer || 'Add Customer')}
+                {editingCustomer
+                  ? t.editCustomer || 'Edit Customer'
+                  : t.addCustomer || 'Add Customer'}
               </h3>
-              <button onClick={() => setShowAddModal(false)} className="p-2 rounded-full hover:bg-gray-100">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-2 rounded-full hover:bg-gray-100"
+              >
                 <X size={24} />
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">{t.name || 'Name'} *</label>
+                <label className="text-xs font-bold text-gray-500 uppercase">
+                  {t.name || 'Name'} *
+                </label>
                 <input
                   type="text"
                   value={formData.name}
@@ -311,7 +351,9 @@ const CRMView: React.FC<CRMViewProps> = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">{t.phone || 'Phone'}</label>
+                <label className="text-xs font-bold text-gray-500 uppercase">
+                  {t.phone || 'Phone'}
+                </label>
                 <input
                   type="tel"
                   value={formData.phone}
@@ -321,7 +363,9 @@ const CRMView: React.FC<CRMViewProps> = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">{t.email || 'Email'}</label>
+                <label className="text-xs font-bold text-gray-500 uppercase">
+                  {t.email || 'Email'}
+                </label>
                 <input
                   type="email"
                   value={formData.email}
@@ -331,7 +375,9 @@ const CRMView: React.FC<CRMViewProps> = () => {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase">{t.notes || 'Notes'}</label>
+                <label className="text-xs font-bold text-gray-500 uppercase">
+                  {t.notes || 'Notes'}
+                </label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
@@ -356,6 +402,21 @@ const CRMView: React.FC<CRMViewProps> = () => {
             </div>
           </div>
         </div>
+      )}
+      {showDeleteConfirm && (
+        <ConfirmationModal
+          open={showDeleteConfirm}
+          title={t.confirmDelete || 'Delete Customer'}
+          message={t.confirmDelete || 'Are you sure you want to delete this customer?'}
+          variant="danger"
+          confirmLabel={t.delete || 'Delete'}
+          cancelLabel={t.cancel || 'Cancel'}
+          onConfirm={confirmDeleteCustomer}
+          onCancel={() => {
+            setShowDeleteConfirm(false);
+            setCustomerToDelete(null);
+          }}
+        />
       )}
     </div>
   );

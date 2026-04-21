@@ -1,25 +1,113 @@
-
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-  Settings, Plus, Trash2, Save, Scale,
-  Coffee, Loader2, Shield, X, Database, Copy, CheckCircle2,
-  Tag, Power, PowerOff, AlertCircle, AlertTriangle, ArrowRight,
-  RefreshCw, ImageIcon, DollarSign, PieChart, Info, TrendingUp,
-  ExternalLink, Layers, Search, FlaskConical, Milk, Droplets, Utensils,
-  Edit3, Beaker, Archive, HardDrive, Trash, Code2, ClipboardCheck,
-  CheckCircle, DatabaseZap, Activity, Terminal, XCircle, FileText, ToggleLeft, ToggleRight,
-  PlusCircle, MinusCircle, Calculator, Package, FileDown
+  Settings,
+  Plus,
+  Trash2,
+  Save,
+  Scale,
+  Coffee,
+  Loader2,
+  Shield,
+  X,
+  Database,
+  Copy,
+  CheckCircle2,
+  Tag,
+  Power,
+  PowerOff,
+  AlertCircle,
+  AlertTriangle,
+  ArrowRight,
+  RefreshCw,
+  ImageIcon,
+  DollarSign,
+  PieChart,
+  Info,
+  TrendingUp,
+  ExternalLink,
+  Layers,
+  Search,
+  FlaskConical,
+  Milk,
+  Droplets,
+  Utensils,
+  Edit3,
+  Beaker,
+  Archive,
+  HardDrive,
+  Trash,
+  Code2,
+  ClipboardCheck,
+  CheckCircle,
+  DatabaseZap,
+  Activity,
+  Terminal,
+  XCircle,
+  FileText,
+  ToggleLeft,
+  ToggleRight,
+  PlusCircle,
+  MinusCircle,
+  Calculator,
+  Package,
+  FileDown,
 } from 'lucide-react';
 import { useLanguage, useTheme } from '../App';
-import { PackageTemplate, ProductDefinition, RoastingLevel, UserRole, Recipe, RecipeIngredient, AddOn, InventoryItem, SystemSettings, Location, RoastProfile } from '../types';
+import { useErrorToast } from '../hooks/useErrorToast';
+import {
+  PackageTemplate,
+  ProductDefinition,
+  RoastingLevel,
+  UserRole,
+  Recipe,
+  RecipeIngredient,
+  AddOn,
+  InventoryItem,
+  SystemSettings,
+  Location,
+  RoastProfile,
+} from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
-import { exportInvoicesToExcel, fetchInvoicesByPeriod, InvoiceExportPeriod } from '../utils/reportExport';
+import {
+  exportInvoicesToExcel,
+  fetchInvoicesByPeriod,
+  InvoiceExportPeriod,
+} from '../utils/reportExport';
 
 const FULL_SCHEMA_COLUMNS = [
-  'id', 'name', 'description', 'category', 'roast_level', 'template_id',
-  'base_price', 'selling_price', 'cost_price', 'profit_margin', 'is_active', 'type', 'recipe', 'image', 'sku', 'main_category', 'sub_category', 'variant_of', 'variant_label', 'variant_size', 'variant_flavor', 'unit',
-  'labor_cost', 'roasting_overhead', 'estimated_green_bean_cost', 'add_ons', 'is_perishable', 'expiry_date', 'bom', 'product_status', 'supplier', 'bean_id'
+  'id',
+  'name',
+  'description',
+  'category',
+  'roast_level',
+  'template_id',
+  'base_price',
+  'selling_price',
+  'cost_price',
+  'profit_margin',
+  'is_active',
+  'type',
+  'recipe',
+  'image',
+  'sku',
+  'main_category',
+  'sub_category',
+  'variant_of',
+  'variant_label',
+  'variant_size',
+  'variant_flavor',
+  'unit',
+  'labor_cost',
+  'roasting_overhead',
+  'estimated_green_bean_cost',
+  'add_ons',
+  'is_perishable',
+  'expiry_date',
+  'bom',
+  'product_status',
+  'supplier',
+  'bean_id',
 ];
 
 interface GreenBeanRecord {
@@ -58,12 +146,23 @@ const ConfigurationView: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
 
-  const [activeSubTab, setActiveSubTab] = useState<'catalog' | 'templates' | 'roastProfiles' | 'greenBeans' | 'database' | 'branches' | 'settings' | 'invoices'>('catalog');
+  const [activeSubTab, setActiveSubTab] = useState<
+    | 'catalog'
+    | 'templates'
+    | 'roastProfiles'
+    | 'greenBeans'
+    | 'database'
+    | 'branches'
+    | 'settings'
+    | 'invoices'
+  >('catalog');
   const [searchTerm, setSearchTerm] = useState('');
   const [skuFilter, setSkuFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [supplierFilter, setSupplierFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | ProductDefinition['productStatus']>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | ProductDefinition['productStatus']>(
+    'ALL'
+  );
 
   const [templates, setTemplates] = useState<PackageTemplate[]>([]);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
@@ -74,14 +173,16 @@ const ConfigurationView: React.FC = () => {
     unitCost: '',
     shelfLifeDays: '180',
     skuPrefix: '',
-    isActive: true
+    isActive: true,
   });
   const [products, setProducts] = useState<ProductDefinition[]>([]);
   const [roastProfiles, setRoastProfiles] = useState<RoastProfile[]>([]);
   const [greenBeans, setGreenBeans] = useState<{ id: string; label: string }[]>([]);
   const [allIngredients, setAllIngredients] = useState<InventoryItem[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
-  const [productLocationStock, setProductLocationStock] = useState<Record<string, Record<string, number>>>({});
+  const [productLocationStock, setProductLocationStock] = useState<
+    Record<string, Record<string, number>>
+  >({});
   const [settings, setSettings] = useState<SystemSettings>({
     id: '',
     printer_width: '80mm',
@@ -91,7 +192,7 @@ const ConfigurationView: React.FC = () => {
     vat_rate: 0,
     currency: 'QAR',
     late_penalty_type: 'per_minute',
-    late_penalty_amount: 0
+    late_penalty_amount: 0,
   });
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -115,7 +216,8 @@ const ConfigurationView: React.FC = () => {
   const [showGreenBeanModal, setShowGreenBeanModal] = useState(false);
   const [editingGreenBeanId, setEditingGreenBeanId] = useState<string | null>(null);
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
-  const [selectedBeanForAdjustment, setSelectedBeanForAdjustment] = useState<GreenBeanRecord | null>(null);
+  const [selectedBeanForAdjustment, setSelectedBeanForAdjustment] =
+    useState<GreenBeanRecord | null>(null);
   const [greenBeanSearch, setGreenBeanSearch] = useState('');
   const [greenBeanForm, setGreenBeanForm] = useState({
     bean_name: '',
@@ -127,13 +229,13 @@ const ConfigurationView: React.FC = () => {
     supplier: '',
     processing_method: '',
     elevation: '',
-    notes: ''
+    notes: '',
   });
   const [adjustmentForm, setAdjustmentForm] = useState({
     mode: 'OUT' as 'IN' | 'OUT',
     quantity: '',
     reason: 'COUNT_CORRECTION',
-    note: ''
+    note: '',
   });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingRoastProfileId, setEditingRoastProfileId] = useState<string | null>(null);
@@ -150,7 +252,7 @@ const ConfigurationView: React.FC = () => {
     inspectionDuration: '',
     packagingDuration: '',
     profileJson: '',
-    isActive: true
+    isActive: true,
   });
 
   const [productForm, setProductForm] = useState({
@@ -181,7 +283,7 @@ const ConfigurationView: React.FC = () => {
     estimatedGreenBeanCost: '0',
     allBranches: true,
     selectedBranchIds: [] as string[],
-    branchStock: {} as Record<string, string>
+    branchStock: {} as Record<string, string>,
   });
   const [recipeIngredients, setRecipeIngredients] = useState<RecipeIngredient[]>([]);
   const [bomComponents, setBomComponents] = useState<RecipeIngredient[]>([]);
@@ -230,7 +332,7 @@ const ConfigurationView: React.FC = () => {
     ...item,
     quantity: toNumber(item?.quantity),
     cost_per_kg: toNumber(item?.cost_per_kg),
-    unit: item?.unit || 'kg'
+    unit: item?.unit || 'kg',
   });
 
   const mapGreenBeanMovementRecord = (item: any): GreenBeanMovementRecord => ({
@@ -238,73 +340,92 @@ const ConfigurationView: React.FC = () => {
     quantity: item?.quantity !== undefined ? toNumber(item?.quantity) : undefined,
     quantity_in: item?.quantity_in !== undefined ? toNumber(item?.quantity_in) : undefined,
     quantity_out: item?.quantity_out !== undefined ? toNumber(item?.quantity_out) : undefined,
-    balance_after: item?.balance_after !== undefined ? toNumber(item?.balance_after) : undefined
+    balance_after: item?.balance_after !== undefined ? toNumber(item?.balance_after) : undefined,
   });
 
   const fetchGreenBeansData = useCallback(async () => {
     const [beansRes, movementRes] = await Promise.all([
       supabase.from('green_beans').select('*').order('created_at', { ascending: false }),
-      supabase.from('green_bean_movements')
+      supabase
+        .from('green_bean_movements')
         .select('*, green_beans(origin,variety)')
         .order('movement_at', { ascending: false })
-        .limit(200)
+        .limit(200),
     ]);
 
     if (beansRes.data) {
       const mappedBeans = beansRes.data.map(mapGreenBeanRecord);
       setGreenBeanRecords(mappedBeans);
-      setGreenBeans(mappedBeans.map((bean: any) => ({ id: bean.id, label: `${bean.origin || '-'} - ${bean.variety || '-'}` })));
+      setGreenBeans(
+        mappedBeans.map((bean: any) => ({
+          id: bean.id,
+          label: `${bean.origin || '-'} - ${bean.variety || '-'}`,
+        }))
+      );
     }
     if (movementRes.data) setGreenBeanMovements(movementRes.data.map(mapGreenBeanMovementRecord));
   }, []);
 
-  const logGreenBeanMovement = useCallback(async (params: {
-    beanId: string;
-    movementType: 'OPENING_BALANCE' | 'ROASTING' | 'ROASTING_CONSUMPTION' | 'ADJUSTMENT' | 'PURCHASE';
-    quantityIn?: number;
-    quantityOut?: number;
-    balanceAfter?: number;
-    reason?: string;
-    note?: string;
-  }) => {
-    const quantityIn = toNumber(params.quantityIn);
-    const quantityOut = toNumber(params.quantityOut);
-    const legacyQuantity = Math.abs(quantityIn - quantityOut);
-    const nowIso = new Date().toISOString();
-    const payloadV2: any = {
-      bean_id: params.beanId,
-      movement_type: params.movementType,
-      quantity_in: quantityIn,
-      quantity_out: quantityOut,
-      balance_after: params.balanceAfter ?? null,
-      reason: params.reason || null,
-      notes: params.note || null,
-      unit: 'kg',
-      movement_at: nowIso,
-      created_by: user?.id || null,
-      created_by_name: user?.name || 'System'
-    };
+  const logGreenBeanMovement = useCallback(
+    async (params: {
+      beanId: string;
+      movementType:
+        | 'OPENING_BALANCE'
+        | 'ROASTING'
+        | 'ROASTING_CONSUMPTION'
+        | 'ADJUSTMENT'
+        | 'PURCHASE';
+      quantityIn?: number;
+      quantityOut?: number;
+      balanceAfter?: number;
+      reason?: string;
+      note?: string;
+    }) => {
+      const quantityIn = toNumber(params.quantityIn);
+      const quantityOut = toNumber(params.quantityOut);
+      const legacyQuantity = Math.abs(quantityIn - quantityOut);
+      const nowIso = new Date().toISOString();
+      const payloadV2: any = {
+        bean_id: params.beanId,
+        movement_type: params.movementType,
+        quantity_in: quantityIn,
+        quantity_out: quantityOut,
+        balance_after: params.balanceAfter ?? null,
+        reason: params.reason || null,
+        notes: params.note || null,
+        unit: 'kg',
+        movement_at: nowIso,
+        created_by: user?.id || null,
+        created_by_name: user?.name || 'System',
+      };
 
-    const { error: v2Error } = await supabase.from('green_bean_movements').insert([payloadV2]);
-    if (!v2Error) return;
+      const { error: v2Error } = await supabase.from('green_bean_movements').insert([payloadV2]);
+      if (!v2Error) return;
 
-    const isColumnMismatch = v2Error.code === 'PGRST204' || /column/i.test(v2Error.message || '');
-    if (!isColumnMismatch) throw v2Error;
+      const isColumnMismatch = v2Error.code === 'PGRST204' || /column/i.test(v2Error.message || '');
+      if (!isColumnMismatch) throw v2Error;
 
-    const payloadLegacy = {
-      bean_id: params.beanId,
-      movement_type: params.movementType === 'ROASTING' ? 'ROASTING_CONSUMPTION' : params.movementType,
-      quantity: legacyQuantity,
-      notes: params.reason ? `${params.reason}${params.note ? ` - ${params.note}` : ''}` : (params.note || null),
-      unit: 'kg',
-      movement_at: nowIso,
-      created_by: user?.id || null,
-      created_by_name: user?.name || 'System'
-    };
+      const payloadLegacy = {
+        bean_id: params.beanId,
+        movement_type:
+          params.movementType === 'ROASTING' ? 'ROASTING_CONSUMPTION' : params.movementType,
+        quantity: legacyQuantity,
+        notes: params.reason
+          ? `${params.reason}${params.note ? ` - ${params.note}` : ''}`
+          : params.note || null,
+        unit: 'kg',
+        movement_at: nowIso,
+        created_by: user?.id || null,
+        created_by_name: user?.name || 'System',
+      };
 
-    const { error: legacyError } = await supabase.from('green_bean_movements').insert([payloadLegacy]);
-    if (legacyError) throw legacyError;
-  }, [user]);
+      const { error: legacyError } = await supabase
+        .from('green_bean_movements')
+        .insert([payloadLegacy]);
+      if (legacyError) throw legacyError;
+    },
+    [user]
+  );
 
   const fetchInitialData = useCallback(async () => {
     setIsLoadingData(true);
@@ -313,12 +434,18 @@ const ConfigurationView: React.FC = () => {
     try {
       const [tplRes, prodRes, ingRes, settingsRes, locRes, stockRes, roastRes] = await Promise.all([
         supabase.from('package_templates').select('*').order('created_at', { ascending: false }),
-        supabase.from('product_definitions').select(FULL_SCHEMA_COLUMNS.filter(c => !missing.has(c)).join(',')).order('created_at', { ascending: false }),
+        supabase
+          .from('product_definitions')
+          .select(FULL_SCHEMA_COLUMNS.filter((c) => !missing.has(c)).join(','))
+          .order('created_at', { ascending: false }),
         supabase.from('inventory_items').select('*').eq('type', 'INGREDIENT'),
         supabase.from('system_settings').select('*').single(),
         supabase.from('locations').select('*').order('name', { ascending: true }),
-        supabase.from('inventory_items').select('product_id, location_id, stock').not('product_id', 'is', null),
-        supabase.from('roast_profiles').select('*').order('created_at', { ascending: false })
+        supabase
+          .from('inventory_items')
+          .select('product_id, location_id, stock')
+          .not('product_id', 'is', null),
+        supabase.from('roast_profiles').select('*').order('created_at', { ascending: false }),
       ]);
 
       if (tplRes.data) setTemplates(tplRes.data.map(mapTemplateFromDB));
@@ -332,25 +459,32 @@ const ConfigurationView: React.FC = () => {
         stockRes.data.forEach((row: any) => {
           if (!row.product_id || !row.location_id) return;
           if (!stockMap[row.product_id]) stockMap[row.product_id] = {};
-          stockMap[row.product_id][row.location_id] = (stockMap[row.product_id][row.location_id] || 0) + (row.stock || 0);
+          stockMap[row.product_id][row.location_id] =
+            (stockMap[row.product_id][row.location_id] || 0) + (row.stock || 0);
         });
         setProductLocationStock(stockMap);
       }
 
       await fetchGreenBeansData();
-
     } catch (err) {
-      console.error("Data Load Error:", err);
+      console.error('Data Load Error:', err);
     } finally {
       setIsLoadingData(false);
     }
   }, [checkSchemaIntegrity, fetchGreenBeansData]);
 
-  useEffect(() => { fetchInitialData(); }, [fetchInitialData]);
+  useEffect(() => {
+    fetchInitialData();
+  }, [fetchInitialData]);
 
   const mapTemplateFromDB = (item: any): PackageTemplate => ({
-    id: item.id, sizeLabel: item.size_label, weightInKg: item.weight_in_kg, unitCost: item.unit_cost || 0,
-    isActive: item.is_active, shelf_life_days: item.shelf_life_days || 180, skuPrefix: item.sku_prefix
+    id: item.id,
+    sizeLabel: item.size_label,
+    weightInKg: item.weight_in_kg,
+    unitCost: item.unit_cost || 0,
+    isActive: item.is_active,
+    shelf_life_days: item.shelf_life_days || 180,
+    skuPrefix: item.sku_prefix,
   });
 
   const mapProductFromDB = (item: any): ProductDefinition => ({
@@ -385,7 +519,7 @@ const ConfigurationView: React.FC = () => {
     laborCost: item.labor_cost,
     roastingOverhead: item.roasting_overhead,
     estimatedGreenBeanCost: item.estimated_green_bean_cost,
-    add_ons: item.add_ons || []
+    add_ons: item.add_ons || [],
   });
 
   const resetRoastProfileForm = () => {
@@ -403,7 +537,7 @@ const ConfigurationView: React.FC = () => {
       inspectionDuration: '',
       packagingDuration: '',
       profileJson: '',
-      isActive: true
+      isActive: true,
     });
   };
 
@@ -468,8 +602,8 @@ const ConfigurationView: React.FC = () => {
           roasting: roastingDuration,
           cooling: coolingDuration,
           inspection: inspectionDuration,
-          packaging: packagingDuration
-        }
+          packaging: packagingDuration,
+        },
       };
       const mergedProfile = { ...parsedProfile, ...baseProfile };
       const payload = {
@@ -478,7 +612,7 @@ const ConfigurationView: React.FC = () => {
         profile: mergedProfile,
         bean_ids: roastProfileForm.beanIds,
         parent_profile_id: forkedFromId,
-        is_active: roastProfileForm.isActive
+        is_active: roastProfileForm.isActive,
       };
       if (editingRoastProfileId) {
         await supabase.from('roast_profiles').update(payload).eq('id', editingRoastProfileId);
@@ -499,7 +633,8 @@ const ConfigurationView: React.FC = () => {
     const profileData = (profile.profile || {}) as any;
     const stageDurations = profileData.stageDurations || {};
     const { chargeTemperature, targetCurve, stageDurations: _, ...extraProfile } = profileData;
-    const extraJson = Object.keys(extraProfile).length > 0 ? JSON.stringify(extraProfile, null, 2) : '';
+    const extraJson =
+      Object.keys(extraProfile).length > 0 ? JSON.stringify(extraProfile, null, 2) : '';
     setEditingRoastProfileId(profile.id);
     setForkedFromId(profile.parent_profile_id || null);
     setRoastProfileForm({
@@ -508,13 +643,17 @@ const ConfigurationView: React.FC = () => {
       beanIds: profile.bean_ids || [],
       chargeTemperature: chargeTemperature !== undefined ? String(chargeTemperature) : '',
       targetCurve: targetCurve || '',
-      preparationDuration: stageDurations.preparation !== undefined ? String(stageDurations.preparation) : '',
-      roastingDuration: stageDurations.roasting !== undefined ? String(stageDurations.roasting) : '',
+      preparationDuration:
+        stageDurations.preparation !== undefined ? String(stageDurations.preparation) : '',
+      roastingDuration:
+        stageDurations.roasting !== undefined ? String(stageDurations.roasting) : '',
       coolingDuration: stageDurations.cooling !== undefined ? String(stageDurations.cooling) : '',
-      inspectionDuration: stageDurations.inspection !== undefined ? String(stageDurations.inspection) : '',
-      packagingDuration: stageDurations.packaging !== undefined ? String(stageDurations.packaging) : '',
+      inspectionDuration:
+        stageDurations.inspection !== undefined ? String(stageDurations.inspection) : '',
+      packagingDuration:
+        stageDurations.packaging !== undefined ? String(stageDurations.packaging) : '',
       profileJson: extraJson,
-      isActive: profile.is_active !== false
+      isActive: profile.is_active !== false,
     });
   };
 
@@ -522,7 +661,8 @@ const ConfigurationView: React.FC = () => {
     const profileData = (profile.profile || {}) as any;
     const stageDurations = profileData.stageDurations || {};
     const { chargeTemperature, targetCurve, stageDurations: _, ...extraProfile } = profileData;
-    const extraJson = Object.keys(extraProfile).length > 0 ? JSON.stringify(extraProfile, null, 2) : '';
+    const extraJson =
+      Object.keys(extraProfile).length > 0 ? JSON.stringify(extraProfile, null, 2) : '';
     setEditingRoastProfileId(null);
     setForkedFromId(profile.id);
     setRoastProfileForm({
@@ -531,20 +671,24 @@ const ConfigurationView: React.FC = () => {
       beanIds: profile.bean_ids || [],
       chargeTemperature: chargeTemperature !== undefined ? String(chargeTemperature) : '',
       targetCurve: targetCurve || '',
-      preparationDuration: stageDurations.preparation !== undefined ? String(stageDurations.preparation) : '',
-      roastingDuration: stageDurations.roasting !== undefined ? String(stageDurations.roasting) : '',
+      preparationDuration:
+        stageDurations.preparation !== undefined ? String(stageDurations.preparation) : '',
+      roastingDuration:
+        stageDurations.roasting !== undefined ? String(stageDurations.roasting) : '',
       coolingDuration: stageDurations.cooling !== undefined ? String(stageDurations.cooling) : '',
-      inspectionDuration: stageDurations.inspection !== undefined ? String(stageDurations.inspection) : '',
-      packagingDuration: stageDurations.packaging !== undefined ? String(stageDurations.packaging) : '',
+      inspectionDuration:
+        stageDurations.inspection !== undefined ? String(stageDurations.inspection) : '',
+      packagingDuration:
+        stageDurations.packaging !== undefined ? String(stageDurations.packaging) : '',
       profileJson: extraJson,
-      isActive: profile.is_active !== false
+      isActive: profile.is_active !== false,
     });
   };
 
   const toggleRoastProfileBean = (beanId: string) => {
-    setRoastProfileForm(prev => {
+    setRoastProfileForm((prev) => {
       if (prev.beanIds.includes(beanId)) {
-        return { ...prev, beanIds: prev.beanIds.filter(id => id !== beanId) };
+        return { ...prev, beanIds: prev.beanIds.filter((id) => id !== beanId) };
       }
       return { ...prev, beanIds: [...prev.beanIds, beanId] };
     });
@@ -556,7 +700,9 @@ const ConfigurationView: React.FC = () => {
     try {
       const nextActive = !(profile.is_active ?? true);
       await supabase.from('roast_profiles').update({ is_active: nextActive }).eq('id', profile.id);
-      setRoastProfiles(prev => prev.map(item => item.id === profile.id ? { ...item, is_active: nextActive } : item));
+      setRoastProfiles((prev) =>
+        prev.map((item) => (item.id === profile.id ? { ...item, is_active: nextActive } : item))
+      );
     } finally {
       setIsSaving(false);
     }
@@ -1655,11 +1801,19 @@ NOTIFY pgrst, 'reload schema';
   `.trim();
 
   const generateSku = (name: string) => {
-    const base = name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const base = name
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
     const suffix = Date.now().toString().slice(-6);
     return [base || 'SKU', suffix].join('-');
   };
-  const normalizeSku = (value: string) => value.trim().toUpperCase().replace(/[^A-Z0-9-]/g, '');
+  const normalizeSku = (value: string) =>
+    value
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9-]/g, '');
   const parseDelimited = (text: string, delimiter: string) => {
     const rows: string[][] = [];
     let row: string[] = [];
@@ -1694,29 +1848,34 @@ NOTIFY pgrst, 'reload schema';
     }
     row.push(current);
     rows.push(row);
-    return rows.filter(r => r.some(cell => cell.trim() !== ''));
+    return rows.filter((r) => r.some((cell) => cell.trim() !== ''));
   };
   const detectDelimitedFormat = (text: string) => {
     const normalizedText = text.replace(/^\uFEFF/, '');
-    const lines = normalizedText.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+    const lines = normalizedText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
     const separatorDirective = lines[0]?.match(/^sep=(.)$/i);
 
     if (separatorDirective) {
       return {
         text: normalizedText.replace(/^sep=.\r?\n/i, ''),
-        delimiter: separatorDirective[1]
+        delimiter: separatorDirective[1],
       };
     }
 
     const headerLine = lines[0] || '';
     const candidates = [',', ';', '\t'];
-    const delimiter = candidates
-      .map(candidate => ({ candidate, count: headerLine.split(candidate).length - 1 }))
-      .sort((a, b) => b.count - a.count)[0]?.candidate || ',';
+    const delimiter =
+      candidates
+        .map((candidate) => ({ candidate, count: headerLine.split(candidate).length - 1 }))
+        .sort((a, b) => b.count - a.count)[0]?.candidate || ',';
 
     return { text: normalizedText, delimiter };
   };
-  const parseBoolean = (value: string) => ['true', '1', 'yes', 'y'].includes(value.trim().toLowerCase());
+  const parseBoolean = (value: string) =>
+    ['true', '1', 'yes', 'y'].includes(value.trim().toLowerCase());
   const parseJsonValue = (value: string) => {
     if (!value.trim()) return null;
     try {
@@ -1759,7 +1918,7 @@ NOTIFY pgrst, 'reload schema';
     'template_id',
     'add_ons',
     'recipe',
-    'bom'
+    'bom',
   ];
   const buildCatalogRow = (product: ProductDefinition) => [
     product.name || '',
@@ -1787,7 +1946,7 @@ NOTIFY pgrst, 'reload schema';
     product.templateId || '',
     JSON.stringify(product.add_ons || []),
     JSON.stringify(product.recipe || null),
-    JSON.stringify(product.bom || [])
+    JSON.stringify(product.bom || []),
   ];
   const downloadFile = (content: string, filename: string, mime: string) => {
     const blob = new Blob([content], { type: mime });
@@ -1803,16 +1962,24 @@ NOTIFY pgrst, 'reload schema';
   const handleExportCatalogCsv = (items: ProductDefinition[]) => {
     const rows = items.map(buildCatalogRow);
     const csvContent = [productCatalogHeaders, ...rows]
-      .map(row => row.map(cell => escapeCsvValue(String(cell ?? ''))).join(','))
+      .map((row) => row.map((cell) => escapeCsvValue(String(cell ?? ''))).join(','))
       .join('\n');
-    downloadFile(csvContent, `product_catalog_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8;');
+    downloadFile(
+      csvContent,
+      `product_catalog_${new Date().toISOString().slice(0, 10)}.csv`,
+      'text/csv;charset=utf-8;'
+    );
   };
   const handleExportCatalogExcel = (items: ProductDefinition[]) => {
     const rows = items.map(buildCatalogRow);
     const tsvContent = [productCatalogHeaders, ...rows]
-      .map(row => row.map(cell => String(cell ?? '')).join('\t'))
+      .map((row) => row.map((cell) => String(cell ?? '')).join('\t'))
       .join('\n');
-    downloadFile(tsvContent, `product_catalog_${new Date().toISOString().slice(0, 10)}.xls`, 'application/vnd.ms-excel;charset=utf-8;');
+    downloadFile(
+      tsvContent,
+      `product_catalog_${new Date().toISOString().slice(0, 10)}.xls`,
+      'application/vnd.ms-excel;charset=utf-8;'
+    );
   };
   const handleDownloadCatalogTemplate = () => {
     const csvContent = productCatalogHeaders.join(',');
@@ -1822,7 +1989,7 @@ NOTIFY pgrst, 'reload schema';
     setIsImportingCatalog(true);
     try {
       const fileName = file.name.toLowerCase();
-      const isSupportedTextFile = ['.csv', '.tsv', '.txt'].some(ext => fileName.endsWith(ext));
+      const isSupportedTextFile = ['.csv', '.tsv', '.txt'].some((ext) => fileName.endsWith(ext));
       if (!isSupportedTextFile) throw new Error('unsupported_format');
 
       const text = await file.text();
@@ -1832,89 +1999,116 @@ NOTIFY pgrst, 'reload schema';
       const rows = parseDelimited(normalizedText, delimiter);
       console.log('Parsed rows:', rows.length);
       if (rows.length < 2) throw new Error('empty');
-      const headers = rows[0].map(h => h.trim().toLowerCase());
+      const headers = rows[0].map((h) => h.trim().toLowerCase());
       console.log('Headers:', headers);
       if (!headers.includes('name')) throw new Error('missing_name_header');
-      
+
       const getValue = (row: string[], key: string) => {
         const idx = headers.indexOf(key);
-        return idx >= 0 ? row[idx] ?? '' : '';
+        return idx >= 0 ? (row[idx] ?? '') : '';
       };
-      
-      const payloads = rows.slice(1).map(row => {
-        const name = getValue(row, 'name').trim();
-        if (!name) return null;
-        const rawSku = getValue(row, 'sku').trim();
-        const normalizedSku = normalizeSku(rawSku);
-        const finalSku = normalizedSku || generateSku(name);
-        const statusRaw = getValue(row, 'product_status').trim().toUpperCase();
-        const productStatus = ['ACTIVE', 'DISABLED', 'DISCONTINUED'].includes(statusRaw) ? statusRaw : 'ACTIVE';
-        const typeRaw = getValue(row, 'type').trim().toUpperCase();
-        const type = ['BEVERAGE', 'PACKAGED_COFFEE', 'ACCESSORY', 'RAW_MATERIAL'].includes(typeRaw) ? typeRaw : 'PACKAGED_COFFEE';
-        const basePriceValue = getValue(row, 'base_price') || getValue(row, 'selling_price');
-        const basePrice = parseFloat(basePriceValue || '0');
-        const sellingPrice = parseFloat(getValue(row, 'selling_price') || basePrice.toString());
-        const costPrice = parseFloat(getValue(row, 'cost_price') || '0');
-        const profitMargin = parseFloat(getValue(row, 'profit_margin') || '0');
-        const payload: any = {
-          name,
-          category: getValue(row, 'sub_category') || getValue(row, 'category') || getValue(row, 'main_category') || 'Coffee',
-          base_price: Number.isNaN(basePrice) ? 0 : basePrice,
-          is_active: productStatus === 'ACTIVE',
-          sku: finalSku
-        };
-        const id = getValue(row, 'id').trim();
-        if (id) payload.id = id;
-        if (!missingCols.has('description')) payload.description = getValue(row, 'description') || null;
-        if (!missingCols.has('type')) payload.type = type;
-        if (!missingCols.has('image')) payload.image = getValue(row, 'image') || null;
-        if (!missingCols.has('main_category')) payload.main_category = getValue(row, 'main_category') || null;
-        if (!missingCols.has('sub_category')) payload.sub_category = getValue(row, 'sub_category') || null;
-        if (!missingCols.has('variant_of')) payload.variant_of = getValue(row, 'variant_of') || null;
-        if (!missingCols.has('variant_label')) payload.variant_label = getValue(row, 'variant_label') || null;
-        if (!missingCols.has('variant_size')) payload.variant_size = getValue(row, 'variant_size') || null;
-        if (!missingCols.has('variant_flavor')) payload.variant_flavor = getValue(row, 'variant_flavor') || null;
-        if (!missingCols.has('unit')) payload.unit = getValue(row, 'unit') || null;
-        if (!missingCols.has('selling_price')) payload.selling_price = Number.isNaN(sellingPrice) ? payload.base_price : sellingPrice;
-        if (!missingCols.has('cost_price')) payload.cost_price = Number.isNaN(costPrice) ? 0 : costPrice;
-        if (!missingCols.has('profit_margin')) payload.profit_margin = Number.isNaN(profitMargin) ? 0 : profitMargin;
-        if (!missingCols.has('is_perishable')) payload.is_perishable = parseBoolean(getValue(row, 'is_perishable') || 'false');
-        if (!missingCols.has('expiry_date')) payload.expiry_date = getValue(row, 'expiry_date') || null;
-        if (!missingCols.has('product_status')) payload.product_status = productStatus;
-        if (!missingCols.has('supplier')) payload.supplier = getValue(row, 'supplier') || null;
-        if (!missingCols.has('add_ons')) {
-          const addOns = parseJsonValue(getValue(row, 'add_ons'));
-          payload.add_ons = Array.isArray(addOns) ? addOns : [];
-        }
-        if (!missingCols.has('bom')) {
-          const bom = parseJsonValue(getValue(row, 'bom'));
-          payload.bom = Array.isArray(bom) ? bom : [];
-        }
-        if (!missingCols.has('recipe')) {
-          const recipe = parseJsonValue(getValue(row, 'recipe'));
-          payload.recipe = recipe && typeof recipe === 'object' ? recipe : null;
-        }
-        if (!missingCols.has('roast_level')) payload.roast_level = getValue(row, 'roast_level') || null;
-        if (!missingCols.has('template_id')) payload.template_id = getValue(row, 'template_id') || null;
-        return payload;
-      }).filter(Boolean) as any[];
-      
+
+      const payloads = rows
+        .slice(1)
+        .map((row) => {
+          const name = getValue(row, 'name').trim();
+          if (!name) return null;
+          const rawSku = getValue(row, 'sku').trim();
+          const normalizedSku = normalizeSku(rawSku);
+          const finalSku = normalizedSku || generateSku(name);
+          const statusRaw = getValue(row, 'product_status').trim().toUpperCase();
+          const productStatus = ['ACTIVE', 'DISABLED', 'DISCONTINUED'].includes(statusRaw)
+            ? statusRaw
+            : 'ACTIVE';
+          const typeRaw = getValue(row, 'type').trim().toUpperCase();
+          const type = ['BEVERAGE', 'PACKAGED_COFFEE', 'ACCESSORY', 'RAW_MATERIAL'].includes(
+            typeRaw
+          )
+            ? typeRaw
+            : 'PACKAGED_COFFEE';
+          const basePriceValue = getValue(row, 'base_price') || getValue(row, 'selling_price');
+          const basePrice = parseFloat(basePriceValue || '0');
+          const sellingPrice = parseFloat(getValue(row, 'selling_price') || basePrice.toString());
+          const costPrice = parseFloat(getValue(row, 'cost_price') || '0');
+          const profitMargin = parseFloat(getValue(row, 'profit_margin') || '0');
+          const payload: any = {
+            name,
+            category:
+              getValue(row, 'sub_category') ||
+              getValue(row, 'category') ||
+              getValue(row, 'main_category') ||
+              'Coffee',
+            base_price: Number.isNaN(basePrice) ? 0 : basePrice,
+            is_active: productStatus === 'ACTIVE',
+            sku: finalSku,
+          };
+          const id = getValue(row, 'id').trim();
+          if (id) payload.id = id;
+          if (!missingCols.has('description'))
+            payload.description = getValue(row, 'description') || null;
+          if (!missingCols.has('type')) payload.type = type;
+          if (!missingCols.has('image')) payload.image = getValue(row, 'image') || null;
+          if (!missingCols.has('main_category'))
+            payload.main_category = getValue(row, 'main_category') || null;
+          if (!missingCols.has('sub_category'))
+            payload.sub_category = getValue(row, 'sub_category') || null;
+          if (!missingCols.has('variant_of'))
+            payload.variant_of = getValue(row, 'variant_of') || null;
+          if (!missingCols.has('variant_label'))
+            payload.variant_label = getValue(row, 'variant_label') || null;
+          if (!missingCols.has('variant_size'))
+            payload.variant_size = getValue(row, 'variant_size') || null;
+          if (!missingCols.has('variant_flavor'))
+            payload.variant_flavor = getValue(row, 'variant_flavor') || null;
+          if (!missingCols.has('unit')) payload.unit = getValue(row, 'unit') || null;
+          if (!missingCols.has('selling_price'))
+            payload.selling_price = Number.isNaN(sellingPrice) ? payload.base_price : sellingPrice;
+          if (!missingCols.has('cost_price'))
+            payload.cost_price = Number.isNaN(costPrice) ? 0 : costPrice;
+          if (!missingCols.has('profit_margin'))
+            payload.profit_margin = Number.isNaN(profitMargin) ? 0 : profitMargin;
+          if (!missingCols.has('is_perishable'))
+            payload.is_perishable = parseBoolean(getValue(row, 'is_perishable') || 'false');
+          if (!missingCols.has('expiry_date'))
+            payload.expiry_date = getValue(row, 'expiry_date') || null;
+          if (!missingCols.has('product_status')) payload.product_status = productStatus;
+          if (!missingCols.has('supplier')) payload.supplier = getValue(row, 'supplier') || null;
+          if (!missingCols.has('add_ons')) {
+            const addOns = parseJsonValue(getValue(row, 'add_ons'));
+            payload.add_ons = Array.isArray(addOns) ? addOns : [];
+          }
+          if (!missingCols.has('bom')) {
+            const bom = parseJsonValue(getValue(row, 'bom'));
+            payload.bom = Array.isArray(bom) ? bom : [];
+          }
+          if (!missingCols.has('recipe')) {
+            const recipe = parseJsonValue(getValue(row, 'recipe'));
+            payload.recipe = recipe && typeof recipe === 'object' ? recipe : null;
+          }
+          if (!missingCols.has('roast_level'))
+            payload.roast_level = getValue(row, 'roast_level') || null;
+          if (!missingCols.has('template_id'))
+            payload.template_id = getValue(row, 'template_id') || null;
+          return payload;
+        })
+        .filter(Boolean) as any[];
+
       console.log('Payloads to import:', payloads.length);
       if (!payloads.length) throw new Error('empty');
 
       // Check which SKUs already exist in the database
-      const skuList = payloads.map(p => p.sku).filter(Boolean);
+      const skuList = payloads.map((p) => p.sku).filter(Boolean);
       const { data: existingProducts } = await supabase
         .from('product_definitions')
         .select('id, sku')
         .in('sku', skuList);
-      
-      const existingSkuMap = new Map((existingProducts || []).map(p => [p.sku, p.id]));
-      
+
+      const existingSkuMap = new Map((existingProducts || []).map((p) => [p.sku, p.id]));
+
       // Separate into inserts and updates
       const insertPayloads: any[] = [];
       const updatePayloads: { id: string; payload: any }[] = [];
-      
+
       for (const payload of payloads) {
         const existingId = existingSkuMap.get(payload.sku);
         if (existingId) {
@@ -1923,9 +2117,9 @@ NOTIFY pgrst, 'reload schema';
           insertPayloads.push(payload);
         }
       }
-      
+
       console.log(`Importing: ${insertPayloads.length} new, ${updatePayloads.length} existing`);
-      
+
       // Insert new products
       if (insertPayloads.length > 0) {
         const { error: insertError } = await supabase
@@ -1936,7 +2130,7 @@ NOTIFY pgrst, 'reload schema';
           throw insertError;
         }
       }
-      
+
       // Update existing products
       if (updatePayloads.length > 0) {
         for (const item of updatePayloads) {
@@ -1978,7 +2172,9 @@ NOTIFY pgrst, 'reload schema';
 
     const desiredSku = normalizeSku(productForm.sku || '');
     const finalSku = desiredSku || generateSku(productForm.name);
-    const skuTaken = products.some(p => (p.sku || '').toUpperCase() === finalSku.toUpperCase() && p.id !== editingId);
+    const skuTaken = products.some(
+      (p) => (p.sku || '').toUpperCase() === finalSku.toUpperCase() && p.id !== editingId
+    );
     if (skuTaken) {
       alert(t.skuAlreadyExists);
       setIsSaving(false);
@@ -1989,11 +2185,12 @@ NOTIFY pgrst, 'reload schema';
     const laborCost = parseFloat(productForm.laborCost || '0');
     const roastingOverhead = parseFloat(productForm.roastingOverhead || '0');
     const estimatedGreenBeanCost = parseFloat(productForm.estimatedGreenBeanCost || '0');
-    const costPrice = productForm.type === 'BEVERAGE'
-      ? calculatedBeverageCost + laborCost + roastingOverhead
-      : productForm.type === 'PACKAGED_COFFEE'
-        ? estimatedGreenBeanCost + laborCost + roastingOverhead
-        : 0;
+    const costPrice =
+      productForm.type === 'BEVERAGE'
+        ? calculatedBeverageCost + laborCost + roastingOverhead
+        : productForm.type === 'PACKAGED_COFFEE'
+          ? estimatedGreenBeanCost + laborCost + roastingOverhead
+          : 0;
     const profitMargin = sellingPrice > 0 ? ((sellingPrice - costPrice) / sellingPrice) * 100 : 0;
 
     const payload: any = {
@@ -2001,7 +2198,7 @@ NOTIFY pgrst, 'reload schema';
       category: productForm.subCategory || productForm.category,
       base_price: sellingPrice,
       is_active: productForm.productStatus === 'ACTIVE',
-      sku: finalSku
+      sku: finalSku,
     };
 
     if (editingId) payload.id = editingId;
@@ -2014,16 +2211,19 @@ NOTIFY pgrst, 'reload schema';
     if (!missingCols.has('variant_of')) payload.variant_of = productForm.variantOf || null;
     if (!missingCols.has('variant_label')) payload.variant_label = productForm.variantLabel || null;
     if (!missingCols.has('variant_size')) payload.variant_size = productForm.variantSize || null;
-    if (!missingCols.has('variant_flavor')) payload.variant_flavor = productForm.variantFlavor || null;
+    if (!missingCols.has('variant_flavor'))
+      payload.variant_flavor = productForm.variantFlavor || null;
     if (!missingCols.has('unit')) payload.unit = productForm.unit || null;
     if (!missingCols.has('selling_price')) payload.selling_price = sellingPrice;
     if (!missingCols.has('cost_price')) payload.cost_price = costPrice;
     if (!missingCols.has('profit_margin')) payload.profit_margin = profitMargin;
     if (!missingCols.has('labor_cost')) payload.labor_cost = laborCost;
     if (!missingCols.has('roasting_overhead')) payload.roasting_overhead = roastingOverhead;
-    if (!missingCols.has('estimated_green_bean_cost')) payload.estimated_green_bean_cost = estimatedGreenBeanCost;
+    if (!missingCols.has('estimated_green_bean_cost'))
+      payload.estimated_green_bean_cost = estimatedGreenBeanCost;
     if (!missingCols.has('is_perishable')) payload.is_perishable = productForm.isPerishable;
-    if (!missingCols.has('expiry_date')) payload.expiry_date = productForm.isPerishable ? (productForm.expiryDate || null) : null;
+    if (!missingCols.has('expiry_date'))
+      payload.expiry_date = productForm.isPerishable ? productForm.expiryDate || null : null;
     if (!missingCols.has('bom')) payload.bom = bomComponents;
     if (!missingCols.has('product_status')) payload.product_status = productForm.productStatus;
     if (!missingCols.has('supplier')) payload.supplier = productForm.supplier || null;
@@ -2052,21 +2252,25 @@ NOTIFY pgrst, 'reload schema';
     }
 
     try {
-      const { data: productData, error } = await supabase.from('product_definitions').upsert([payload]).select('id').single();
+      const { data: productData, error } = await supabase
+        .from('product_definitions')
+        .upsert([payload])
+        .select('id')
+        .single();
       if (error) throw error;
 
       const branchesToUpdate = productForm.allBranches
-        ? locations.filter(l => l.type === 'BRANCH' || l.is_roastery).map(l => l.id)
+        ? locations.filter((l) => l.type === 'BRANCH' || l.is_roastery).map((l) => l.id)
         : productForm.selectedBranchIds;
 
       if (!editingId && branchesToUpdate.length > 0 && productData?.id) {
-        const inventoryItems = branchesToUpdate.map(branchId => ({
+        const inventoryItems = branchesToUpdate.map((branchId) => ({
           product_id: productData.id,
           location_id: branchId,
           stock: parseFloat(productForm.branchStock[branchId] || '0'),
           reserved_stock: 0,
           damaged_stock: 0,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
         }));
 
         const { error: invError } = await supabase.from('inventory_items').upsert(inventoryItems);
@@ -2081,7 +2285,9 @@ NOTIFY pgrst, 'reload schema';
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err: any) {
       alert(err.message);
-    } finally { setIsSaving(false); }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -2092,7 +2298,7 @@ NOTIFY pgrst, 'reload schema';
         .from('system_settings')
         .upsert({
           ...settings,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .select('*')
         .single();
@@ -2104,7 +2310,7 @@ NOTIFY pgrst, 'reload schema';
       setShowSuccess(true);
       setTimeout(() => setShowSuccess(false), 3000);
     } catch (err) {
-      console.error("Settings Save Error:", err);
+      console.error('Settings Save Error:', err);
     } finally {
       setIsSaving(false);
     }
@@ -2113,11 +2319,34 @@ NOTIFY pgrst, 'reload schema';
   const resetProductForm = () => {
     setEditingId(null);
     setProductForm({
-      name: '', description: '', category: 'Coffee', roastLevel: RoastingLevel.MEDIUM,
-      mainCategory: '', subCategory: '', variantOf: '', variantLabel: '', variantSize: '', variantFlavor: '', unit: 'piece', templateId: '', basePrice: '', image: '', sku: '', supplier: '', isActive: true, productStatus: 'ACTIVE', isPerishable: false, expiryDate: '', type: 'PACKAGED_COFFEE',
+      name: '',
+      description: '',
+      category: 'Coffee',
+      roastLevel: RoastingLevel.MEDIUM,
+      mainCategory: '',
+      subCategory: '',
+      variantOf: '',
+      variantLabel: '',
+      variantSize: '',
+      variantFlavor: '',
+      unit: 'piece',
+      templateId: '',
+      basePrice: '',
+      image: '',
+      sku: '',
+      supplier: '',
+      isActive: true,
+      productStatus: 'ACTIVE',
+      isPerishable: false,
+      expiryDate: '',
+      type: 'PACKAGED_COFFEE',
       beanId: '',
-      laborCost: '0', roastingOverhead: '0', estimatedGreenBeanCost: '0',
-      allBranches: true, selectedBranchIds: [], branchStock: {}
+      laborCost: '0',
+      roastingOverhead: '0',
+      estimatedGreenBeanCost: '0',
+      allBranches: true,
+      selectedBranchIds: [],
+      branchStock: {},
     });
     setRecipeIngredients([]);
     setBomComponents([]);
@@ -2132,7 +2361,7 @@ NOTIFY pgrst, 'reload schema';
       unitCost: '',
       shelfLifeDays: '180',
       skuPrefix: '',
-      isActive: true
+      isActive: true,
     });
   };
 
@@ -2146,14 +2375,17 @@ NOTIFY pgrst, 'reload schema';
         unit_cost: parseFloat(templateForm.unitCost) || 0,
         shelf_life_days: parseInt(templateForm.shelfLifeDays) || 180,
         sku_prefix: templateForm.skuPrefix,
-        is_active: templateForm.isActive
+        is_active: templateForm.isActive,
       };
       if (editingTemplateId) payload.id = editingTemplateId;
 
       const { error } = await supabase.from('package_templates').upsert([payload]);
       if (error) throw error;
 
-      const { data } = await supabase.from('package_templates').select('*').order('created_at', { ascending: false });
+      const { data } = await supabase
+        .from('package_templates')
+        .select('*')
+        .order('created_at', { ascending: false });
       if (data) setTemplates(data.map(mapTemplateFromDB));
 
       setShowTemplateModal(false);
@@ -2173,7 +2405,10 @@ NOTIFY pgrst, 'reload schema';
     try {
       const { error } = await supabase.from('package_templates').delete().eq('id', id);
       if (error) throw error;
-      const { data } = await supabase.from('package_templates').select('*').order('created_at', { ascending: false });
+      const { data } = await supabase
+        .from('package_templates')
+        .select('*')
+        .order('created_at', { ascending: false });
       if (data) setTemplates(data.map(mapTemplateFromDB));
       setSuccessMsg(t.deleteSuccess || 'Deleted successfully');
       setShowSuccess(true);
@@ -2183,24 +2418,39 @@ NOTIFY pgrst, 'reload schema';
     }
   };
 
-  const addIngredient = () => setRecipeIngredients([...recipeIngredients, { ingredient_id: '', name: '', amount: 0, unit: 'g' }]);
+  const addIngredient = () =>
+    setRecipeIngredients([
+      ...recipeIngredients,
+      { ingredient_id: '', name: '', amount: 0, unit: 'g' },
+    ]);
   const updateIngredient = (idx: number, field: string, value: any) => {
     const newIng = [...recipeIngredients];
     if (field === 'ingredient_id') {
-      const selected = allIngredients.find(i => i.id === value);
-      newIng[idx] = { ...newIng[idx], ingredient_id: value, name: selected?.name || '', unit: selected?.unit || 'g' };
+      const selected = allIngredients.find((i) => i.id === value);
+      newIng[idx] = {
+        ...newIng[idx],
+        ingredient_id: value,
+        name: selected?.name || '',
+        unit: selected?.unit || 'g',
+      };
     } else {
       newIng[idx] = { ...newIng[idx], [field]: value } as any;
     }
     setRecipeIngredients(newIng);
   };
 
-  const addBomComponent = () => setBomComponents([...bomComponents, { ingredient_id: '', name: '', amount: 0, unit: 'g' }]);
+  const addBomComponent = () =>
+    setBomComponents([...bomComponents, { ingredient_id: '', name: '', amount: 0, unit: 'g' }]);
   const updateBomComponent = (idx: number, field: string, value: any) => {
     const newItems = [...bomComponents];
     if (field === 'ingredient_id') {
-      const selected = allIngredients.find(i => i.id === value);
-      newItems[idx] = { ...newItems[idx], ingredient_id: value, name: selected?.name || '', unit: selected?.unit || 'g' };
+      const selected = allIngredients.find((i) => i.id === value);
+      newItems[idx] = {
+        ...newItems[idx],
+        ingredient_id: value,
+        name: selected?.name || '',
+        unit: selected?.unit || 'g',
+      };
     } else {
       newItems[idx] = { ...newItems[idx], [field]: value } as any;
     }
@@ -2220,12 +2470,16 @@ NOTIFY pgrst, 'reload schema';
         unit: newIngredientUnit,
         cost_per_unit: cost,
         stock: 0,
-        price: 0
+        price: 0,
       };
-      const { data, error } = await supabase.from('inventory_items').insert(payload).select().single();
+      const { data, error } = await supabase
+        .from('inventory_items')
+        .insert(payload)
+        .select()
+        .single();
       if (error) throw error;
       if (data) {
-        setAllIngredients(prev => [data as InventoryItem, ...prev]);
+        setAllIngredients((prev) => [data as InventoryItem, ...prev]);
         setNewIngredientName('');
         setNewIngredientCost('');
       }
@@ -2237,7 +2491,8 @@ NOTIFY pgrst, 'reload schema';
     }
   };
 
-  const addAddOn = () => setProductAddOns([...productAddOns, { id: crypto.randomUUID(), name: '', price: 0 }]);
+  const addAddOn = () =>
+    setProductAddOns([...productAddOns, { id: crypto.randomUUID(), name: '', price: 0 }]);
   const updateAddOn = (idx: number, field: string, value: any) => {
     const newAddOns = [...productAddOns];
     newAddOns[idx] = { ...newAddOns[idx], [field]: value } as any;
@@ -2248,8 +2503,8 @@ NOTIFY pgrst, 'reload schema';
     if (productForm.type !== 'BEVERAGE') return 0;
     // REQ-002: Calculate beverage cost based on recipe ingredients
     return recipeIngredients.reduce((sum, ing) => {
-      const dbIng = allIngredients.find(i => i.id === ing.ingredient_id);
-      return sum + (ing.amount * (dbIng?.cost_per_unit || 0));
+      const dbIng = allIngredients.find((i) => i.id === ing.ingredient_id);
+      return sum + ing.amount * (dbIng?.cost_per_unit || 0);
     }, 0);
   }, [productForm.type, recipeIngredients, allIngredients]);
 
@@ -2264,7 +2519,8 @@ NOTIFY pgrst, 'reload schema';
     return t.packaged;
   };
   const getProductCategoryLabel = (product: ProductDefinition) => {
-    if (product.mainCategory && product.subCategory) return `${product.mainCategory} / ${product.subCategory}`;
+    if (product.mainCategory && product.subCategory)
+      return `${product.mainCategory} / ${product.subCategory}`;
     return product.mainCategory || product.subCategory || product.category;
   };
   const getProductStatusLabel = (status: ProductDefinition['productStatus']) => {
@@ -2274,7 +2530,7 @@ NOTIFY pgrst, 'reload schema';
   };
   const categoryOptions = useMemo(() => {
     const unique = new Set<string>();
-    products.forEach(product => {
+    products.forEach((product) => {
       const label = getProductCategoryLabel(product);
       if (label) unique.add(label);
     });
@@ -2284,12 +2540,13 @@ NOTIFY pgrst, 'reload schema';
     const nameTerm = searchTerm.toLowerCase().trim();
     const skuTerm = skuFilter.toLowerCase().trim();
     const supplierTerm = supplierFilter.toLowerCase().trim();
-    return products.filter(product => {
+    return products.filter((product) => {
       const categoryLabel = getProductCategoryLabel(product);
       const matchesName = !nameTerm || product.name.toLowerCase().includes(nameTerm);
       const matchesSku = !skuTerm || (product.sku || '').toLowerCase().includes(skuTerm);
       const matchesCategory = !categoryFilter || categoryLabel === categoryFilter;
-      const matchesSupplier = !supplierTerm || (product.supplier || '').toLowerCase().includes(supplierTerm);
+      const matchesSupplier =
+        !supplierTerm || (product.supplier || '').toLowerCase().includes(supplierTerm);
       const matchesStatus = statusFilter === 'ALL' || product.productStatus === statusFilter;
       return matchesName && matchesSku && matchesCategory && matchesSupplier && matchesStatus;
     });
@@ -2307,7 +2564,7 @@ NOTIFY pgrst, 'reload schema';
       supplier: '',
       processing_method: '',
       elevation: '',
-      notes: ''
+      notes: '',
     });
   };
 
@@ -2328,7 +2585,7 @@ NOTIFY pgrst, 'reload schema';
       supplier: bean.supplier || '',
       processing_method: bean.processing_method || '',
       elevation: bean.elevation || '',
-      notes: bean.notes || ''
+      notes: bean.notes || '',
     });
     setShowGreenBeanModal(true);
   };
@@ -2348,7 +2605,9 @@ NOTIFY pgrst, 'reload schema';
     setIsSaving(true);
     try {
       const payload = {
-        bean_name: greenBeanForm.bean_name.trim() || `${greenBeanForm.origin.trim()} ${greenBeanForm.variety.trim()}`,
+        bean_name:
+          greenBeanForm.bean_name.trim() ||
+          `${greenBeanForm.origin.trim()} ${greenBeanForm.variety.trim()}`,
         origin: greenBeanForm.origin.trim(),
         variety: greenBeanForm.variety.trim(),
         quantity,
@@ -2357,11 +2616,11 @@ NOTIFY pgrst, 'reload schema';
         supplier: greenBeanForm.supplier.trim() || null,
         processing_method: greenBeanForm.processing_method.trim() || null,
         elevation: greenBeanForm.elevation.trim() || null,
-        notes: greenBeanForm.notes.trim() || null
+        notes: greenBeanForm.notes.trim() || null,
       };
 
       if (editingGreenBeanId) {
-        const prevBean = greenBeanRecords.find(b => b.id === editingGreenBeanId);
+        const prevBean = greenBeanRecords.find((b) => b.id === editingGreenBeanId);
         const prevQty = toNumber(prevBean?.quantity);
         const { data: updated, error } = await supabase
           .from('green_beans')
@@ -2379,7 +2638,7 @@ NOTIFY pgrst, 'reload schema';
             quantityOut: quantity < prevQty ? prevQty - quantity : 0,
             balanceAfter: toNumber(updated?.quantity, quantity),
             reason: 'COUNT_CORRECTION',
-            note: 'Adjusted from edit form'
+            note: 'Adjusted from edit form',
           });
         }
       } else {
@@ -2398,7 +2657,7 @@ NOTIFY pgrst, 'reload schema';
             quantityOut: 0,
             balanceAfter: toNumber(inserted.quantity, quantity),
             reason: 'OPENING_STOCK',
-            note: 'Initial opening stock'
+            note: 'Initial opening stock',
           });
         }
       }
@@ -2438,35 +2697,61 @@ NOTIFY pgrst, 'reload schema';
       twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
       const [inventoryRes, transactionsRes, profitabilityRes, monthlyRes] = await Promise.all([
-        supabase.from('inventory_items').select('stock, location_id, locations(name)').eq('product_id', productId),
-        supabase.from('transactions').select('id, total, items, created_at').gte('created_at', thirtyDaysAgo.toISOString()),
-        supabase.from('product_profitability_report').select('total_revenue, total_cost, gross_profit').eq('product_name', productName),
-        supabase.from('product_profitability_report').select('period_month, total_revenue').eq('product_name', productName).gte('period_month', twelveMonthsAgo.toISOString().slice(0, 7)).order('period_month', { ascending: true })
+        supabase
+          .from('inventory_items')
+          .select('stock, location_id, locations(name)')
+          .eq('product_id', productId),
+        supabase
+          .from('transactions')
+          .select('id, total, items, created_at')
+          .gte('created_at', thirtyDaysAgo.toISOString()),
+        supabase
+          .from('product_profitability_report')
+          .select('total_revenue, total_cost, gross_profit')
+          .eq('product_name', productName),
+        supabase
+          .from('product_profitability_report')
+          .select('period_month, total_revenue')
+          .eq('product_name', productName)
+          .gte('period_month', twelveMonthsAgo.toISOString().slice(0, 7))
+          .order('period_month', { ascending: true }),
       ]);
 
-      const stock = (inventoryRes.data || []).reduce((sum: number, item: any) => sum + (Number(item.stock) || 0), 0);
+      const stock = (inventoryRes.data || []).reduce(
+        (sum: number, item: any) => sum + (Number(item.stock) || 0),
+        0
+      );
       const stockByLocation = (inventoryRes.data || []).map((item: any) => ({
         locationName: item.locations?.name || 'Unknown',
-        stock: Number(item.stock) || 0
+        stock: Number(item.stock) || 0,
       }));
 
       let totalQuantitySold = 0;
       let lastSoldDate: string | null = null;
       let productTransactions = 0;
-      
+
       (transactionsRes.data || []).forEach((tx: any) => {
         const items = tx.items || [];
-        const matchingItems = items.filter((item: any) => item.name === productName || item.productId === productId);
+        const matchingItems = items.filter(
+          (item: any) => item.name === productName || item.productId === productId
+        );
         if (matchingItems.length > 0) {
           productTransactions++;
-          totalQuantitySold += matchingItems.reduce((sum: number, item: any) => sum + (Number(item.quantity) || 1), 0);
+          totalQuantitySold += matchingItems.reduce(
+            (sum: number, item: any) => sum + (Number(item.quantity) || 1),
+            0
+          );
           if (!lastSoldDate || tx.created_at > lastSoldDate) {
             lastSoldDate = tx.created_at;
           }
         }
       });
 
-      const profitability = (profitabilityRes.data || [])[0] || { total_revenue: 0, total_cost: 0, gross_profit: 0 };
+      const profitability = (profitabilityRes.data || [])[0] || {
+        total_revenue: 0,
+        total_cost: 0,
+        gross_profit: 0,
+      };
       const totalRevenue = Number(profitability.total_revenue) || 0;
       const totalCost = Number(profitability.total_cost) || 0;
       const totalProfit = Number(profitability.gross_profit) || 0;
@@ -2474,7 +2759,7 @@ NOTIFY pgrst, 'reload schema';
 
       const monthlyTrend = (monthlyRes.data || []).map((row: any) => ({
         month: row.period_month,
-        revenue: Number(row.total_revenue) || 0
+        revenue: Number(row.total_revenue) || 0,
       }));
 
       setCostAnalysisData({
@@ -2489,7 +2774,7 @@ NOTIFY pgrst, 'reload schema';
         currentStock: stock,
         stockByLocation,
         lastSoldDate,
-        monthlyTrend
+        monthlyTrend,
       });
       setShowCostAnalysis(true);
     } catch (error) {
@@ -2505,7 +2790,7 @@ NOTIFY pgrst, 'reload schema';
       mode: 'OUT',
       quantity: '',
       reason: 'COUNT_CORRECTION',
-      note: ''
+      note: '',
     });
     setShowAdjustmentModal(true);
   };
@@ -2543,7 +2828,7 @@ NOTIFY pgrst, 'reload schema';
         quantityOut: adjustmentForm.mode === 'OUT' ? qty : 0,
         balanceAfter: toNumber(updated?.quantity, nextQty),
         reason: adjustmentForm.reason,
-        note: adjustmentForm.note
+        note: adjustmentForm.note,
       });
 
       await fetchGreenBeansData();
@@ -2563,7 +2848,7 @@ NOTIFY pgrst, 'reload schema';
   const filteredGreenBeans = useMemo(() => {
     const q = greenBeanSearch.trim().toLowerCase();
     if (!q) return greenBeanRecords;
-    return greenBeanRecords.filter(bean => {
+    return greenBeanRecords.filter((bean) => {
       const origin = (bean.origin || '').toLowerCase();
       const variety = (bean.variety || '').toLowerCase();
       const supplier = (bean.supplier || '').toLowerCase();
@@ -2586,38 +2871,70 @@ NOTIFY pgrst, 'reload schema';
 
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-orange-600 text-white rounded-[20px] shadow-lg"><Settings size={28} /></div>
+          <div className="p-3 bg-orange-600 text-white rounded-[20px] shadow-lg">
+            <Settings size={28} />
+          </div>
           <div>
             <h2 className="text-2xl font-bold text-black ">{t.systemSetup}</h2>
-            <p className="text-xs text-black font-bold uppercase">{t.ingredientAddonPriceManagement}</p>
+            <p className="text-xs text-black font-bold uppercase">
+              {t.ingredientAddonPriceManagement}
+            </p>
           </div>
         </div>
         {activeSubTab === 'catalog' && (
-          <button onClick={() => { resetProductForm(); setShowProductModal(true); }} className="w-full md:w-auto bg-orange-600 text-white px-8 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover">
+          <button
+            onClick={() => {
+              resetProductForm();
+              setShowProductModal(true);
+            }}
+            className="w-full md:w-auto bg-orange-600 text-white px-8 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover"
+          >
             <Plus size={18} /> {t.addProduct}
           </button>
         )}
         {activeSubTab === 'roastProfiles' && (
-          <button onClick={resetRoastProfileForm} className="w-full md:w-auto bg-orange-600 text-white px-8 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover">
+          <button
+            onClick={resetRoastProfileForm}
+            className="w-full md:w-auto bg-orange-600 text-white px-8 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover"
+          >
             <Plus size={18} /> {t.addRoastProfile}
           </button>
         )}
         {activeSubTab === 'greenBeans' && (
-          <button onClick={openCreateGreenBean} className="w-full md:w-auto bg-orange-600 text-white px-8 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover">
+          <button
+            onClick={openCreateGreenBean}
+            className="w-full md:w-auto bg-orange-600 text-white px-8 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover"
+          >
             <Plus size={18} /> {t.addGreenBean || 'Add Green Bean'}
           </button>
         )}
         {activeSubTab === 'templates' && (
-          <button onClick={() => { resetTemplateForm(); setShowTemplateModal(true); }} className="w-full md:w-auto bg-orange-600 text-white px-8 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover">
+          <button
+            onClick={() => {
+              resetTemplateForm();
+              setShowTemplateModal(true);
+            }}
+            className="w-full md:w-auto bg-orange-600 text-white px-8 py-3.5 rounded-2xl text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-95 transition-all hover"
+          >
             <Plus size={18} /> {t.addTemplate || 'Add Template'}
           </button>
         )}
       </div>
 
       <div className="flex flex-wrap gap-4 bg-white/50 p-2 rounded-2xl w-full md:w-fit mb-10 overflow-x-auto no-scrollbar">
-        {['catalog', 'templates', 'roastProfiles', 'greenBeans', 'settings', 'database', 'branches', 'invoices'].map(tab => (
+        {[
+          'catalog',
+          'templates',
+          'roastProfiles',
+          'greenBeans',
+          'settings',
+          'database',
+          'branches',
+          'invoices',
+        ].map((tab) => (
           <button
-            key={tab} onClick={() => setActiveSubTab(tab as any)}
+            key={tab}
+            onClick={() => setActiveSubTab(tab as any)}
             className={`px-6 py-2.5 rounded-xl text-xs font-bold transition-all ${activeSubTab === tab ? 'bg-white  text-black  shadow-sm border border-orange-100 ' : 'text-black hover'}`}
           >
             {tab === 'catalog'
@@ -2627,15 +2944,15 @@ NOTIFY pgrst, 'reload schema';
                 : tab === 'roastProfiles'
                   ? t.roastProfiles
                   : tab === 'greenBeans'
-                    ? (t.greenBeansTab || 'Green Beans')
+                    ? t.greenBeansTab || 'Green Beans'
                     : tab === 'database'
                       ? 'SQL'
                       : tab === 'settings'
                         ? t.printerSettings
                         : tab === 'invoices'
-                          ? (t.exportInvoices || 'Export Invoices')
+                          ? t.exportInvoices || 'Export Invoices'
                           : tab === 'branches'
-                            ? (t.branches || 'Branches')
+                            ? t.branches || 'Branches'
                             : t.profile}
           </button>
         ))}
@@ -2646,29 +2963,64 @@ NOTIFY pgrst, 'reload schema';
           <div className="bg-white/70 border border-orange-100 rounded-2xl p-4">
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.productName}</label>
-                <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} className="w-full bg-white  border-none rounded-2xl px-4 py-3 text-xs font-bold" placeholder={t.searchProduct} />
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.productName}
+                </label>
+                <input
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-white  border-none rounded-2xl px-4 py-3 text-xs font-bold"
+                  placeholder={t.searchProduct}
+                />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.sku}</label>
-                <input value={skuFilter} onChange={e => setSkuFilter(e.target.value)} className="w-full bg-white  border-none rounded-2xl px-4 py-3 text-xs font-bold" placeholder={t.sku} />
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.sku}
+                </label>
+                <input
+                  value={skuFilter}
+                  onChange={(e) => setSkuFilter(e.target.value)}
+                  className="w-full bg-white  border-none rounded-2xl px-4 py-3 text-xs font-bold"
+                  placeholder={t.sku}
+                />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.category}</label>
-                <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="w-full bg-white  border-none rounded-2xl px-4 py-3 text-xs font-bold">
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.category}
+                </label>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="w-full bg-white  border-none rounded-2xl px-4 py-3 text-xs font-bold"
+                >
                   <option value="">{t.all}</option>
-                  {categoryOptions.map(option => (
-                    <option key={option} value={option}>{option}</option>
+                  {categoryOptions.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
                   ))}
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.supplier}</label>
-                <input value={supplierFilter} onChange={e => setSupplierFilter(e.target.value)} className="w-full bg-white  border-none rounded-2xl px-4 py-3 text-xs font-bold" placeholder={t.supplier} />
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.supplier}
+                </label>
+                <input
+                  value={supplierFilter}
+                  onChange={(e) => setSupplierFilter(e.target.value)}
+                  className="w-full bg-white  border-none rounded-2xl px-4 py-3 text-xs font-bold"
+                  placeholder={t.supplier}
+                />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.status}</label>
-                <select value={statusFilter} onChange={e => setStatusFilter(e.target.value as any)} className="w-full bg-white  border-none rounded-2xl px-4 py-3 text-xs font-bold">
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.status}
+                </label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as any)}
+                  className="w-full bg-white  border-none rounded-2xl px-4 py-3 text-xs font-bold"
+                >
                   <option value="ALL">{t.all}</option>
                   <option value="ACTIVE">{t.statusActive}</option>
                   <option value="DISABLED">{t.statusDisabled}</option>
@@ -2683,18 +3035,30 @@ NOTIFY pgrst, 'reload schema';
               type="file"
               accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
               className="hidden"
-              onChange={e => {
+              onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) handleImportCatalog(file);
               }}
             />
-            <button type="button" onClick={() => handleExportCatalogCsv(filteredProducts)} className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleExportCatalogCsv(filteredProducts)}
+              className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2"
+            >
               <DatabaseZap size={16} /> {t.exportCsv}
             </button>
-            <button type="button" onClick={() => handleExportCatalogExcel(filteredProducts)} className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => handleExportCatalogExcel(filteredProducts)}
+              className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2"
+            >
               <FileText size={16} /> {t.exportExcel}
             </button>
-            <button type="button" onClick={handleDownloadCatalogTemplate} className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleDownloadCatalogTemplate}
+              className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2"
+            >
               <FileText size={16} /> {t.downloadTemplate}
             </button>
             <button
@@ -2703,70 +3067,154 @@ NOTIFY pgrst, 'reload schema';
               disabled={isImportingCatalog}
               className="px-4 py-3 rounded-xl font-bold text-xs bg-orange-600 text-white flex items-center gap-2 disabled:opacity-60"
             >
-              {isImportingCatalog ? <Loader2 size={16} className="animate-spin" /> : <ClipboardCheck size={16} />}
+              {isImportingCatalog ? (
+                <Loader2 size={16} className="animate-spin" />
+              ) : (
+                <ClipboardCheck size={16} />
+              )}
               {t.bulkImport}
             </button>
           </div>
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 animate-in slide-in-from-bottom-4">
-            {filteredProducts.map(product => {
-              const variantDetails = [product.variantLabel, product.variantSize, product.variantFlavor].filter(Boolean).join(' • ');
-              const parentName = product.variantOf ? products.find(p => p.id === product.variantOf)?.name : '';
+            {filteredProducts.map((product) => {
+              const variantDetails = [
+                product.variantLabel,
+                product.variantSize,
+                product.variantFlavor,
+              ]
+                .filter(Boolean)
+                .join(' • ');
+              const parentName = product.variantOf
+                ? products.find((p) => p.id === product.variantOf)?.name
+                : '';
               return (
-                <div key={product.id} className="bg-white  rounded-[32px] overflow-hidden border border-orange-100  shadow-sm group flex flex-col sm:flex-row h-full">
+                <div
+                  key={product.id}
+                  className="bg-white  rounded-[32px] overflow-hidden border border-orange-100  shadow-sm group flex flex-col sm:flex-row h-full"
+                >
                   <div className="w-full sm:w-48 h-48 sm:h-auto bg-white  relative shrink-0">
-                    <img src={product.image || 'https://picsum.photos/seed/coffee/200/200'} className="w-full h-full object-cover" />
-                    <div className="absolute top-4 left-4"><span className="bg-orange-600 text-white text-[8px] font-black uppercase px-2 py-1 rounded-lg shadow-md">{getProductTypeLabel(product.type)}</span></div>
+                    <img
+                      src={product.image || 'https://picsum.photos/seed/coffee/200/200'}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-4 left-4">
+                      <span className="bg-orange-600 text-white text-[8px] font-black uppercase px-2 py-1 rounded-lg shadow-md">
+                        {getProductTypeLabel(product.type)}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex-1 p-4 sm:p-6 flex flex-col">
                     <div className="flex justify-between items-start mb-4">
                       <div>
                         <h4 className="text-lg font-bold">{product.name}</h4>
-                        {variantDetails && <div className="text-[10px] text-black font-bold">{variantDetails}</div>}
-                        {parentName && <div className="text-[10px] text-black font-bold">{t.baseProduct}: {parentName}</div>}
-                        <span className="text-[10px] text-black font-black uppercase">{getProductCategoryLabel(product)}</span>
-                        <span className="inline-flex mt-1 text-[9px] font-black uppercase rounded-full px-2 py-1 bg-orange-50 text-black border border-orange-100">{getProductStatusLabel(product.productStatus)}</span>
-                      </div>
-                      <span className="text-xl font-black">{product.basePrice}<span className="text-[10px] ml-1 opacity-50">{t.currency}</span></span>
-                    </div>
-                    {product.type === 'BEVERAGE' && product.add_ons && product.add_ons.length > 0 && (
-                      <div className="mb-4">
-                        <span className="text-[8px] font-black text-black uppercase block mb-1">{t.availableAddOns}</span>
-                        <div className="flex flex-wrap gap-1">
-                          {product.add_ons.map(ao => <span key={ao.id} className="text-[9px] bg-white  px-2 py-0.5 rounded-md border border-orange-50 ">{ao.name} (+{ao.price})</span>)}
-                        </div>
-                      </div>
-                    )}
-                    <div className="mb-4">
-                      <span className="text-[8px] font-black text-black uppercase block mb-2">{t.stockByLocation}</span>
-                      <div className="space-y-1">
-                        {Object.entries(productLocationStock[product.id] || {}).map(([locationId, qty]) => (
-                          <div key={locationId} className="text-[10px] font-bold text-black flex justify-between">
-                            <span>{locations.find(l => l.id === locationId)?.name || '-'}</span>
-                            <span>{qty}</span>
+                        {variantDetails && (
+                          <div className="text-[10px] text-black font-bold">{variantDetails}</div>
+                        )}
+                        {parentName && (
+                          <div className="text-[10px] text-black font-bold">
+                            {t.baseProduct}: {parentName}
                           </div>
-                        ))}
+                        )}
+                        <span className="text-[10px] text-black font-black uppercase">
+                          {getProductCategoryLabel(product)}
+                        </span>
+                        <span className="inline-flex mt-1 text-[9px] font-black uppercase rounded-full px-2 py-1 bg-orange-50 text-black border border-orange-100">
+                          {getProductStatusLabel(product.productStatus)}
+                        </span>
+                      </div>
+                      <span className="text-xl font-black">
+                        {product.basePrice}
+                        <span className="text-[10px] ml-1 opacity-50">{t.currency}</span>
+                      </span>
+                    </div>
+                    {product.type === 'BEVERAGE' &&
+                      product.add_ons &&
+                      product.add_ons.length > 0 && (
+                        <div className="mb-4">
+                          <span className="text-[8px] font-black text-black uppercase block mb-1">
+                            {t.availableAddOns}
+                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {product.add_ons.map((ao) => (
+                              <span
+                                key={ao.id}
+                                className="text-[9px] bg-white  px-2 py-0.5 rounded-md border border-orange-50 "
+                              >
+                                {ao.name} (+{ao.price})
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    <div className="mb-4">
+                      <span className="text-[8px] font-black text-black uppercase block mb-2">
+                        {t.stockByLocation}
+                      </span>
+                      <div className="space-y-1">
+                        {Object.entries(productLocationStock[product.id] || {}).map(
+                          ([locationId, qty]) => (
+                            <div
+                              key={locationId}
+                              className="text-[10px] font-bold text-black flex justify-between"
+                            >
+                              <span>{locations.find((l) => l.id === locationId)?.name || '-'}</span>
+                              <span>{qty}</span>
+                            </div>
+                          )
+                        )}
                         {Object.keys(productLocationStock[product.id] || {}).length === 0 && (
                           <div className="text-[10px] text-black">{t.noLocationStock}</div>
                         )}
                       </div>
                     </div>
                     <div className="mt-auto flex justify-end gap-2">
-                      <button onClick={() => {
-                        setEditingId(product.id);
-                        setProductForm({
-                          name: product.name, description: product.description || '', category: product.category, mainCategory: product.mainCategory || '', subCategory: product.subCategory || '', variantOf: product.variantOf || '', variantLabel: product.variantLabel || '', variantSize: product.variantSize || '', variantFlavor: product.variantFlavor || '', unit: product.unit || 'piece', roastLevel: product.roastLevel || RoastingLevel.MEDIUM,
-                          templateId: product.templateId || '', basePrice: product.basePrice.toString(), image: product.image || '', sku: product.sku || '', supplier: product.supplier || '', isActive: product.productStatus === 'ACTIVE', productStatus: product.productStatus || (product.isActive ? 'ACTIVE' : 'DISABLED'), isPerishable: product.isPerishable || false, expiryDate: product.expiryDate || '', type: product.type || 'PACKAGED_COFFEE',
-                          beanId: product.beanId || '',
-                          laborCost: (product.laborCost || 0).toString(), roastingOverhead: (product.roastingOverhead || 0).toString(), estimatedGreenBeanCost: (product.estimatedGreenBeanCost || 0).toString(),
-                          allBranches: true, selectedBranchIds: [], branchStock: {}
-                        });
-                        setRecipeIngredients(product.recipe?.ingredients || []);
-                        setBomComponents(product.bom || []);
-                        setProductAddOns(product.add_ons || []);
-                        setShowProductModal(true);
-                      }} className="p-2.5 text-black  rounded-xl transition-all"><Edit3 size={18} /></button>
-                      <button 
-                        onClick={() => fetchProductCostAnalysis(product.id, product.name)} 
+                      <button
+                        onClick={() => {
+                          setEditingId(product.id);
+                          setProductForm({
+                            name: product.name,
+                            description: product.description || '',
+                            category: product.category,
+                            mainCategory: product.mainCategory || '',
+                            subCategory: product.subCategory || '',
+                            variantOf: product.variantOf || '',
+                            variantLabel: product.variantLabel || '',
+                            variantSize: product.variantSize || '',
+                            variantFlavor: product.variantFlavor || '',
+                            unit: product.unit || 'piece',
+                            roastLevel: product.roastLevel || RoastingLevel.MEDIUM,
+                            templateId: product.templateId || '',
+                            basePrice: product.basePrice.toString(),
+                            image: product.image || '',
+                            sku: product.sku || '',
+                            supplier: product.supplier || '',
+                            isActive: product.productStatus === 'ACTIVE',
+                            productStatus:
+                              product.productStatus || (product.isActive ? 'ACTIVE' : 'DISABLED'),
+                            isPerishable: product.isPerishable || false,
+                            expiryDate: product.expiryDate || '',
+                            type: product.type || 'PACKAGED_COFFEE',
+                            beanId: product.beanId || '',
+                            laborCost: (product.laborCost || 0).toString(),
+                            roastingOverhead: (product.roastingOverhead || 0).toString(),
+                            estimatedGreenBeanCost: (
+                              product.estimatedGreenBeanCost || 0
+                            ).toString(),
+                            allBranches: true,
+                            selectedBranchIds: [],
+                            branchStock: {},
+                          });
+                          setRecipeIngredients(product.recipe?.ingredients || []);
+                          setBomComponents(product.bom || []);
+                          setProductAddOns(product.add_ons || []);
+                          setShowProductModal(true);
+                        }}
+                        className="p-2.5 text-black  rounded-xl transition-all"
+                      >
+                        <Edit3 size={18} />
+                      </button>
+                      <button
+                        onClick={() => fetchProductCostAnalysis(product.id, product.name)}
                         className="p-2.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-all"
                         title={(t as any).smartCostAnalysis || 'Smart Cost Analysis'}
                       >
@@ -2775,7 +3223,7 @@ NOTIFY pgrst, 'reload schema';
                     </div>
                   </div>
                 </div>
-              )
+              );
             })}
           </div>
         </div>
@@ -2784,21 +3232,32 @@ NOTIFY pgrst, 'reload schema';
       {activeSubTab === 'templates' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {templates.map(template => (
-              <div key={template.id} className="bg-white rounded-[24px] p-5 border border-orange-100 shadow-sm">
+            {templates.map((template) => (
+              <div
+                key={template.id}
+                className="bg-white rounded-[24px] p-5 border border-orange-100 shadow-sm"
+              >
                 <div className="flex items-start justify-between mb-3">
                   <div>
                     <h4 className="font-bold text-black">{template.sizeLabel}</h4>
                     <p className="text-xs text-black opacity-60">{template.weightInKg} kg</p>
                   </div>
-                  <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${template.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  <span
+                    className={`px-2 py-1 rounded-full text-[10px] font-bold ${template.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}
+                  >
                     {template.isActive ? t.active : t.inactive}
                   </span>
                 </div>
                 <div className="space-y-1 text-xs text-black">
-                  <p><span className="font-bold">SKU Prefix:</span> {template.skuPrefix || '-'}</p>
-                  <p><span className="font-bold">Unit Cost:</span> {template.unitCost} QAR</p>
-                  <p><span className="font-bold">Shelf Life:</span> {template.shelf_life_days} days</p>
+                  <p>
+                    <span className="font-bold">SKU Prefix:</span> {template.skuPrefix || '-'}
+                  </p>
+                  <p>
+                    <span className="font-bold">Unit Cost:</span> {template.unitCost} QAR
+                  </p>
+                  <p>
+                    <span className="font-bold">Shelf Life:</span> {template.shelf_life_days} days
+                  </p>
                 </div>
                 <div className="flex gap-2 mt-4">
                   <button
@@ -2811,7 +3270,7 @@ NOTIFY pgrst, 'reload schema';
                         unitCost: template.unitCost.toString(),
                         shelfLifeDays: template.shelf_life_days.toString(),
                         skuPrefix: template.skuPrefix,
-                        isActive: template.isActive
+                        isActive: template.isActive,
                       });
                       setShowTemplateModal(true);
                     }}
@@ -2833,7 +3292,9 @@ NOTIFY pgrst, 'reload schema';
               <div className="col-span-full text-center py-12 text-black opacity-50">
                 <Package size={48} className="mx-auto mb-3 opacity-50" />
                 <p className="font-bold">{t.noTemplatesYet || 'No package templates yet'}</p>
-                <p className="text-xs mt-1">{t.addTemplateToStart || 'Add a template to get started'}</p>
+                <p className="text-xs mt-1">
+                  {t.addTemplateToStart || 'Add a template to get started'}
+                </p>
               </div>
             )}
           </div>
@@ -2842,9 +3303,14 @@ NOTIFY pgrst, 'reload schema';
 
       {activeSubTab === 'roastProfiles' && (
         <div className="space-y-6">
-          <form onSubmit={handleSaveRoastProfile} className="bg-white  rounded-[32px] p-6 border border-orange-100  shadow-sm space-y-6">
+          <form
+            onSubmit={handleSaveRoastProfile}
+            className="bg-white  rounded-[32px] p-6 border border-orange-100  shadow-sm space-y-6"
+          >
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-orange-50 text-black rounded-2xl"><FlaskConical size={22} /></div>
+              <div className="p-3 bg-orange-50 text-black rounded-2xl">
+                <FlaskConical size={22} />
+              </div>
               <div>
                 <h3 className="text-lg font-bold">{t.roastProfiles}</h3>
                 <p className="text-xs text-black">{t.manageRoastProfiles}</p>
@@ -2852,22 +3318,40 @@ NOTIFY pgrst, 'reload schema';
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.roastProfileName}</label>
-                <input value={roastProfileForm.name} onChange={e => setRoastProfileForm({ ...roastProfileForm, name: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.roastProfileName}
+                </label>
+                <input
+                  value={roastProfileForm.name}
+                  onChange={(e) =>
+                    setRoastProfileForm({ ...roastProfileForm, name: e.target.value })
+                  }
+                  className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.roastProfileDescription}</label>
-                <input value={roastProfileForm.description} onChange={e => setRoastProfileForm({ ...roastProfileForm, description: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.roastProfileDescription}
+                </label>
+                <input
+                  value={roastProfileForm.description}
+                  onChange={(e) =>
+                    setRoastProfileForm({ ...roastProfileForm, description: e.target.value })
+                  }
+                  className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                />
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.linkedBeans}</label>
+              <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                {t.linkedBeans}
+              </label>
               <div className="text-[10px] text-black">{t.selectLinkedBeans}</div>
               {greenBeans.length === 0 ? (
                 <div className="text-xs text-black">{t.noLinkedBeans}</div>
               ) : (
                 <div className="flex flex-wrap gap-2">
-                  {greenBeans.map(bean => {
+                  {greenBeans.map((bean) => {
                     const isSelected = roastProfileForm.beanIds.includes(bean.id);
                     return (
                       <button
@@ -2885,52 +3369,156 @@ NOTIFY pgrst, 'reload schema';
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.chargeTemperature}</label>
-                <input type="number" step="0.1" value={roastProfileForm.chargeTemperature} onChange={e => setRoastProfileForm({ ...roastProfileForm, chargeTemperature: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.chargeTemperature}
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={roastProfileForm.chargeTemperature}
+                  onChange={(e) =>
+                    setRoastProfileForm({ ...roastProfileForm, chargeTemperature: e.target.value })
+                  }
+                  className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                />
               </div>
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.targetRoastCurve}</label>
-                <input value={roastProfileForm.targetCurve} onChange={e => setRoastProfileForm({ ...roastProfileForm, targetCurve: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.targetRoastCurve}
+                </label>
+                <input
+                  value={roastProfileForm.targetCurve}
+                  onChange={(e) =>
+                    setRoastProfileForm({ ...roastProfileForm, targetCurve: e.target.value })
+                  }
+                  className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                />
               </div>
             </div>
             <div className="space-y-3">
-              <div className="text-[10px] font-black text-black uppercase tracking-widest">{t.stageDurations}</div>
+              <div className="text-[10px] font-black text-black uppercase tracking-widest">
+                {t.stageDurations}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.preparationDuration}</label>
-                  <input type="number" step="0.1" value={roastProfileForm.preparationDuration} onChange={e => setRoastProfileForm({ ...roastProfileForm, preparationDuration: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.preparationDuration}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={roastProfileForm.preparationDuration}
+                    onChange={(e) =>
+                      setRoastProfileForm({
+                        ...roastProfileForm,
+                        preparationDuration: e.target.value,
+                      })
+                    }
+                    className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.roastingDuration}</label>
-                  <input type="number" step="0.1" value={roastProfileForm.roastingDuration} onChange={e => setRoastProfileForm({ ...roastProfileForm, roastingDuration: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.roastingDuration}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={roastProfileForm.roastingDuration}
+                    onChange={(e) =>
+                      setRoastProfileForm({ ...roastProfileForm, roastingDuration: e.target.value })
+                    }
+                    className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.coolingDuration}</label>
-                  <input type="number" step="0.1" value={roastProfileForm.coolingDuration} onChange={e => setRoastProfileForm({ ...roastProfileForm, coolingDuration: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.coolingDuration}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={roastProfileForm.coolingDuration}
+                    onChange={(e) =>
+                      setRoastProfileForm({ ...roastProfileForm, coolingDuration: e.target.value })
+                    }
+                    className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.inspectionDuration}</label>
-                  <input type="number" step="0.1" value={roastProfileForm.inspectionDuration} onChange={e => setRoastProfileForm({ ...roastProfileForm, inspectionDuration: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.inspectionDuration}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={roastProfileForm.inspectionDuration}
+                    onChange={(e) =>
+                      setRoastProfileForm({
+                        ...roastProfileForm,
+                        inspectionDuration: e.target.value,
+                      })
+                    }
+                    className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.packagingDuration}</label>
-                  <input type="number" step="0.1" value={roastProfileForm.packagingDuration} onChange={e => setRoastProfileForm({ ...roastProfileForm, packagingDuration: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.packagingDuration}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={roastProfileForm.packagingDuration}
+                    onChange={(e) =>
+                      setRoastProfileForm({
+                        ...roastProfileForm,
+                        packagingDuration: e.target.value,
+                      })
+                    }
+                    className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                  />
                 </div>
               </div>
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.roastProfileDetails}</label>
-              <textarea value={roastProfileForm.profileJson} onChange={e => setRoastProfileForm({ ...roastProfileForm, profileJson: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono text-xs font-bold outline-none focus:ring-2 focus:ring-orange-600 h-32" placeholder={t.roastProfileJsonHint} />
+              <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                {t.roastProfileDetails}
+              </label>
+              <textarea
+                value={roastProfileForm.profileJson}
+                onChange={(e) =>
+                  setRoastProfileForm({ ...roastProfileForm, profileJson: e.target.value })
+                }
+                className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono text-xs font-bold outline-none focus:ring-2 focus:ring-orange-600 h-32"
+                placeholder={t.roastProfileJsonHint}
+              />
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" onClick={() => setRoastProfileForm({ ...roastProfileForm, isActive: !roastProfileForm.isActive })} className="px-4 py-3 rounded-xl font-bold text-xs bg-orange-50 text-black border border-orange-100 flex items-center gap-2">
-                {roastProfileForm.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />} {roastProfileForm.isActive ? t.statusActive : t.statusDisabled}
+              <button
+                type="button"
+                onClick={() =>
+                  setRoastProfileForm({ ...roastProfileForm, isActive: !roastProfileForm.isActive })
+                }
+                className="px-4 py-3 rounded-xl font-bold text-xs bg-orange-50 text-black border border-orange-100 flex items-center gap-2"
+              >
+                {roastProfileForm.isActive ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}{' '}
+                {roastProfileForm.isActive ? t.statusActive : t.statusDisabled}
               </button>
-              <button type="submit" disabled={isSaving} className="px-5 py-3 rounded-xl font-bold text-xs bg-orange-600 text-white flex items-center gap-2 disabled:opacity-60">
-                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} {editingRoastProfileId ? t.saveChanges : t.addRoastProfile}
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="px-5 py-3 rounded-xl font-bold text-xs bg-orange-600 text-white flex items-center gap-2 disabled:opacity-60"
+              >
+                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}{' '}
+                {editingRoastProfileId ? t.saveChanges : t.addRoastProfile}
               </button>
               {editingRoastProfileId && (
-                <button type="button" onClick={resetRoastProfileForm} className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={resetRoastProfileForm}
+                  className="px-4 py-3 rounded-xl font-bold text-xs bg-white  text-black  border border-orange-100 flex items-center gap-2"
+                >
                   <X size={16} /> {t.cancel}
                 </button>
               )}
@@ -2938,53 +3526,99 @@ NOTIFY pgrst, 'reload schema';
           </form>
 
           {roastProfiles.length === 0 ? (
-            <div className="bg-white  rounded-[32px] p-6 border border-orange-100  text-black text-sm">{t.noRoastProfiles}</div>
+            <div className="bg-white  rounded-[32px] p-6 border border-orange-100  text-black text-sm">
+              {t.noRoastProfiles}
+            </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {roastProfiles.map(profile => {
+              {roastProfiles.map((profile) => {
                 const profileData = (profile.profile || {}) as any;
                 const stageDurations = profileData.stageDurations || {};
-                const linkedBeans = (profile.bean_ids || []).map(id => greenBeans.find(bean => bean.id === id)?.label || id);
+                const linkedBeans = (profile.bean_ids || []).map(
+                  (id) => greenBeans.find((bean) => bean.id === id)?.label || id
+                );
                 return (
-                  <div key={profile.id} className="bg-white  rounded-[32px] p-6 border border-orange-100  shadow-sm space-y-3">
+                  <div
+                    key={profile.id}
+                    className="bg-white  rounded-[32px] p-6 border border-orange-100  shadow-sm space-y-3"
+                  >
                     <div className="flex justify-between items-start gap-4">
                       <div>
                         <h4 className="text-lg font-bold">{profile.name}</h4>
-                        {profile.description && <div className="text-xs text-black">{profile.description}</div>}
-                        <div className="text-[9px] font-black uppercase mt-2">{(profile.is_active ?? true) ? t.statusActive : t.statusDisabled}</div>
+                        {profile.description && (
+                          <div className="text-xs text-black">{profile.description}</div>
+                        )}
+                        <div className="text-[9px] font-black uppercase mt-2">
+                          {(profile.is_active ?? true) ? t.statusActive : t.statusDisabled}
+                        </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button onClick={() => handleToggleRoastProfile(profile)} className="p-2 rounded-xl bg-orange-50 text-black border border-orange-100">
-                          {(profile.is_active ?? true) ? <ToggleRight size={16} /> : <ToggleLeft size={16} />}
+                        <button
+                          onClick={() => handleToggleRoastProfile(profile)}
+                          className="p-2 rounded-xl bg-orange-50 text-black border border-orange-100"
+                        >
+                          {(profile.is_active ?? true) ? (
+                            <ToggleRight size={16} />
+                          ) : (
+                            <ToggleLeft size={16} />
+                          )}
                         </button>
-                        <button onClick={() => handleForkRoastProfile(profile)} title={t.forkProfile} className="p-2 rounded-xl bg-white  text-black  border border-orange-100">
+                        <button
+                          onClick={() => handleForkRoastProfile(profile)}
+                          title={t.forkProfile}
+                          className="p-2 rounded-xl bg-white  text-black  border border-orange-100"
+                        >
                           <Copy size={16} />
                         </button>
-                        <button onClick={() => handleEditRoastProfile(profile)} className="p-2 rounded-xl bg-white  text-black  border border-orange-100">
+                        <button
+                          onClick={() => handleEditRoastProfile(profile)}
+                          className="p-2 rounded-xl bg-white  text-black  border border-orange-100"
+                        >
                           <Edit3 size={16} />
                         </button>
                       </div>
                     </div>
-                    {(profileData.chargeTemperature !== undefined || profileData.targetCurve || Object.keys(stageDurations).length > 0) && (
+                    {(profileData.chargeTemperature !== undefined ||
+                      profileData.targetCurve ||
+                      Object.keys(stageDurations).length > 0) && (
                       <div className="text-[10px] font-bold text-black space-y-1">
                         {linkedBeans.length > 0 && (
-                          <div>{t.linkedBeans}: {linkedBeans.join(' • ')}</div>
+                          <div>
+                            {t.linkedBeans}: {linkedBeans.join(' • ')}
+                          </div>
                         )}
                         {profileData.chargeTemperature !== undefined && (
-                          <div>{t.chargeTemperature}: {profileData.chargeTemperature}</div>
+                          <div>
+                            {t.chargeTemperature}: {profileData.chargeTemperature}
+                          </div>
                         )}
                         {profileData.targetCurve && (
-                          <div>{t.targetRoastCurve}: {profileData.targetCurve}</div>
+                          <div>
+                            {t.targetRoastCurve}: {profileData.targetCurve}
+                          </div>
                         )}
                         {Object.keys(stageDurations).length > 0 && (
                           <div>
-                            {t.stageDurations}: {[
-                              stageDurations.preparation ? `${t.preparationDuration} ${stageDurations.preparation}` : '',
-                              stageDurations.roasting ? `${t.roastingDuration} ${stageDurations.roasting}` : '',
-                              stageDurations.cooling ? `${t.coolingDuration} ${stageDurations.cooling}` : '',
-                              stageDurations.inspection ? `${t.inspectionDuration} ${stageDurations.inspection}` : '',
-                              stageDurations.packaging ? `${t.packagingDuration} ${stageDurations.packaging}` : ''
-                            ].filter(Boolean).join(' • ')}
+                            {t.stageDurations}:{' '}
+                            {[
+                              stageDurations.preparation
+                                ? `${t.preparationDuration} ${stageDurations.preparation}`
+                                : '',
+                              stageDurations.roasting
+                                ? `${t.roastingDuration} ${stageDurations.roasting}`
+                                : '',
+                              stageDurations.cooling
+                                ? `${t.coolingDuration} ${stageDurations.cooling}`
+                                : '',
+                              stageDurations.inspection
+                                ? `${t.inspectionDuration} ${stageDurations.inspection}`
+                                : '',
+                              stageDurations.packaging
+                                ? `${t.packagingDuration} ${stageDurations.packaging}`
+                                : '',
+                            ]
+                              .filter(Boolean)
+                              .join(' • ')}
                           </div>
                         )}
                       </div>
@@ -3001,27 +3635,40 @@ NOTIFY pgrst, 'reload schema';
         <div className="space-y-6 animate-in slide-in-from-bottom-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-2xl border border-orange-100 p-5">
-              <div className="text-[10px] font-black uppercase text-black">{t.greenBeanInventory || 'Green Bean Inventory'}</div>
-              <div className="mt-2 text-3xl font-black text-black font-mono">{totalGreenBeanStock.toFixed(2)} kg</div>
+              <div className="text-[10px] font-black uppercase text-black">
+                {t.greenBeanInventory || 'Green Bean Inventory'}
+              </div>
+              <div className="mt-2 text-3xl font-black text-black font-mono">
+                {totalGreenBeanStock.toFixed(2)} kg
+              </div>
             </div>
             <div className="bg-white rounded-2xl border border-orange-100 p-5">
-              <div className="text-[10px] font-black uppercase text-black">{t.totalItems || 'Beans'}</div>
-              <div className="mt-2 text-3xl font-black text-black font-mono">{greenBeanRecords.length}</div>
+              <div className="text-[10px] font-black uppercase text-black">
+                {t.totalItems || 'Beans'}
+              </div>
+              <div className="mt-2 text-3xl font-black text-black font-mono">
+                {greenBeanRecords.length}
+              </div>
             </div>
             <div className="bg-white rounded-2xl border border-orange-100 p-5">
-              <div className="text-[10px] font-black uppercase text-black">{t.lowStockWarning || 'Low Stock'}</div>
+              <div className="text-[10px] font-black uppercase text-black">
+                {t.lowStockWarning || 'Low Stock'}
+              </div>
               <div className="mt-2 text-3xl font-black text-red-600 font-mono">
-                {greenBeanRecords.filter(bean => toNumber(bean.quantity) < 100).length}
+                {greenBeanRecords.filter((bean) => toNumber(bean.quantity) < 100).length}
               </div>
             </div>
           </div>
 
           <div className="bg-white rounded-2xl border border-orange-100 p-4">
             <div className="relative">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-black/50" size={18} />
+              <Search
+                className="absolute left-4 top-1/2 -translate-y-1/2 text-black/50"
+                size={18}
+              />
               <input
                 value={greenBeanSearch}
-                onChange={e => setGreenBeanSearch(e.target.value)}
+                onChange={(e) => setGreenBeanSearch(e.target.value)}
                 placeholder={t.searchGreenBeans || 'Search green beans...'}
                 className="w-full bg-white border border-orange-100 rounded-2xl pl-11 pr-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-orange-600"
               />
@@ -3044,10 +3691,12 @@ NOTIFY pgrst, 'reload schema';
                 <tbody>
                   {filteredGreenBeans.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-8 text-center text-sm text-black">{t.noItemsFound}</td>
+                      <td colSpan={6} className="p-8 text-center text-sm text-black">
+                        {t.noItemsFound}
+                      </td>
                     </tr>
                   ) : (
-                    filteredGreenBeans.map(bean => {
+                    filteredGreenBeans.map((bean) => {
                       const qty = toNumber(bean.quantity);
                       const isLow = qty < 100;
                       return (
@@ -3055,21 +3704,34 @@ NOTIFY pgrst, 'reload schema';
                           <td className="p-4 text-sm font-bold">{bean.origin || '-'}</td>
                           <td className="p-4 text-sm font-bold">{bean.variety || '-'}</td>
                           <td className="p-4 text-sm font-bold">{bean.supplier || '-'}</td>
-                          <td className="p-4 text-sm font-mono font-black">{qty.toFixed(2)} {bean.unit || 'kg'}</td>
+                          <td className="p-4 text-sm font-mono font-black">
+                            {qty.toFixed(2)} {bean.unit || 'kg'}
+                          </td>
                           <td className="p-4">
-                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${isLow ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                              {isLow ? (t.low || 'Low') : (t.good || 'Good')}
+                            <span
+                              className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${isLow ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}
+                            >
+                              {isLow ? t.low || 'Low' : t.good || 'Good'}
                             </span>
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <button onClick={() => openQuickAdjustment(bean)} className="px-3 py-2 rounded-xl text-[10px] font-black bg-orange-600 text-white">
+                              <button
+                                onClick={() => openQuickAdjustment(bean)}
+                                className="px-3 py-2 rounded-xl text-[10px] font-black bg-orange-600 text-white"
+                              >
                                 {t.quickStockUpdate || 'Quick Stock Update'}
                               </button>
-                              <button onClick={() => openEditGreenBean(bean)} className="p-2 rounded-xl bg-orange-50 text-black border border-orange-100">
+                              <button
+                                onClick={() => openEditGreenBean(bean)}
+                                className="p-2 rounded-xl bg-orange-50 text-black border border-orange-100"
+                              >
                                 <Edit3 size={14} />
                               </button>
-                              <button onClick={() => handleDeleteGreenBean(bean)} className="p-2 rounded-xl bg-red-50 text-red-700 border border-red-100">
+                              <button
+                                onClick={() => handleDeleteGreenBean(bean)}
+                                className="p-2 rounded-xl bg-red-50 text-red-700 border border-red-100"
+                              >
                                 <Trash2 size={14} />
                               </button>
                             </div>
@@ -3084,27 +3746,49 @@ NOTIFY pgrst, 'reload schema';
           </div>
 
           <div className="bg-white rounded-2xl border border-orange-100 p-5">
-            <h4 className="text-sm font-black uppercase mb-4">{t.stockMovements || 'Stock Movements'}</h4>
+            <h4 className="text-sm font-black uppercase mb-4">
+              {t.stockMovements || 'Stock Movements'}
+            </h4>
             <div className="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
               {greenBeanMovements.length === 0 ? (
-                <div className="text-sm text-black">{t.noCountEntries || 'No movement records'}</div>
+                <div className="text-sm text-black">
+                  {t.noCountEntries || 'No movement records'}
+                </div>
               ) : (
-                greenBeanMovements.map(mv => {
+                greenBeanMovements.map((mv) => {
                   const qtyIn = toNumber(mv.quantity_in);
                   const qtyOut = toNumber(mv.quantity_out);
                   const legacyQty = toNumber(mv.quantity);
-                  const direction = qtyIn > 0 ? `+${qtyIn.toFixed(2)}` : qtyOut > 0 ? `-${qtyOut.toFixed(2)}` : legacyQty.toFixed(2);
-                  const beanLabel = mv.green_beans ? `${mv.green_beans.origin || '-'} - ${mv.green_beans.variety || '-'}` : '-';
+                  const direction =
+                    qtyIn > 0
+                      ? `+${qtyIn.toFixed(2)}`
+                      : qtyOut > 0
+                        ? `-${qtyOut.toFixed(2)}`
+                        : legacyQty.toFixed(2);
+                  const beanLabel = mv.green_beans
+                    ? `${mv.green_beans.origin || '-'} - ${mv.green_beans.variety || '-'}`
+                    : '-';
                   return (
-                    <div key={mv.id} className="border border-orange-100 rounded-xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+                    <div
+                      key={mv.id}
+                      className="border border-orange-100 rounded-xl p-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2"
+                    >
                       <div>
                         <div className="text-xs font-black">{beanLabel}</div>
-                        <div className="text-[10px] text-black">{mv.movement_type} {mv.reason ? `• ${mv.reason}` : ''}</div>
+                        <div className="text-[10px] text-black">
+                          {mv.movement_type} {mv.reason ? `• ${mv.reason}` : ''}
+                        </div>
                       </div>
                       <div className="text-right">
-                        <div className={`text-sm font-black font-mono ${direction.startsWith('-') ? 'text-red-600' : 'text-green-700'}`}>{direction} kg</div>
+                        <div
+                          className={`text-sm font-black font-mono ${direction.startsWith('-') ? 'text-red-600' : 'text-green-700'}`}
+                        >
+                          {direction} kg
+                        </div>
                         <div className="text-[10px] text-black">
-                          {(mv.movement_at || mv.created_at) ? new Date(mv.movement_at || mv.created_at || '').toLocaleString() : '-'}
+                          {mv.movement_at || mv.created_at
+                            ? new Date(mv.movement_at || mv.created_at || '').toLocaleString()
+                            : '-'}
                         </div>
                       </div>
                     </div>
@@ -3118,17 +3802,40 @@ NOTIFY pgrst, 'reload schema';
 
       {activeSubTab === 'database' && (
         <div className="bg-orange-600 rounded-[40px] p-10 text-white shadow-xl">
-          <h3 className="text-2xl font-black mb-4 flex items-center gap-3 text-white"><Terminal size={24} /> {t.sqlSchemaUpgrade}</h3>
-          <pre className="bg-white p-6 rounded-2xl font-mono text-xs text-black whitespace-pre-wrap mb-6 border border-white/20">{sqlFixScript}</pre>
-          <button onClick={() => { navigator.clipboard.writeText(sqlFixScript); setCopyingSql(true); setTimeout(() => setCopyingSql(false), 2000); }} className="bg-white hover:bg-orange-50 px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors text-black">{copyingSql ? <CheckCircle size={18} className="text-orange-600" /> : <Copy size={18} />} {t.copySqlScript}</button>
+          <h3 className="text-2xl font-black mb-4 flex items-center gap-3 text-white">
+            <Terminal size={24} /> {t.sqlSchemaUpgrade}
+          </h3>
+          <pre className="bg-white p-6 rounded-2xl font-mono text-xs text-black whitespace-pre-wrap mb-6 border border-white/20">
+            {sqlFixScript}
+          </pre>
+          <button
+            onClick={() => {
+              navigator.clipboard.writeText(sqlFixScript);
+              setCopyingSql(true);
+              setTimeout(() => setCopyingSql(false), 2000);
+            }}
+            className="bg-white hover:bg-orange-50 px-6 py-3 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors text-black"
+          >
+            {copyingSql ? (
+              <CheckCircle size={18} className="text-orange-600" />
+            ) : (
+              <Copy size={18} />
+            )}{' '}
+            {t.copySqlScript}
+          </button>
         </div>
       )}
 
       {activeSubTab === 'settings' && (
         <div className="max-w-4xl animate-in slide-in-from-bottom-4">
-          <form onSubmit={handleSaveSettings} className="bg-white  rounded-[40px] p-10 border border-orange-100  shadow-sm space-y-10">
+          <form
+            onSubmit={handleSaveSettings}
+            className="bg-white  rounded-[40px] p-10 border border-orange-100  shadow-sm space-y-10"
+          >
             <div className="flex items-center gap-4 border-b border-orange-50  pb-8">
-              <div className="p-4 bg-white  text-black  rounded-2xl"><Settings size={32} /></div>
+              <div className="p-4 bg-white  text-black  rounded-2xl">
+                <Settings size={32} />
+              </div>
               <div>
                 <h3 className="text-2xl font-bold">{t.printerSettings}</h3>
                 <p className="text-black text-sm">{t.printerSettingsDesc}</p>
@@ -3138,33 +3845,66 @@ NOTIFY pgrst, 'reload schema';
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.printerWidth}</label>
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.printerWidth}
+                  </label>
                   <div className="flex bg-orange-50 p-1 rounded-2xl w-fit">
-                    <button type="button" onClick={() => setSettings({ ...settings, printer_width: '58mm' })} className={`px-8 py-3 rounded-xl font-bold text-sm transition-all ${settings.printer_width === '58mm' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}>{t.width58mm}</button>
-                    <button type="button" onClick={() => setSettings({ ...settings, printer_width: '80mm' })} className={`px-8 py-3 rounded-xl font-bold text-sm transition-all ${settings.printer_width === '80mm' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}>{t.width80mm}</button>
+                    <button
+                      type="button"
+                      onClick={() => setSettings({ ...settings, printer_width: '58mm' })}
+                      className={`px-8 py-3 rounded-xl font-bold text-sm transition-all ${settings.printer_width === '58mm' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}
+                    >
+                      {t.width58mm}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSettings({ ...settings, printer_width: '80mm' })}
+                      className={`px-8 py-3 rounded-xl font-bold text-sm transition-all ${settings.printer_width === '80mm' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}
+                    >
+                      {t.width80mm}
+                    </button>
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.tax} (%)</label>
-                  <input type="number" step="0.01" value={settings.vat_rate * 100} onChange={e => setSettings({ ...settings, vat_rate: parseFloat(e.target.value) / 100 })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.tax} (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={settings.vat_rate * 100}
+                    onChange={(e) =>
+                      setSettings({ ...settings, vat_rate: parseFloat(e.target.value) / 100 })
+                    }
+                    className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                  />
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.vatNumber}</label>
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.vatNumber}
+                  </label>
                   <input
                     type="text"
                     value={settings.vat_number || ''}
-                    onChange={e => setSettings({ ...settings, vat_number: e.target.value })}
+                    onChange={(e) => setSettings({ ...settings, vat_number: e.target.value })}
                     className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
                     placeholder="e.g. 123456789"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.latePenaltyType}</label>
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.latePenaltyType}
+                  </label>
                   <select
                     value={settings.late_penalty_type || 'per_minute'}
-                    onChange={(e) => setSettings({ ...settings, late_penalty_type: e.target.value as 'per_minute' | 'per_occurrence' })}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        late_penalty_type: e.target.value as 'per_minute' | 'per_occurrence',
+                      })
+                    }
                     className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
                   >
                     <option value="per_minute">{t.latePenaltyPerMinute}</option>
@@ -3172,12 +3912,19 @@ NOTIFY pgrst, 'reload schema';
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.latePenaltyAmount.replace('{currency}', t.currency)}</label>
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.latePenaltyAmount.replace('{currency}', t.currency)}
+                  </label>
                   <input
                     type="number"
                     step="0.01"
                     value={settings.late_penalty_amount || 0}
-                    onChange={(e) => setSettings({ ...settings, late_penalty_amount: parseFloat(e.target.value || '0') })}
+                    onChange={(e) =>
+                      setSettings({
+                        ...settings,
+                        late_penalty_amount: parseFloat(e.target.value || '0'),
+                      })
+                    }
                     className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
                   />
                 </div>
@@ -3185,19 +3932,38 @@ NOTIFY pgrst, 'reload schema';
 
               <div className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.storeNameLabel}</label>
-                  <input type="text" value={settings.store_name} onChange={e => setSettings({ ...settings, store_name: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.storeNameLabel}
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.store_name}
+                    onChange={(e) => setSettings({ ...settings, store_name: e.target.value })}
+                    className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                  />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.storeAddressLabel}</label>
-                  <input type="text" value={settings.store_address} onChange={e => setSettings({ ...settings, store_address: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.storeAddressLabel}
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.store_address}
+                    onChange={(e) => setSettings({ ...settings, store_address: e.target.value })}
+                    className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                  />
                 </div>
               </div>
             </div>
 
             <div className="pt-6 flex justify-end">
-              <button type="submit" disabled={isSaving} className="bg-orange-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all flex items-center gap-3">
-                {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />} {t.saveChanges}
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="bg-orange-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl active:scale-95 transition-all flex items-center gap-3"
+              >
+                {isSaving ? <Loader2 className="animate-spin" size={20} /> : <Save size={20} />}{' '}
+                {t.saveChanges}
               </button>
             </div>
           </form>
@@ -3213,13 +3979,18 @@ NOTIFY pgrst, 'reload schema';
               </div>
               <div>
                 <h3 className="text-2xl font-black">{t.exportInvoices || 'Export Invoices'}</h3>
-                <p className="text-sm text-stone-500">{(t as any).exportInvoicesDesc || 'Download all invoices for a specific period in Excel format'}</p>
+                <p className="text-sm text-stone-500">
+                  {(t as any).exportInvoicesDesc ||
+                    'Download all invoices for a specific period in Excel format'}
+                </p>
               </div>
             </div>
 
             <div className="space-y-6">
               <div className="space-y-3">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{(t as any).selectPeriod || 'Select Period'}</label>
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {(t as any).selectPeriod || 'Select Period'}
+                </label>
                 <div className="flex flex-wrap gap-3">
                   <button
                     type="button"
@@ -3269,16 +4040,22 @@ NOTIFY pgrst, 'reload schema';
               </div>
 
               <div className="space-y-3">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{(t as any).selectBranch || 'Select Branch'}</label>
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {(t as any).selectBranch || 'Select Branch'}
+                </label>
                 <select
                   value={invoiceExportBranch}
                   onChange={(e) => setInvoiceExportBranch(e.target.value)}
                   className="w-full md:w-64 bg-orange-50 border-none rounded-xl px-4 py-3 font-bold text-sm"
                 >
                   <option value="">{(t as any).allBranches || 'All Branches'}</option>
-                  {locations.filter(l => l.is_active).map(loc => (
-                    <option key={loc.id} value={loc.id}>{loc.name}</option>
-                  ))}
+                  {locations
+                    .filter((l) => l.is_active)
+                    .map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name}
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -3295,25 +4072,36 @@ NOTIFY pgrst, 'reload schema';
                     setInvoiceExportLoading(true);
                     setInvoiceExportError(null);
                     try {
-                      const transactions = await fetchInvoicesByPeriod(supabase, invoiceExportPeriod, undefined, invoiceExportBranch || undefined);
+                      const transactions = await fetchInvoicesByPeriod(
+                        supabase,
+                        invoiceExportPeriod,
+                        undefined,
+                        invoiceExportBranch || undefined
+                      );
                       if (!transactions || transactions.length === 0) {
-                        setInvoiceExportError(t.noDataForPeriod || 'No invoices found for the selected period');
+                        setInvoiceExportError(
+                          t.noDataForPeriod || 'No invoices found for the selected period'
+                        );
                         return;
                       }
                       const periodLabels: Record<string, string> = {
                         day: (t as any).today || 'Today',
                         week: (t as any).thisWeek || 'This Week',
                         month: (t as any).thisMonth || 'This Month',
-                        all: (t as any).allTime || 'All Time'
+                        all: (t as any).allTime || 'All Time',
                       };
-                      const branchLabel = invoiceExportBranch ? `_${locations.find(l => l.id === invoiceExportBranch)?.name.replace(/\s+/g, '_') || ''}` : '';
+                      const branchLabel = invoiceExportBranch
+                        ? `_${locations.find((l) => l.id === invoiceExportBranch)?.name.replace(/\s+/g, '_') || ''}`
+                        : '';
                       const filename = `invoices_${invoiceExportPeriod}${branchLabel}_${new Date().toISOString().slice(0, 10)}.xls`;
-                      const fullPeriodLabel = invoiceExportBranch 
-                        ? `${periodLabels[invoiceExportPeriod]} - ${locations.find(l => l.id === invoiceExportBranch)?.name || ''}`
+                      const fullPeriodLabel = invoiceExportBranch
+                        ? `${periodLabels[invoiceExportPeriod]} - ${locations.find((l) => l.id === invoiceExportBranch)?.name || ''}`
                         : periodLabels[invoiceExportPeriod];
                       exportInvoicesToExcel(filename, transactions, fullPeriodLabel);
                     } catch (err: any) {
-                      setInvoiceExportError((t as any).exportFailed || 'Failed to export invoices: ' + err.message);
+                      setInvoiceExportError(
+                        (t as any).exportFailed || 'Failed to export invoices: ' + err.message
+                      );
                     } finally {
                       setInvoiceExportLoading(false);
                     }
@@ -3332,7 +4120,8 @@ NOTIFY pgrst, 'reload schema';
 
               <div className="pt-4 border-t border-orange-100">
                 <p className="text-xs text-stone-500">
-                  {(t as any).exportInvoicesNote || 'Exported file includes all invoice data: invoice #, date, time, cashier, cashier ID, customer ID, customer name, location ID, branch, items, subtotal, VAT, discount %, discount amount, total, payment method, payment breakdown, card reference, received amount, change amount, return ID, and status.'}
+                  {(t as any).exportInvoicesNote ||
+                    'Exported file includes all invoice data: invoice #, date, time, cashier, cashier ID, customer ID, customer name, location ID, branch, items, subtotal, VAT, discount %, discount amount, total, payment method, payment breakdown, card reference, received amount, change amount, return ID, and status.'}
                 </p>
               </div>
             </div>
@@ -3343,7 +4132,9 @@ NOTIFY pgrst, 'reload schema';
       {activeSubTab === 'invoices' && !user?.permissions.includes('can_export_invoices') && (
         <div className="bg-red-50 border border-red-200 rounded-2xl p-6 text-red-700">
           <p className="font-bold">{(t as any).accessDenied || 'Access Denied'}</p>
-          <p className="text-sm">{(t as any).noExportPermission || 'You do not have permission to export invoices.'}</p>
+          <p className="text-sm">
+            {(t as any).noExportPermission || 'You do not have permission to export invoices.'}
+          </p>
         </div>
       )}
 
@@ -3357,7 +4148,9 @@ NOTIFY pgrst, 'reload schema';
                 </div>
                 <div>
                   <h3 className="text-2xl font-black">{t.branches || 'Branches'}</h3>
-                  <p className="text-sm text-stone-500">{t.manageBranchesDesc || 'Manage your branch locations'}</p>
+                  <p className="text-sm text-stone-500">
+                    {t.manageBranchesDesc || 'Manage your branch locations'}
+                  </p>
                 </div>
               </div>
             </div>
@@ -3366,18 +4159,27 @@ NOTIFY pgrst, 'reload schema';
               {locations.length === 0 ? (
                 <p className="text-stone-500">{(t as any).noBranchesYet || 'No branches found'}</p>
               ) : (
-                locations.map(loc => (
-                  <div key={loc.id} className="flex items-center justify-between p-4 bg-orange-50 rounded-2xl">
+                locations.map((loc) => (
+                  <div
+                    key={loc.id}
+                    className="flex items-center justify-between p-4 bg-orange-50 rounded-2xl"
+                  >
                     <div>
                       <p className="font-bold text-black">{loc.name}</p>
                       <p className="text-xs text-stone-500">{loc.address || '-'}</p>
                     </div>
                     <button
                       onClick={async () => {
-                        if (!confirm((t as any).confirmDeleteBranch || `Delete branch "${loc.name}"? This cannot be undone.`)) return;
+                        if (
+                          !confirm(
+                            (t as any).confirmDeleteBranch ||
+                              `Delete branch "${loc.name}"? This cannot be undone.`
+                          )
+                        )
+                          return;
                         try {
                           await supabase.from('locations').delete().eq('id', loc.id);
-                          setLocations(locations.filter(l => l.id !== loc.id));
+                          setLocations(locations.filter((l) => l.id !== loc.id));
                         } catch (err) {
                           console.error('Failed to delete branch:', err);
                           alert((t as any).failedToDeleteBranch || 'Failed to delete branch');
@@ -3399,56 +4201,141 @@ NOTIFY pgrst, 'reload schema';
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-white/60 backdrop-blur-md">
           <div className="bg-white rounded-[32px] max-w-3xl w-full p-8 shadow-2xl max-h-[90vh] overflow-y-auto custom-scrollbar">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-black">{editingGreenBeanId ? (t.edit || 'Edit') : (t.addStock || 'Add')} {t.greenBeanType || 'Green Bean'}</h3>
-              <button onClick={() => setShowGreenBeanModal(false)} className="p-2 rounded-full text-black"><X size={22} /></button>
+              <h3 className="text-xl font-black">
+                {editingGreenBeanId ? t.edit || 'Edit' : t.addStock || 'Add'}{' '}
+                {t.greenBeanType || 'Green Bean'}
+              </h3>
+              <button
+                onClick={() => setShowGreenBeanModal(false)}
+                className="p-2 rounded-full text-black"
+              >
+                <X size={22} />
+              </button>
             </div>
             <form onSubmit={handleSaveGreenBean} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] font-black uppercase">{t.origin}</label>
-                  <input value={greenBeanForm.origin} onChange={e => setGreenBeanForm({ ...greenBeanForm, origin: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold" required />
+                  <input
+                    value={greenBeanForm.origin}
+                    onChange={(e) => setGreenBeanForm({ ...greenBeanForm, origin: e.target.value })}
+                    className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold"
+                    required
+                  />
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase">{t.variety}</label>
-                  <input value={greenBeanForm.variety} onChange={e => setGreenBeanForm({ ...greenBeanForm, variety: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold" required />
+                  <input
+                    value={greenBeanForm.variety}
+                    onChange={(e) =>
+                      setGreenBeanForm({ ...greenBeanForm, variety: e.target.value })
+                    }
+                    className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold"
+                    required
+                  />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase">{t.processingMethod || 'Processing Method'}</label>
-                  <input value={greenBeanForm.processing_method} onChange={e => setGreenBeanForm({ ...greenBeanForm, processing_method: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold" />
+                  <label className="text-[10px] font-black uppercase">
+                    {t.processingMethod || 'Processing Method'}
+                  </label>
+                  <input
+                    value={greenBeanForm.processing_method}
+                    onChange={(e) =>
+                      setGreenBeanForm({ ...greenBeanForm, processing_method: e.target.value })
+                    }
+                    className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold"
+                  />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase">{t.elevation || 'Elevation'}</label>
-                  <input value={greenBeanForm.elevation} onChange={e => setGreenBeanForm({ ...greenBeanForm, elevation: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold" />
+                  <label className="text-[10px] font-black uppercase">
+                    {t.elevation || 'Elevation'}
+                  </label>
+                  <input
+                    value={greenBeanForm.elevation}
+                    onChange={(e) =>
+                      setGreenBeanForm({ ...greenBeanForm, elevation: e.target.value })
+                    }
+                    className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold"
+                  />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase">{t.quantity} ({t.openingStock || 'Opening Stock'})</label>
-                  <input type="number" step="0.01" min="0" value={greenBeanForm.quantity} onChange={e => setGreenBeanForm({ ...greenBeanForm, quantity: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-mono font-bold" />
+                  <label className="text-[10px] font-black uppercase">
+                    {t.quantity} ({t.openingStock || 'Opening Stock'})
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={greenBeanForm.quantity}
+                    onChange={(e) =>
+                      setGreenBeanForm({ ...greenBeanForm, quantity: e.target.value })
+                    }
+                    className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-mono font-bold"
+                  />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase">{t.unitOfMeasure || 'Unit'}</label>
-                  <select value={greenBeanForm.unit} onChange={e => setGreenBeanForm({ ...greenBeanForm, unit: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold">
+                  <label className="text-[10px] font-black uppercase">
+                    {t.unitOfMeasure || 'Unit'}
+                  </label>
+                  <select
+                    value={greenBeanForm.unit}
+                    onChange={(e) => setGreenBeanForm({ ...greenBeanForm, unit: e.target.value })}
+                    className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold"
+                  >
                     <option value="kg">kg</option>
                     <option value="lb">lb</option>
                     <option value="g">g</option>
                   </select>
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase">{t.costPerKg || 'Cost per kg'}</label>
-                  <input type="number" step="0.01" min="0" value={greenBeanForm.cost_per_kg} onChange={e => setGreenBeanForm({ ...greenBeanForm, cost_per_kg: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-mono font-bold" />
+                  <label className="text-[10px] font-black uppercase">
+                    {t.costPerKg || 'Cost per kg'}
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={greenBeanForm.cost_per_kg}
+                    onChange={(e) =>
+                      setGreenBeanForm({ ...greenBeanForm, cost_per_kg: e.target.value })
+                    }
+                    className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-mono font-bold"
+                  />
                 </div>
                 <div>
                   <label className="text-[10px] font-black uppercase">{t.supplier}</label>
-                  <input value={greenBeanForm.supplier} onChange={e => setGreenBeanForm({ ...greenBeanForm, supplier: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold" />
+                  <input
+                    value={greenBeanForm.supplier}
+                    onChange={(e) =>
+                      setGreenBeanForm({ ...greenBeanForm, supplier: e.target.value })
+                    }
+                    className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold"
+                  />
                 </div>
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase">{t.notes || 'Notes'}</label>
-                <textarea value={greenBeanForm.notes} onChange={e => setGreenBeanForm({ ...greenBeanForm, notes: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold h-20" />
+                <textarea
+                  value={greenBeanForm.notes}
+                  onChange={(e) => setGreenBeanForm({ ...greenBeanForm, notes: e.target.value })}
+                  className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold h-20"
+                />
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => setShowGreenBeanModal(false)} className="px-4 py-2 rounded-xl font-bold border border-orange-100">{t.cancel}</button>
-                <button type="submit" disabled={isSaving} className="px-5 py-2 rounded-xl font-bold bg-orange-600 text-white">
-                  {isSaving ? <Loader2 size={16} className="inline animate-spin" /> : null} {editingGreenBeanId ? t.saveChanges : (t.addStock || 'Add')}
+                <button
+                  type="button"
+                  onClick={() => setShowGreenBeanModal(false)}
+                  className="px-4 py-2 rounded-xl font-bold border border-orange-100"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="px-5 py-2 rounded-xl font-bold bg-orange-600 text-white"
+                >
+                  {isSaving ? <Loader2 size={16} className="inline animate-spin" /> : null}{' '}
+                  {editingGreenBeanId ? t.saveChanges : t.addStock || 'Add'}
                 </button>
               </div>
             </form>
@@ -3461,39 +4348,84 @@ NOTIFY pgrst, 'reload schema';
           <div className="bg-white rounded-[28px] max-w-lg w-full p-6 shadow-2xl">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-black">{t.quickStockUpdate || 'Quick Stock Update'}</h3>
-              <button onClick={() => setShowAdjustmentModal(false)} className="p-2 rounded-full text-black"><X size={20} /></button>
+              <button
+                onClick={() => setShowAdjustmentModal(false)}
+                className="p-2 rounded-full text-black"
+              >
+                <X size={20} />
+              </button>
             </div>
             <div className="text-xs font-bold text-black mb-4">
-              {(selectedBeanForAdjustment.origin || '-')} - {(selectedBeanForAdjustment.variety || '-')} • {toNumber(selectedBeanForAdjustment.quantity).toFixed(2)} kg
+              {selectedBeanForAdjustment.origin || '-'} - {selectedBeanForAdjustment.variety || '-'}{' '}
+              • {toNumber(selectedBeanForAdjustment.quantity).toFixed(2)} kg
             </div>
             <form onSubmit={handleQuickAdjustment} className="space-y-4">
               <div>
-                <label className="text-[10px] font-black uppercase">{t.operationType || 'Operation'}</label>
+                <label className="text-[10px] font-black uppercase">
+                  {t.operationType || 'Operation'}
+                </label>
                 <div className="mt-1 flex gap-2">
-                  <button type="button" onClick={() => setAdjustmentForm({ ...adjustmentForm, mode: 'IN' })} className={`flex-1 py-2 rounded-xl font-black text-xs ${adjustmentForm.mode === 'IN' ? 'bg-green-600 text-white' : 'bg-white border border-orange-100'}`}>{t.increaseStock || 'Increase'}</button>
-                  <button type="button" onClick={() => setAdjustmentForm({ ...adjustmentForm, mode: 'OUT' })} className={`flex-1 py-2 rounded-xl font-black text-xs ${adjustmentForm.mode === 'OUT' ? 'bg-red-600 text-white' : 'bg-white border border-orange-100'}`}>{t.decreaseStock || 'Decrease'}</button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustmentForm({ ...adjustmentForm, mode: 'IN' })}
+                    className={`flex-1 py-2 rounded-xl font-black text-xs ${adjustmentForm.mode === 'IN' ? 'bg-green-600 text-white' : 'bg-white border border-orange-100'}`}
+                  >
+                    {t.increaseStock || 'Increase'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAdjustmentForm({ ...adjustmentForm, mode: 'OUT' })}
+                    className={`flex-1 py-2 rounded-xl font-black text-xs ${adjustmentForm.mode === 'OUT' ? 'bg-red-600 text-white' : 'bg-white border border-orange-100'}`}
+                  >
+                    {t.decreaseStock || 'Decrease'}
+                  </button>
                 </div>
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase">{t.quantity}</label>
-                <input type="number" step="0.01" min="0" value={adjustmentForm.quantity} onChange={e => setAdjustmentForm({ ...adjustmentForm, quantity: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-mono font-bold" required />
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={adjustmentForm.quantity}
+                  onChange={(e) =>
+                    setAdjustmentForm({ ...adjustmentForm, quantity: e.target.value })
+                  }
+                  className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-mono font-bold"
+                  required
+                />
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase">{t.reason || 'Reason'}</label>
-                <select value={adjustmentForm.reason} onChange={e => setAdjustmentForm({ ...adjustmentForm, reason: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold">
+                <select
+                  value={adjustmentForm.reason}
+                  onChange={(e) => setAdjustmentForm({ ...adjustmentForm, reason: e.target.value })}
+                  className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold"
+                >
                   <option value="DAMAGE">{t.damage || 'Damage'}</option>
                   <option value="LOSS">{t.loss || 'Loss'}</option>
-                  <option value="COUNT_CORRECTION">{t.countCorrection || 'Count Correction'}</option>
+                  <option value="COUNT_CORRECTION">
+                    {t.countCorrection || 'Count Correction'}
+                  </option>
                   <option value="TRANSFER">{t.transferOrder || 'Transfer'}</option>
                   <option value="OTHER">{t.other}</option>
                 </select>
               </div>
               <div>
                 <label className="text-[10px] font-black uppercase">{t.notes || 'Notes'}</label>
-                <input value={adjustmentForm.note} onChange={e => setAdjustmentForm({ ...adjustmentForm, note: e.target.value })} className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold" />
+                <input
+                  value={adjustmentForm.note}
+                  onChange={(e) => setAdjustmentForm({ ...adjustmentForm, note: e.target.value })}
+                  className="mt-1 w-full bg-white border border-orange-100 rounded-xl px-4 py-3 font-bold"
+                />
               </div>
-              <button type="submit" disabled={isSaving} className="w-full py-3 rounded-xl font-black bg-orange-600 text-white">
-                {isSaving ? <Loader2 size={16} className="inline animate-spin" /> : null} {t.saveChanges}
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="w-full py-3 rounded-xl font-black bg-orange-600 text-white"
+              >
+                {isSaving ? <Loader2 size={16} className="inline animate-spin" /> : null}{' '}
+                {t.saveChanges}
               </button>
             </form>
           </div>
@@ -3502,23 +4434,59 @@ NOTIFY pgrst, 'reload schema';
 
       {showProductModal && (
         <div className="fixed inset-0 z-[160] flex items-center justify-center p-4 bg-white/60 backdrop-blur-md">
-          <div className="bg-white  rounded-[40px] max-w-5xl w-full p-6 sm:p-8 md:p-12 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+          <div
+            className="bg-white  rounded-[40px] max-w-5xl w-full p-6 sm:p-8 md:p-12 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar"
+            dir={lang === 'ar' ? 'rtl' : 'ltr'}
+          >
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8 sm:mb-10 border-b border-orange-50 pb-6 sm:pb-8">
               <div className="flex items-center gap-4">
-                <div className="p-4 bg-white  text-black  rounded-2xl"><Tag size={32} /></div>
-                <h3 className="text-xl sm:text-2xl font-bold">{editingId ? t.editProduct : t.newProduct}</h3>
+                <div className="p-4 bg-white  text-black  rounded-2xl">
+                  <Tag size={32} />
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold">
+                  {editingId ? t.editProduct : t.newProduct}
+                </h3>
               </div>
-              <button onClick={() => setShowProductModal(false)} className="p-2  rounded-full transition-colors text-black"><X size={36} /></button>
+              <button
+                onClick={() => setShowProductModal(false)}
+                className="p-2  rounded-full transition-colors text-black"
+              >
+                <X size={36} />
+              </button>
             </div>
 
             <form onSubmit={handleSaveProduct} className="space-y-10">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 sm:gap-12">
                 <div className="space-y-8">
                   <div className="flex flex-wrap bg-orange-50 p-1 rounded-2xl w-full sm:w-fit gap-2 overflow-x-auto no-scrollbar">
-                    <button type="button" onClick={() => setProductForm({ ...productForm, type: 'PACKAGED_COFFEE' })} className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'PACKAGED_COFFEE' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}>{t.packaged}</button>
-                    <button type="button" onClick={() => setProductForm({ ...productForm, type: 'BEVERAGE' })} className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'BEVERAGE' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}>{t.beverage}</button>
-                    <button type="button" onClick={() => setProductForm({ ...productForm, type: 'ACCESSORY' })} className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'ACCESSORY' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}>{t.accessories}</button>
-                    <button type="button" onClick={() => setProductForm({ ...productForm, type: 'RAW_MATERIAL' })} className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'RAW_MATERIAL' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}>{t.rawMaterials}</button>
+                    <button
+                      type="button"
+                      onClick={() => setProductForm({ ...productForm, type: 'PACKAGED_COFFEE' })}
+                      className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'PACKAGED_COFFEE' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}
+                    >
+                      {t.packaged}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProductForm({ ...productForm, type: 'BEVERAGE' })}
+                      className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'BEVERAGE' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}
+                    >
+                      {t.beverage}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProductForm({ ...productForm, type: 'ACCESSORY' })}
+                      className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'ACCESSORY' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}
+                    >
+                      {t.accessories}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setProductForm({ ...productForm, type: 'RAW_MATERIAL' })}
+                      className={`px-6 py-3 rounded-xl font-bold text-xs transition-all ${productForm.type === 'RAW_MATERIAL' ? 'bg-white  text-black  shadow-sm' : 'text-black'}`}
+                    >
+                      {t.rawMaterials}
+                    </button>
                   </div>
 
                   <div className="space-y-3">
@@ -3527,53 +4495,82 @@ NOTIFY pgrst, 'reload schema';
                         type="checkbox"
                         id="allBranches"
                         checked={productForm.allBranches}
-                        onChange={e => setProductForm({ ...productForm, allBranches: e.target.checked, selectedBranchIds: e.target.checked ? [] : productForm.selectedBranchIds })}
+                        onChange={(e) =>
+                          setProductForm({
+                            ...productForm,
+                            allBranches: e.target.checked,
+                            selectedBranchIds: e.target.checked
+                              ? []
+                              : productForm.selectedBranchIds,
+                          })
+                        }
                         className="h-5 w-5 accent-orange-600"
                       />
-                      <label htmlFor="allBranches" className="text-xs font-black text-black uppercase tracking-widest">{t.allBranches || 'All Branches'}</label>
+                      <label
+                        htmlFor="allBranches"
+                        className="text-xs font-black text-black uppercase tracking-widest"
+                      >
+                        {t.allBranches || 'All Branches'}
+                      </label>
                     </div>
                     {!productForm.allBranches && (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto custom-scrollbar p-3 bg-orange-50 rounded-2xl">
-                        {locations.filter(l => l.type === 'BRANCH' || l.is_roastery).map(loc => (
-                          <label key={loc.id} className="flex items-center gap-2 text-xs font-bold cursor-pointer hover:bg-orange-100 p-2 rounded-lg transition-colors">
-                            <input
-                              type="checkbox"
-                              checked={productForm.selectedBranchIds.includes(loc.id)}
-                              onChange={e => {
-                                const newIds = e.target.checked
-                                  ? [...productForm.selectedBranchIds, loc.id]
-                                  : productForm.selectedBranchIds.filter(id => id !== loc.id);
-                                setProductForm({ ...productForm, selectedBranchIds: newIds });
-                              }}
-                              className="h-4 w-4 accent-orange-600"
-                            />
-                            <span className="truncate">{loc.name}</span>
-                          </label>
-                        ))}
+                        {locations
+                          .filter((l) => l.type === 'BRANCH' || l.is_roastery)
+                          .map((loc) => (
+                            <label
+                              key={loc.id}
+                              className="flex items-center gap-2 text-xs font-bold cursor-pointer hover:bg-orange-100 p-2 rounded-lg transition-colors"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={productForm.selectedBranchIds.includes(loc.id)}
+                                onChange={(e) => {
+                                  const newIds = e.target.checked
+                                    ? [...productForm.selectedBranchIds, loc.id]
+                                    : productForm.selectedBranchIds.filter((id) => id !== loc.id);
+                                  setProductForm({ ...productForm, selectedBranchIds: newIds });
+                                }}
+                                className="h-4 w-4 accent-orange-600"
+                              />
+                              <span className="truncate">{loc.name}</span>
+                            </label>
+                          ))}
                       </div>
                     )}
                     {!productForm.allBranches && productForm.selectedBranchIds.length === 0 && (
-                      <p className="text-xs text-red-500 font-bold">{t.selectAtLeastOneBranch || 'Select at least one branch'}</p>
+                      <p className="text-xs text-red-500 font-bold">
+                        {t.selectAtLeastOneBranch || 'Select at least one branch'}
+                      </p>
                     )}
-                    
+
                     {/* Stock per branch inputs */}
                     <div className="space-y-2 mt-4">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.initialStock || 'Initial Stock by Branch'}</label>
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.initialStock || 'Initial Stock by Branch'}
+                      </label>
                       <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar p-3 bg-orange-50 rounded-2xl">
-                        {(productForm.allBranches 
-                          ? locations.filter(l => l.type === 'BRANCH' || l.is_roastery) 
-                          : locations.filter(l => productForm.selectedBranchIds.includes(l.id))
-                        ).map(loc => (
+                        {(productForm.allBranches
+                          ? locations.filter((l) => l.type === 'BRANCH' || l.is_roastery)
+                          : locations.filter((l) => productForm.selectedBranchIds.includes(l.id))
+                        ).map((loc) => (
                           <div key={loc.id} className="flex flex-col gap-1">
-                            <span className="text-xs font-bold text-gray-700 truncate">{loc.name}</span>
+                            <span className="text-xs font-bold text-gray-700 truncate">
+                              {loc.name}
+                            </span>
                             <input
                               type="number"
                               min="0"
                               value={productForm.branchStock[loc.id] || '0'}
-                              onChange={e => setProductForm({
-                                ...productForm,
-                                branchStock: { ...productForm.branchStock, [loc.id]: e.target.value }
-                              })}
+                              onChange={(e) =>
+                                setProductForm({
+                                  ...productForm,
+                                  branchStock: {
+                                    ...productForm.branchStock,
+                                    [loc.id]: e.target.value,
+                                  },
+                                })
+                              }
                               className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm font-mono"
                               placeholder="0"
                             />
@@ -3584,63 +4581,155 @@ NOTIFY pgrst, 'reload schema';
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.productName}</label>
-                    <input type="text" required value={productForm.name} onChange={e => setProductForm({ ...productForm, name: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600" />
+                    <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                      {t.productName}
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={productForm.name}
+                      onChange={(e) => setProductForm({ ...productForm, name: e.target.value })}
+                      className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
+                    />
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.mainCategory}</label>
-                      <input type="text" value={productForm.mainCategory} onChange={e => setProductForm({ ...productForm, mainCategory: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold" />
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.mainCategory}
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.mainCategory}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, mainCategory: e.target.value })
+                        }
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                      />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.subCategory}</label>
-                      <input type="text" value={productForm.subCategory} onChange={e => setProductForm({ ...productForm, subCategory: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold" />
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.subCategory}
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.subCategory}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, subCategory: e.target.value })
+                        }
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                      />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.baseProduct}</label>
-                      <select value={productForm.variantOf} onChange={e => setProductForm({ ...productForm, variantOf: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.baseProduct}
+                      </label>
+                      <select
+                        value={productForm.variantOf}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, variantOf: e.target.value })
+                        }
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                      >
                         <option value="">{t.baseProduct}</option>
-                        {products.filter(p => p.id !== editingId).map(p => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
+                        {products
+                          .filter((p) => p.id !== editingId)
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.variantLabel}</label>
-                      <input type="text" value={productForm.variantLabel} onChange={e => setProductForm({ ...productForm, variantLabel: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold" />
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.variantLabel}
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.variantLabel}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, variantLabel: e.target.value })
+                        }
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                      />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.variantSize}</label>
-                      <input type="text" value={productForm.variantSize} onChange={e => setProductForm({ ...productForm, variantSize: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold" />
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.variantSize}
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.variantSize}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, variantSize: e.target.value })
+                        }
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                      />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.variantFlavor}</label>
-                      <input type="text" value={productForm.variantFlavor} onChange={e => setProductForm({ ...productForm, variantFlavor: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold" />
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.variantFlavor}
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.variantFlavor}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, variantFlavor: e.target.value })
+                        }
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                      />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.sellingPrice}</label>
-                      <input type="number" step="0.01" required value={productForm.basePrice} onChange={e => setProductForm({ ...productForm, basePrice: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold text-black " />
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.sellingPrice}
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        required
+                        value={productForm.basePrice}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, basePrice: e.target.value })
+                        }
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono font-bold text-black "
+                      />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.imageUrl}</label>
-                      <input type="text" value={productForm.image} onChange={e => setProductForm({ ...productForm, image: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 text-xs font-mono" placeholder="https://..." />
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.imageUrl}
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.image}
+                        onChange={(e) => setProductForm({ ...productForm, image: e.target.value })}
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 text-xs font-mono"
+                        placeholder="https://..."
+                      />
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.unitOfMeasure}</label>
-                      <select value={productForm.unit} onChange={e => setProductForm({ ...productForm, unit: e.target.value as any })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.unitOfMeasure}
+                      </label>
+                      <select
+                        value={productForm.unit}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, unit: e.target.value as any })
+                        }
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                      >
                         <option value="piece">{t.unitPiece}</option>
                         <option value="kg">{t.unitKg}</option>
                         <option value="g">{t.unitG}</option>
@@ -3649,8 +4738,20 @@ NOTIFY pgrst, 'reload schema';
                       </select>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.productStatus}</label>
-                      <select value={productForm.productStatus} onChange={e => setProductForm({ ...productForm, productStatus: e.target.value as any, isActive: e.target.value === 'ACTIVE' })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.productStatus}
+                      </label>
+                      <select
+                        value={productForm.productStatus}
+                        onChange={(e) =>
+                          setProductForm({
+                            ...productForm,
+                            productStatus: e.target.value as any,
+                            isActive: e.target.value === 'ACTIVE',
+                          })
+                        }
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                      >
                         <option value="ACTIVE">{t.statusActive}</option>
                         <option value="DISABLED">{t.statusDisabled}</option>
                         <option value="DISCONTINUED">{t.statusDiscontinued}</option>
@@ -3659,29 +4760,75 @@ NOTIFY pgrst, 'reload schema';
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.perishableProduct}</label>
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.perishableProduct}
+                      </label>
                       <div className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold flex items-center gap-3">
-                        <input type="checkbox" checked={productForm.isPerishable} onChange={e => setProductForm({ ...productForm, isPerishable: e.target.checked })} className="h-5 w-5 accent-orange-600" />
+                        <input
+                          type="checkbox"
+                          checked={productForm.isPerishable}
+                          onChange={(e) =>
+                            setProductForm({ ...productForm, isPerishable: e.target.checked })
+                          }
+                          className="h-5 w-5 accent-orange-600"
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.expiryDate}</label>
-                      <input type="date" value={productForm.expiryDate} onChange={e => setProductForm({ ...productForm, expiryDate: e.target.value })} disabled={!productForm.isPerishable} className={`w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold ${productForm.isPerishable ? '' : 'opacity-60'}`} />
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.expiryDate}
+                      </label>
+                      <input
+                        type="date"
+                        value={productForm.expiryDate}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, expiryDate: e.target.value })
+                        }
+                        disabled={!productForm.isPerishable}
+                        className={`w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold ${productForm.isPerishable ? '' : 'opacity-60'}`}
+                      />
                     </div>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 sm:gap-6">
                     <div className="space-y-2 sm:col-span-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.sku}</label>
-                      <input type="text" value={productForm.sku} onChange={e => setProductForm({ ...productForm, sku: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono text-xs" />
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.sku}
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.sku}
+                        onChange={(e) => setProductForm({ ...productForm, sku: e.target.value })}
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-mono text-xs"
+                      />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.supplier}</label>
-                      <input type="text" value={productForm.supplier} onChange={e => setProductForm({ ...productForm, supplier: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 text-xs font-bold" />
+                      <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                        {t.supplier}
+                      </label>
+                      <input
+                        type="text"
+                        value={productForm.supplier}
+                        onChange={(e) =>
+                          setProductForm({ ...productForm, supplier: e.target.value })
+                        }
+                        className="w-full bg-white  border-none rounded-2xl px-6 py-4 text-xs font-bold"
+                      />
                     </div>
                     <div className="space-y-2 flex items-end">
                       <button
                         type="button"
-                        onClick={() => setProductForm({ ...productForm, sku: `${productForm.name.trim().toUpperCase().replace(/[^A-Z0-9]+/g, '-').replace(/^-|-$/g, '') || 'SKU'}-${Date.now().toString().slice(-6)}` })}
+                        onClick={() =>
+                          setProductForm({
+                            ...productForm,
+                            sku: `${
+                              productForm.name
+                                .trim()
+                                .toUpperCase()
+                                .replace(/[^A-Z0-9]+/g, '-')
+                                .replace(/^-|-$/g, '') || 'SKU'
+                            }-${Date.now().toString().slice(-6)}`,
+                          })
+                        }
                         className="w-full bg-orange-100 text-black  font-bold text-[10px] px-4 py-3 rounded-xl"
                       >
                         {t.generateSku}
@@ -3693,37 +4840,101 @@ NOTIFY pgrst, 'reload schema';
                     <div className="space-y-6">
                       <div className="space-y-4">
                         <div className="flex justify-between items-center border-b border-orange-50 pb-2">
-                          <label className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-2"><FlaskConical size={12} /> {t.beverageRecipe}</label>
-                          <button type="button" onClick={addIngredient} className="text-black  font-bold text-xs flex items-center gap-1"><PlusCircle size={14} /> {t.addIngredient}</button>
+                          <label className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-2">
+                            <FlaskConical size={12} /> {t.beverageRecipe}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={addIngredient}
+                            className="text-black  font-bold text-xs flex items-center gap-1"
+                          >
+                            <PlusCircle size={14} /> {t.addIngredient}
+                          </button>
                         </div>
                         {allIngredients.length === 0 && (
                           <div className="bg-orange-50  rounded-2xl p-4 space-y-3">
-                            <div className="text-xs font-bold text-black">{t.noIngredientsAvailable}</div>
+                            <div className="text-xs font-bold text-black">
+                              {t.noIngredientsAvailable}
+                            </div>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <input type="text" value={newIngredientName} onChange={e => setNewIngredientName(e.target.value)} className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold" placeholder={t.ingredientName} />
-                              <select value={newIngredientUnit} onChange={e => setNewIngredientUnit(e.target.value)} className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold">
+                              <input
+                                type="text"
+                                value={newIngredientName}
+                                onChange={(e) => setNewIngredientName(e.target.value)}
+                                className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold"
+                                placeholder={t.ingredientName}
+                              />
+                              <select
+                                value={newIngredientUnit}
+                                onChange={(e) => setNewIngredientUnit(e.target.value)}
+                                className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold"
+                              >
                                 <option value="g">g</option>
                                 <option value="ml">ml</option>
                                 <option value="unit">unit</option>
                                 <option value="tsp">tsp</option>
                               </select>
-                              <input type="number" value={newIngredientCost} onChange={e => setNewIngredientCost(e.target.value)} className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-mono font-bold" placeholder={t.unitCost} />
+                              <input
+                                type="number"
+                                value={newIngredientCost}
+                                onChange={(e) => setNewIngredientCost(e.target.value)}
+                                className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                                placeholder={t.unitCost}
+                              />
                             </div>
-                            <button type="button" disabled={isAddingIngredient} onClick={handleAddIngredientToInventory} className="bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold">
+                            <button
+                              type="button"
+                              disabled={isAddingIngredient}
+                              onClick={handleAddIngredientToInventory}
+                              className="bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold"
+                            >
                               {isAddingIngredient ? t.saving : t.addIngredientToInventory}
                             </button>
                           </div>
                         )}
                         <div className="space-y-3 max-h-48 overflow-y-auto custom-scrollbar">
                           {recipeIngredients.map((ing, idx) => (
-                            <div key={idx} className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                              <select required value={ing.ingredient_id} onChange={e => updateIngredient(idx, 'ingredient_id', e.target.value)} className="flex-1 bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold">
+                            <div
+                              key={idx}
+                              className="flex flex-col sm:flex-row gap-2 sm:items-center"
+                            >
+                              <select
+                                required
+                                value={ing.ingredient_id}
+                                onChange={(e) =>
+                                  updateIngredient(idx, 'ingredient_id', e.target.value)
+                                }
+                                className="flex-1 bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold"
+                              >
                                 <option value="">{t.selectIngredient}</option>
-                                {allIngredients.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+                                {allIngredients.map((i) => (
+                                  <option key={i.id} value={i.id}>
+                                    {i.name} ({i.unit})
+                                  </option>
+                                ))}
                               </select>
                               <div className="flex items-center gap-2">
-                                <input type="number" required value={ing.amount} onChange={e => updateIngredient(idx, 'amount', parseFloat(e.target.value))} className="w-full sm:w-20 bg-white  border-none rounded-xl px-3 py-2 text-xs font-mono font-bold" placeholder={t.quantityShort} />
-                                <button type="button" onClick={() => setRecipeIngredients(recipeIngredients.filter((_, i) => i !== idx))} className="text-black hover"><MinusCircle size={18} /></button>
+                                <input
+                                  type="number"
+                                  required
+                                  value={ing.amount}
+                                  onChange={(e) =>
+                                    updateIngredient(idx, 'amount', parseFloat(e.target.value))
+                                  }
+                                  className="w-full sm:w-20 bg-white  border-none rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                                  placeholder={t.quantityShort}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setRecipeIngredients(
+                                      recipeIngredients.filter((_, i) => i !== idx)
+                                    )
+                                  }
+                                  className="text-black hover"
+                                >
+                                  <MinusCircle size={18} />
+                                </button>
                               </div>
                             </div>
                           ))}
@@ -3732,15 +4943,48 @@ NOTIFY pgrst, 'reload schema';
 
                       <div className="space-y-4">
                         <div className="flex justify-between items-center border-b border-orange-50 pb-2">
-                          <label className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-2"><PlusCircle size={12} /> {t.paidAddOns}</label>
-                          <button type="button" onClick={addAddOn} className="text-black  font-bold text-xs flex items-center gap-1"><Plus size={14} /> {t.addOption}</button>
+                          <label className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-2">
+                            <PlusCircle size={12} /> {t.paidAddOns}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={addAddOn}
+                            className="text-black  font-bold text-xs flex items-center gap-1"
+                          >
+                            <Plus size={14} /> {t.addOption}
+                          </button>
                         </div>
                         <div className="space-y-3">
                           {productAddOns.map((ao, idx) => (
-                            <div key={ao.id} className="flex gap-2 items-center animate-in slide-in-from-top-1">
-                              <input type="text" placeholder={t.addOnName} value={ao.name} onChange={e => updateAddOn(idx, 'name', e.target.value)} className="flex-1 bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold" />
-                              <input type="number" placeholder={t.price} value={ao.price} onChange={e => updateAddOn(idx, 'price', parseFloat(e.target.value))} className="w-24 bg-white  border-none rounded-xl px-3 py-2 text-xs font-mono font-bold text-black " />
-                              <button type="button" onClick={() => setProductAddOns(productAddOns.filter((_, i) => i !== idx))} className="text-black hover"><Trash2 size={16} /></button>
+                            <div
+                              key={ao.id}
+                              className="flex gap-2 items-center animate-in slide-in-from-top-1"
+                            >
+                              <input
+                                type="text"
+                                placeholder={t.addOnName}
+                                value={ao.name}
+                                onChange={(e) => updateAddOn(idx, 'name', e.target.value)}
+                                className="flex-1 bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold"
+                              />
+                              <input
+                                type="number"
+                                placeholder={t.price}
+                                value={ao.price}
+                                onChange={(e) =>
+                                  updateAddOn(idx, 'price', parseFloat(e.target.value))
+                                }
+                                className="w-24 bg-white  border-none rounded-xl px-3 py-2 text-xs font-mono font-bold text-black "
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setProductAddOns(productAddOns.filter((_, i) => i !== idx))
+                                }
+                                className="text-black hover"
+                              >
+                                <Trash2 size={16} />
+                              </button>
                             </div>
                           ))}
                         </div>
@@ -3750,85 +4994,196 @@ NOTIFY pgrst, 'reload schema';
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.chooseTemplate}</label>
-                          <select required value={productForm.templateId} onChange={e => {
-                            const selected = templates.find(tpl => tpl.id === e.target.value);
-                            setProductForm({ 
-                              ...productForm, 
-                              templateId: e.target.value,
-                              variantSize: selected ? selected.sizeLabel : productForm.variantSize
-                            });
-                          }} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
+                          <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                            {t.chooseTemplate}
+                          </label>
+                          <select
+                            required
+                            value={productForm.templateId}
+                            onChange={(e) => {
+                              const selected = templates.find((tpl) => tpl.id === e.target.value);
+                              setProductForm({
+                                ...productForm,
+                                templateId: e.target.value,
+                                variantSize: selected
+                                  ? selected.sizeLabel
+                                  : productForm.variantSize,
+                              });
+                            }}
+                            className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                          >
                             <option value="">-- {t.chooseTemplate} --</option>
-                            {templates.filter(t => t.isActive).map(tpl => (
-                              <option key={tpl.id} value={tpl.id}>{tpl.sizeLabel} ({tpl.weightInKg}kg)</option>
-                            ))}
+                            {templates
+                              .filter((t) => t.isActive)
+                              .map((tpl) => (
+                                <option key={tpl.id} value={tpl.id}>
+                                  {tpl.sizeLabel} ({tpl.weightInKg}kg)
+                                </option>
+                              ))}
                           </select>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.roastLevel}</label>
-                          <select value={productForm.roastLevel} onChange={e => setProductForm({ ...productForm, roastLevel: e.target.value as RoastingLevel })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
+                          <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                            {t.roastLevel}
+                          </label>
+                          <select
+                            value={productForm.roastLevel}
+                            onChange={(e) =>
+                              setProductForm({
+                                ...productForm,
+                                roastLevel: e.target.value as RoastingLevel,
+                              })
+                            }
+                            className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                          >
                             <option value={RoastingLevel.LIGHT}>{t.light}</option>
                             <option value={RoastingLevel.MEDIUM}>{t.medium}</option>
                             <option value={RoastingLevel.DARK}>{t.dark}</option>
                           </select>
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.selectBean || 'Bean Type'}</label>
-                          <select value={productForm.beanId} onChange={e => setProductForm({ ...productForm, beanId: e.target.value })} className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold">
+                          <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                            {t.selectBean || 'Bean Type'}
+                          </label>
+                          <select
+                            value={productForm.beanId}
+                            onChange={(e) =>
+                              setProductForm({ ...productForm, beanId: e.target.value })
+                            }
+                            className="w-full bg-white  border-none rounded-2xl px-6 py-4 font-bold"
+                          >
                             <option value="">-- {t.selectBean || 'Select Bean'} --</option>
-                            {greenBeans.map(bean => <option key={bean.id} value={bean.id}>{bean.label}</option>)}
+                            {greenBeans.map((bean) => (
+                              <option key={bean.id} value={bean.id}>
+                                {bean.label}
+                              </option>
+                            ))}
                           </select>
                         </div>
                       </div>
-                      {productForm.templateId && (() => {
-                        const selectedTemplate = templates.find(t => t.id === productForm.templateId);
-                        if (!selectedTemplate) return null;
-                        return (
-                          <div className="bg-orange-50 rounded-2xl p-4 flex flex-wrap gap-4 text-xs">
-                            <div><span className="font-bold">Weight:</span> {selectedTemplate.weightInKg} kg</div>
-                            <div><span className="font-bold">Unit Cost:</span> {selectedTemplate.unitCost} QAR</div>
-                            <div><span className="font-bold">Shelf Life:</span> {selectedTemplate.shelf_life_days} days</div>
-                            <div><span className="font-bold">SKU Prefix:</span> {selectedTemplate.skuPrefix || '-'}</div>
-                          </div>
-                        );
-                      })()}
+                      {productForm.templateId &&
+                        (() => {
+                          const selectedTemplate = templates.find(
+                            (t) => t.id === productForm.templateId
+                          );
+                          if (!selectedTemplate) return null;
+                          return (
+                            <div className="bg-orange-50 rounded-2xl p-4 flex flex-wrap gap-4 text-xs">
+                              <div>
+                                <span className="font-bold">Weight:</span>{' '}
+                                {selectedTemplate.weightInKg} kg
+                              </div>
+                              <div>
+                                <span className="font-bold">Unit Cost:</span>{' '}
+                                {selectedTemplate.unitCost} QAR
+                              </div>
+                              <div>
+                                <span className="font-bold">Shelf Life:</span>{' '}
+                                {selectedTemplate.shelf_life_days} days
+                              </div>
+                              <div>
+                                <span className="font-bold">SKU Prefix:</span>{' '}
+                                {selectedTemplate.skuPrefix || '-'}
+                              </div>
+                            </div>
+                          );
+                        })()}
                     </div>
                   ) : null}
                   {productForm.type !== 'BEVERAGE' && (
                     <div className="space-y-4">
                       <div className="flex justify-between items-center border-b border-orange-50 pb-2">
-                        <label className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-2"><Layers size={12} /> {t.bomComponents}</label>
-                        <button type="button" onClick={addBomComponent} className="text-black  font-bold text-xs flex items-center gap-1"><PlusCircle size={14} /> {t.addComponent}</button>
+                        <label className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-2">
+                          <Layers size={12} /> {t.bomComponents}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={addBomComponent}
+                          className="text-black  font-bold text-xs flex items-center gap-1"
+                        >
+                          <PlusCircle size={14} /> {t.addComponent}
+                        </button>
                       </div>
                       {allIngredients.length === 0 && (
                         <div className="bg-orange-50  rounded-2xl p-4 space-y-3">
-                          <div className="text-xs font-bold text-black">{t.noIngredientsAvailable}</div>
+                          <div className="text-xs font-bold text-black">
+                            {t.noIngredientsAvailable}
+                          </div>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <input type="text" value={newIngredientName} onChange={e => setNewIngredientName(e.target.value)} className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold" placeholder={t.ingredientName} />
-                            <select value={newIngredientUnit} onChange={e => setNewIngredientUnit(e.target.value)} className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold">
+                            <input
+                              type="text"
+                              value={newIngredientName}
+                              onChange={(e) => setNewIngredientName(e.target.value)}
+                              className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold"
+                              placeholder={t.ingredientName}
+                            />
+                            <select
+                              value={newIngredientUnit}
+                              onChange={(e) => setNewIngredientUnit(e.target.value)}
+                              className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold"
+                            >
                               <option value="g">g</option>
                               <option value="ml">ml</option>
                               <option value="unit">unit</option>
                               <option value="tsp">tsp</option>
                             </select>
-                            <input type="number" value={newIngredientCost} onChange={e => setNewIngredientCost(e.target.value)} className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-mono font-bold" placeholder={t.unitCost} />
+                            <input
+                              type="number"
+                              value={newIngredientCost}
+                              onChange={(e) => setNewIngredientCost(e.target.value)}
+                              className="bg-white  border-none rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                              placeholder={t.unitCost}
+                            />
                           </div>
-                          <button type="button" disabled={isAddingIngredient} onClick={handleAddIngredientToInventory} className="bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold">
+                          <button
+                            type="button"
+                            disabled={isAddingIngredient}
+                            onClick={handleAddIngredientToInventory}
+                            className="bg-orange-600 text-white px-4 py-2 rounded-xl text-xs font-bold"
+                          >
                             {isAddingIngredient ? t.saving : t.addIngredientToInventory}
                           </button>
                         </div>
                       )}
                       <div className="space-y-3 max-h-48 overflow-y-auto custom-scrollbar">
                         {bomComponents.map((component, idx) => (
-                          <div key={`${component.ingredient_id}-${idx}`} className="flex flex-col sm:flex-row gap-2 sm:items-center">
-                            <select value={component.ingredient_id} onChange={e => updateBomComponent(idx, 'ingredient_id', e.target.value)} className="flex-1 bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold">
+                          <div
+                            key={`${component.ingredient_id}-${idx}`}
+                            className="flex flex-col sm:flex-row gap-2 sm:items-center"
+                          >
+                            <select
+                              value={component.ingredient_id}
+                              onChange={(e) =>
+                                updateBomComponent(idx, 'ingredient_id', e.target.value)
+                              }
+                              className="flex-1 bg-white  border-none rounded-xl px-3 py-2 text-xs font-bold"
+                            >
                               <option value="">{t.selectIngredient}</option>
-                              {allIngredients.map(i => <option key={i.id} value={i.id}>{i.name} ({i.unit})</option>)}
+                              {allIngredients.map((i) => (
+                                <option key={i.id} value={i.id}>
+                                  {i.name} ({i.unit})
+                                </option>
+                              ))}
                             </select>
                             <div className="flex items-center gap-2">
-                              <input type="number" value={component.amount} onChange={e => updateBomComponent(idx, 'amount', parseFloat(e.target.value))} className="w-full sm:w-20 bg-white  border-none rounded-xl px-3 py-2 text-xs font-mono font-bold" placeholder={t.quantityShort} />
-                              <button type="button" onClick={() => setBomComponents(bomComponents.filter((_, i) => i !== idx))} className="text-black hover"><MinusCircle size={18} /></button>
+                              <input
+                                type="number"
+                                value={component.amount}
+                                onChange={(e) =>
+                                  updateBomComponent(idx, 'amount', parseFloat(e.target.value))
+                                }
+                                className="w-full sm:w-20 bg-white  border-none rounded-xl px-3 py-2 text-xs font-mono font-bold"
+                                placeholder={t.quantityShort}
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setBomComponents(bomComponents.filter((_, i) => i !== idx))
+                                }
+                                className="text-black hover"
+                              >
+                                <MinusCircle size={18} />
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -3838,34 +5193,72 @@ NOTIFY pgrst, 'reload schema';
                 </div>
 
                 <div className="bg-orange-600 rounded-[32px] sm:rounded-[40px] p-6 sm:p-10 text-white space-y-6 sm:space-y-8 shadow-xl border border-white/20 relative overflow-hidden">
-                  <h4 className="text-lg sm:text-xl font-black flex items-center gap-3 border-b border-white/20 pb-4 sm:pb-6"><Calculator size={24} className="text-white" /> {t.smartCostAnalysis}</h4>
+                  <h4 className="text-lg sm:text-xl font-black flex items-center gap-3 border-b border-white/20 pb-4 sm:pb-6">
+                    <Calculator size={24} className="text-white" /> {t.smartCostAnalysis}
+                  </h4>
 
                   {productForm.type === 'BEVERAGE' ? (
                     <div className="space-y-6">
                       <div className="bg-white p-6 rounded-3xl border border-white/10">
-                        <span className="text-[10px] font-black text-black uppercase block mb-3">{t.ingredientCostCalculated}</span>
+                        <span className="text-[10px] font-black text-black uppercase block mb-3">
+                          {t.ingredientCostCalculated}
+                        </span>
                         <div className="flex justify-between items-end">
-                          <span className="text-4xl font-black font-mono text-black">{calculatedBeverageCost.toFixed(2)}</span>
-                          <span className="text-xs font-bold text-black/80 mb-1">{t.currency} / {t.cup}</span>
+                          <span className="text-4xl font-black font-mono text-black">
+                            {calculatedBeverageCost.toFixed(2)}
+                          </span>
+                          <span className="text-xs font-bold text-black/80 mb-1">
+                            {t.currency} / {t.cup}
+                          </span>
                         </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div className="p-4 bg-white rounded-2xl border border-white/10">
-                          <span className="text-[8px] font-black text-black uppercase block mb-1">{t.opsCost}</span>
-                          <input type="number" step="0.01" value={productForm.roastingOverhead} onChange={e => setProductForm({ ...productForm, roastingOverhead: e.target.value })} className="w-full bg-transparent border-none p-0 font-bold text-black outline-none" />
+                          <span className="text-[8px] font-black text-black uppercase block mb-1">
+                            {t.opsCost}
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={productForm.roastingOverhead}
+                            onChange={(e) =>
+                              setProductForm({ ...productForm, roastingOverhead: e.target.value })
+                            }
+                            className="w-full bg-transparent border-none p-0 font-bold text-black outline-none"
+                          />
                         </div>
                         <div className="p-4 bg-white rounded-2xl border border-white/10">
-                          <span className="text-[8px] font-black text-black uppercase block mb-1">{t.laborCost}</span>
-                          <input type="number" step="0.01" value={productForm.laborCost} onChange={e => setProductForm({ ...productForm, laborCost: e.target.value })} className="w-full bg-transparent border-none p-0 font-bold text-black outline-none" />
+                          <span className="text-[8px] font-black text-black uppercase block mb-1">
+                            {t.laborCost}
+                          </span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={productForm.laborCost}
+                            onChange={(e) =>
+                              setProductForm({ ...productForm, laborCost: e.target.value })
+                            }
+                            className="w-full bg-transparent border-none p-0 font-bold text-black outline-none"
+                          />
                         </div>
                       </div>
                       <div className="pt-6 border-t border-white/20">
                         <div className="flex justify-between items-center">
-                          <span className="text-sm font-bold text-white/70 uppercase tracking-widest">{t.expectedMargin}</span>
+                          <span className="text-sm font-bold text-white/70 uppercase tracking-widest">
+                            {t.expectedMargin}
+                          </span>
                           <span className="text-4xl font-black text-white">
                             {parseFloat(productForm.basePrice) > 0
-                              ? (((parseFloat(productForm.basePrice) - (calculatedBeverageCost + parseFloat(productForm.laborCost) + parseFloat(productForm.roastingOverhead))) / parseFloat(productForm.basePrice)) * 100).toFixed(0)
-                              : '0'}%
+                              ? (
+                                  ((parseFloat(productForm.basePrice) -
+                                    (calculatedBeverageCost +
+                                      parseFloat(productForm.laborCost) +
+                                      parseFloat(productForm.roastingOverhead))) /
+                                    parseFloat(productForm.basePrice)) *
+                                  100
+                                ).toFixed(0)
+                              : '0'}
+                            %
                           </span>
                         </div>
                       </div>
@@ -3873,17 +5266,50 @@ NOTIFY pgrst, 'reload schema';
                   ) : (
                     <div className="space-y-6">
                       <div className="space-y-2">
-                        <label className="text-[10px] font-black text-white/70 uppercase tracking-widest">{t.greenBeanCost}</label>
-                        <input type="number" step="0.01" value={productForm.estimatedGreenBeanCost} onChange={e => setProductForm({ ...productForm, estimatedGreenBeanCost: e.target.value })} className="w-full bg-white border-none rounded-2xl px-6 py-4 font-mono font-bold text-black outline-none focus:ring-2 focus:ring-white/50" />
+                        <label className="text-[10px] font-black text-white/70 uppercase tracking-widest">
+                          {t.greenBeanCost}
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={productForm.estimatedGreenBeanCost}
+                          onChange={(e) =>
+                            setProductForm({
+                              ...productForm,
+                              estimatedGreenBeanCost: e.target.value,
+                            })
+                          }
+                          className="w-full bg-white border-none rounded-2xl px-6 py-4 font-mono font-bold text-black outline-none focus:ring-2 focus:ring-white/50"
+                        />
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black text-white/70 uppercase tracking-widest">{t.laborCost}</label>
-                          <input type="number" step="0.01" value={productForm.laborCost} onChange={e => setProductForm({ ...productForm, laborCost: e.target.value })} className="w-full bg-white border-none rounded-2xl px-6 py-4 font-mono font-bold text-black outline-none focus:ring-2 focus:ring-white/50" />
+                          <label className="text-[10px] font-black text-white/70 uppercase tracking-widest">
+                            {t.laborCost}
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={productForm.laborCost}
+                            onChange={(e) =>
+                              setProductForm({ ...productForm, laborCost: e.target.value })
+                            }
+                            className="w-full bg-white border-none rounded-2xl px-6 py-4 font-mono font-bold text-black outline-none focus:ring-2 focus:ring-white/50"
+                          />
                         </div>
                         <div className="space-y-2">
-                          <label className="text-[10px] font-black text-white/70 uppercase tracking-widest">{t.opsCost}</label>
-                          <input type="number" step="0.01" value={productForm.roastingOverhead} onChange={e => setProductForm({ ...productForm, roastingOverhead: e.target.value })} className="w-full bg-white border-none rounded-2xl px-6 py-4 font-mono font-bold text-black outline-none focus:ring-2 focus:ring-white/50" />
+                          <label className="text-[10px] font-black text-white/70 uppercase tracking-widest">
+                            {t.opsCost}
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={productForm.roastingOverhead}
+                            onChange={(e) =>
+                              setProductForm({ ...productForm, roastingOverhead: e.target.value })
+                            }
+                            className="w-full bg-white border-none rounded-2xl px-6 py-4 font-mono font-bold text-black outline-none focus:ring-2 focus:ring-white/50"
+                          />
                         </div>
                       </div>
                     </div>
@@ -3892,9 +5318,20 @@ NOTIFY pgrst, 'reload schema';
               </div>
 
               <div className="pt-10 flex flex-col sm:flex-row gap-4 sm:gap-6 border-t border-orange-50 ">
-                <button type="button" onClick={() => setShowProductModal(false)} className="flex-1 py-4 sm:py-5 font-black text-black uppercase tracking-widest hover">{t.cancel}</button>
-                <button type="submit" disabled={isSaving} className="flex-[3] bg-orange-600 text-white py-4 sm:py-5 rounded-[24px] font-black shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 sm:gap-4 text-lg sm:text-xl">
-                  {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Save size={24} />} {editingId ? t.saveChanges : t.addProduct}
+                <button
+                  type="button"
+                  onClick={() => setShowProductModal(false)}
+                  className="flex-1 py-4 sm:py-5 font-black text-black uppercase tracking-widest hover"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex-[3] bg-orange-600 text-white py-4 sm:py-5 rounded-[24px] font-black shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3 sm:gap-4 text-lg sm:text-xl"
+                >
+                  {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Save size={24} />}{' '}
+                  {editingId ? t.saveChanges : t.addProduct}
                 </button>
               </div>
             </form>
@@ -3904,23 +5341,37 @@ NOTIFY pgrst, 'reload schema';
 
       {showTemplateModal && (
         <div className="fixed inset-0 z-[170] flex items-center justify-center p-4 bg-white/60 backdrop-blur-md">
-          <div className="bg-white rounded-[40px] max-w-lg w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+          <div
+            className="bg-white rounded-[40px] max-w-lg w-full p-6 sm:p-8 shadow-2xl animate-in zoom-in-95 max-h-[90vh] overflow-y-auto custom-scrollbar"
+            dir={lang === 'ar' ? 'rtl' : 'ltr'}
+          >
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-8 sm:mb-10 border-b border-orange-50 pb-6 sm:pb-8">
               <div className="flex items-center gap-4">
-                <div className="p-4 bg-orange-50 text-black rounded-2xl"><Package size={32} /></div>
-                <h3 className="text-xl sm:text-2xl font-bold">{editingTemplateId ? t.editTemplate : t.newTemplate}</h3>
+                <div className="p-4 bg-orange-50 text-black rounded-2xl">
+                  <Package size={32} />
+                </div>
+                <h3 className="text-xl sm:text-2xl font-bold">
+                  {editingTemplateId ? t.editTemplate : t.newTemplate}
+                </h3>
               </div>
-              <button onClick={() => setShowTemplateModal(false)} className="p-2 rounded-full transition-colors text-black"><X size={36} /></button>
+              <button
+                onClick={() => setShowTemplateModal(false)}
+                className="p-2 rounded-full transition-colors text-black"
+              >
+                <X size={36} />
+              </button>
             </div>
 
             <form onSubmit={handleSaveTemplate} className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.sizeLabel}</label>
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.sizeLabel}
+                </label>
                 <input
                   type="text"
                   required
                   value={templateForm.sizeLabel}
-                  onChange={e => setTemplateForm({ ...templateForm, sizeLabel: e.target.value })}
+                  onChange={(e) => setTemplateForm({ ...templateForm, sizeLabel: e.target.value })}
                   className="w-full bg-orange-50 border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
                   placeholder="e.g., 250g, 500g, 1kg"
                 />
@@ -3928,25 +5379,31 @@ NOTIFY pgrst, 'reload schema';
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.weightInKg}</label>
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.weightInKg}
+                  </label>
                   <input
                     type="number"
                     step="0.001"
                     required
                     value={templateForm.weightInKg}
-                    onChange={e => setTemplateForm({ ...templateForm, weightInKg: e.target.value })}
+                    onChange={(e) =>
+                      setTemplateForm({ ...templateForm, weightInKg: e.target.value })
+                    }
                     className="w-full bg-orange-50 border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
                     placeholder="0.25"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.unitCost}</label>
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.unitCost}
+                  </label>
                   <input
                     type="number"
                     step="0.01"
                     required
                     value={templateForm.unitCost}
-                    onChange={e => setTemplateForm({ ...templateForm, unitCost: e.target.value })}
+                    onChange={(e) => setTemplateForm({ ...templateForm, unitCost: e.target.value })}
                     className="w-full bg-orange-50 border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
                     placeholder="0.00"
                   />
@@ -3955,22 +5412,30 @@ NOTIFY pgrst, 'reload schema';
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.shelfLifeDays}</label>
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.shelfLifeDays}
+                  </label>
                   <input
                     type="number"
                     required
                     value={templateForm.shelfLifeDays}
-                    onChange={e => setTemplateForm({ ...templateForm, shelfLifeDays: e.target.value })}
+                    onChange={(e) =>
+                      setTemplateForm({ ...templateForm, shelfLifeDays: e.target.value })
+                    }
                     className="w-full bg-orange-50 border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
                     placeholder="180"
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.skuPrefix}</label>
+                  <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                    {t.skuPrefix}
+                  </label>
                   <input
                     type="text"
                     value={templateForm.skuPrefix}
-                    onChange={e => setTemplateForm({ ...templateForm, skuPrefix: e.target.value })}
+                    onChange={(e) =>
+                      setTemplateForm({ ...templateForm, skuPrefix: e.target.value })
+                    }
                     className="w-full bg-orange-50 border-none rounded-2xl px-6 py-4 font-bold outline-none focus:ring-2 focus:ring-orange-600"
                     placeholder="PKG"
                   />
@@ -3978,7 +5443,9 @@ NOTIFY pgrst, 'reload schema';
               </div>
 
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-black uppercase tracking-widest">{t.status}</label>
+                <label className="text-[10px] font-black text-black uppercase tracking-widest">
+                  {t.status}
+                </label>
                 <div className="flex gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
@@ -4002,9 +5469,20 @@ NOTIFY pgrst, 'reload schema';
               </div>
 
               <div className="pt-4 flex flex-col sm:flex-row gap-4 sm:gap-6 border-t border-orange-50">
-                <button type="button" onClick={() => setShowTemplateModal(false)} className="flex-1 py-4 sm:py-5 font-black text-black uppercase tracking-widest hover">{t.cancel}</button>
-                <button type="submit" disabled={isSaving} className="flex-[3] bg-orange-600 text-white py-4 sm:py-5 rounded-[24px] font-black shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3">
-                  {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Save size={24} />} {editingTemplateId ? t.saveChanges : t.addTemplate}
+                <button
+                  type="button"
+                  onClick={() => setShowTemplateModal(false)}
+                  className="flex-1 py-4 sm:py-5 font-black text-black uppercase tracking-widest hover"
+                >
+                  {t.cancel}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSaving}
+                  className="flex-[3] bg-orange-600 text-white py-4 sm:py-5 rounded-[24px] font-black shadow-2xl active:scale-95 transition-all flex items-center justify-center gap-3"
+                >
+                  {isSaving ? <Loader2 className="animate-spin" size={24} /> : <Save size={24} />}{' '}
+                  {editingTemplateId ? t.saveChanges : t.addTemplate}
                 </button>
               </div>
             </form>
@@ -4022,11 +5500,16 @@ NOTIFY pgrst, 'reload schema';
                     <AlertTriangle size={24} />
                   </div>
                   <div>
-                    <h2 className="text-xl font-black text-black">{(t as any).smartCostAnalysis || 'Smart Cost Analysis'}</h2>
+                    <h2 className="text-xl font-black text-black">
+                      {(t as any).smartCostAnalysis || 'Smart Cost Analysis'}
+                    </h2>
                     <p className="text-sm text-stone-500">{costAnalysisData.productName}</p>
                   </div>
                 </div>
-                <button onClick={() => setShowCostAnalysis(false)} className="p-2 hover:bg-stone-100 rounded-full">
+                <button
+                  onClick={() => setShowCostAnalysis(false)}
+                  className="p-2 hover:bg-stone-100 rounded-full"
+                >
                   <X size={24} />
                 </button>
               </div>
@@ -4034,23 +5517,41 @@ NOTIFY pgrst, 'reload schema';
 
             <div className="p-6 space-y-6">
               <div className="bg-orange-50 rounded-2xl p-4">
-                <h3 className="text-sm font-black text-black mb-3">{(t as any).financialOverview || 'Financial Overview'}</h3>
+                <h3 className="text-sm font-black text-black mb-3">
+                  {(t as any).financialOverview || 'Financial Overview'}
+                </h3>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="text-center">
-                    <p className="text-xs text-stone-500 uppercase">{(t as any).totalRevenue || 'Total Revenue'}</p>
-                    <p className="text-xl font-black text-green-600">{costAnalysisData.totalRevenue.toFixed(2)} QAR</p>
+                    <p className="text-xs text-stone-500 uppercase">
+                      {(t as any).totalRevenue || 'Total Revenue'}
+                    </p>
+                    <p className="text-xl font-black text-green-600">
+                      {costAnalysisData.totalRevenue.toFixed(2)} QAR
+                    </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-stone-500 uppercase">{(t as any).totalCost || 'Total Cost'}</p>
-                    <p className="text-xl font-black text-red-600">{costAnalysisData.totalCost.toFixed(2)} QAR</p>
+                    <p className="text-xs text-stone-500 uppercase">
+                      {(t as any).totalCost || 'Total Cost'}
+                    </p>
+                    <p className="text-xl font-black text-red-600">
+                      {costAnalysisData.totalCost.toFixed(2)} QAR
+                    </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-stone-500 uppercase">{(t as any).grossProfit || 'Gross Profit'}</p>
-                    <p className="text-xl font-black text-black">{costAnalysisData.totalProfit.toFixed(2)} QAR</p>
+                    <p className="text-xs text-stone-500 uppercase">
+                      {(t as any).grossProfit || 'Gross Profit'}
+                    </p>
+                    <p className="text-xl font-black text-black">
+                      {costAnalysisData.totalProfit.toFixed(2)} QAR
+                    </p>
                   </div>
                   <div className="text-center">
-                    <p className="text-xs text-stone-500 uppercase">{(t as any).margin || 'Margin'}</p>
-                    <p className={`text-xl font-black ${costAnalysisData.marginPct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className="text-xs text-stone-500 uppercase">
+                      {(t as any).margin || 'Margin'}
+                    </p>
+                    <p
+                      className={`text-xl font-black ${costAnalysisData.marginPct >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                    >
                       {costAnalysisData.marginPct.toFixed(1)}%
                     </p>
                   </div>
@@ -4058,35 +5559,55 @@ NOTIFY pgrst, 'reload schema';
               </div>
 
               <div className="bg-blue-50 rounded-2xl p-4">
-                <h3 className="text-sm font-black text-black mb-3">{(t as any).salesMetrics || 'Sales Metrics (Last 30 Days)'}</h3>
+                <h3 className="text-sm font-black text-black mb-3">
+                  {(t as any).salesMetrics || 'Sales Metrics (Last 30 Days)'}
+                </h3>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   <div>
-                    <p className="text-xs text-stone-500 uppercase">{(t as any).transactions || 'Transactions'}</p>
+                    <p className="text-xs text-stone-500 uppercase">
+                      {(t as any).transactions || 'Transactions'}
+                    </p>
                     <p className="text-2xl font-black">{costAnalysisData.totalTransactions}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-stone-500 uppercase">{(t as any).quantitySold || 'Quantity Sold'}</p>
+                    <p className="text-xs text-stone-500 uppercase">
+                      {(t as any).quantitySold || 'Quantity Sold'}
+                    </p>
                     <p className="text-2xl font-black">{costAnalysisData.totalQuantitySold}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-stone-500 uppercase">{(t as any).lastSold || 'Last Sold'}</p>
-                    <p className="text-lg font-bold">{costAnalysisData.lastSoldDate ? new Date(costAnalysisData.lastSoldDate).toLocaleDateString() : 'Never'}</p>
+                    <p className="text-xs text-stone-500 uppercase">
+                      {(t as any).lastSold || 'Last Sold'}
+                    </p>
+                    <p className="text-lg font-bold">
+                      {costAnalysisData.lastSoldDate
+                        ? new Date(costAnalysisData.lastSoldDate).toLocaleDateString()
+                        : 'Never'}
+                    </p>
                   </div>
                 </div>
               </div>
 
               <div className="bg-purple-50 rounded-2xl p-4">
-                <h3 className="text-sm font-black text-black mb-3">{(t as any).inventoryStatus || 'Inventory Status'}</h3>
+                <h3 className="text-sm font-black text-black mb-3">
+                  {(t as any).inventoryStatus || 'Inventory Status'}
+                </h3>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <p className="text-sm font-bold">{(t as any).currentStock || 'Current Stock'}</p>
-                    <p className={`text-2xl font-black ${costAnalysisData.currentStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    <p className="text-sm font-bold">
+                      {(t as any).currentStock || 'Current Stock'}
+                    </p>
+                    <p
+                      className={`text-2xl font-black ${costAnalysisData.currentStock > 0 ? 'text-green-600' : 'text-red-600'}`}
+                    >
                       {costAnalysisData.currentStock}
                     </p>
                   </div>
                   {costAnalysisData.stockByLocation.length > 0 && (
                     <div className="mt-2 pt-2 border-t border-purple-200">
-                      <p className="text-xs font-bold text-stone-600 mb-1">{(t as any).stockByLocation || 'Stock by Location'}</p>
+                      <p className="text-xs font-bold text-stone-600 mb-1">
+                        {(t as any).stockByLocation || 'Stock by Location'}
+                      </p>
                       {costAnalysisData.stockByLocation.map((loc, idx) => (
                         <div key={idx} className="flex justify-between text-sm">
                           <span>{loc.locationName}</span>
@@ -4100,15 +5621,20 @@ NOTIFY pgrst, 'reload schema';
 
               {costAnalysisData.monthlyTrend.length > 0 && (
                 <div className="bg-stone-50 rounded-2xl p-4">
-                  <h3 className="text-sm font-black text-black mb-3">{(t as any).monthlyRevenueTrend || 'Monthly Revenue Trend'}</h3>
+                  <h3 className="text-sm font-black text-black mb-3">
+                    {(t as any).monthlyRevenueTrend || 'Monthly Revenue Trend'}
+                  </h3>
                   <div className="flex items-end gap-2 h-20">
                     {costAnalysisData.monthlyTrend.slice(-6).map((month, idx) => {
-                      const maxRevenue = Math.max(...costAnalysisData.monthlyTrend.map(m => m.revenue), 1);
+                      const maxRevenue = Math.max(
+                        ...costAnalysisData.monthlyTrend.map((m) => m.revenue),
+                        1
+                      );
                       const height = (month.revenue / maxRevenue) * 100;
                       return (
                         <div key={idx} className="flex flex-col items-center flex-1">
-                          <div 
-                            className="w-full bg-orange-500 rounded-t" 
+                          <div
+                            className="w-full bg-orange-500 rounded-t"
                             style={{ height: `${Math.max(height, 2)}%`, minHeight: '4px' }}
                           />
                           <p className="text-[8px] text-stone-500 mt-1">{month.month.slice(5)}</p>
@@ -4123,12 +5649,29 @@ NOTIFY pgrst, 'reload schema';
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
                   <div>
-                    <h4 className="font-bold text-red-800">{(t as any).warningDeleteProduct || 'Warning: Deleting this Product'}</h4>
+                    <h4 className="font-bold text-red-800">
+                      {(t as any).warningDeleteProduct || 'Warning: Deleting this Product'}
+                    </h4>
                     <ul className="text-sm text-red-700 mt-2 space-y-1">
-                      <li>• {(t as any).deleteWarning1 || 'All sales history for this product will remain in the system'}</li>
-                      <li>• {(t as any).deleteWarning2 || 'Existing inventory stock will be preserved'}</li>
-                      <li>• {(t as any).deleteWarning3 || 'Product will be marked as DISABLED (not permanently deleted)'}</li>
-                      <li>• {(t as any).deleteWarning4 || 'You can re-enable the product later if needed'}</li>
+                      <li>
+                        •{' '}
+                        {(t as any).deleteWarning1 ||
+                          'All sales history for this product will remain in the system'}
+                      </li>
+                      <li>
+                        •{' '}
+                        {(t as any).deleteWarning2 || 'Existing inventory stock will be preserved'}
+                      </li>
+                      <li>
+                        •{' '}
+                        {(t as any).deleteWarning3 ||
+                          'Product will be marked as DISABLED (not permanently deleted)'}
+                      </li>
+                      <li>
+                        •{' '}
+                        {(t as any).deleteWarning4 ||
+                          'You can re-enable the product later if needed'}
+                      </li>
                     </ul>
                   </div>
                 </div>
@@ -4151,18 +5694,22 @@ NOTIFY pgrst, 'reload schema';
                       .update({ product_status: 'DISABLED', is_active: false })
                       .eq('id', costAnalysisData.productId);
                     if (error) throw error;
-                    setProducts(products.map(p => 
-                      p.id === costAnalysisData.productId 
-                        ? { ...p, productStatus: 'DISABLED', isActive: false }
-                        : p
-                    ));
+                    setProducts(
+                      products.map((p) =>
+                        p.id === costAnalysisData.productId
+                          ? { ...p, productStatus: 'DISABLED', isActive: false }
+                          : p
+                      )
+                    );
                     setShowCostAnalysis(false);
                     setShowSuccess(true);
                     setSuccessMsg(t.changesSaved || 'Changes saved');
                     setTimeout(() => setShowSuccess(false), 2000);
                   } catch (error: any) {
                     console.error('Error disabling product:', error);
-                    alert(error?.message || (t as any).disableFailed || 'Failed to disable product');
+                    alert(
+                      error?.message || (t as any).disableFailed || 'Failed to disable product'
+                    );
                   } finally {
                     setIsSaving(false);
                   }

@@ -1,8 +1,29 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { ArrowUpRight, ArrowDownRight, Package, Flame, TrendingUp, AlertTriangle, AlertCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+} from 'recharts';
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  Package,
+  Flame,
+  TrendingUp,
+  AlertTriangle,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+} from 'lucide-react';
 import { useLanguage } from '../App';
+import { useErrorToast } from '../hooks/useErrorToast';
 import { supabase } from '../supabaseClient';
 import { BatchStatus, RoastingBatch, Transaction } from '../types';
 
@@ -21,13 +42,16 @@ const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: any) 
     </div>
     <div className="mt-4">
       <h3 className="text-black text-xs md:text-sm font-medium">{title}</h3>
-      <p className="text-xl md:text-2xl font-bold mt-1 truncate text-black transition-colors">{value}</p>
+      <p className="text-xl md:text-2xl font-bold mt-1 truncate text-black transition-colors">
+        {value}
+      </p>
     </div>
   </div>
 );
 
 const DashboardView: React.FC = () => {
   const { t } = useLanguage();
+  const { showError } = useErrorToast();
   const theme = 'light';
   const [stats, setStats] = useState({
     totalSales: 0,
@@ -35,16 +59,19 @@ const DashboardView: React.FC = () => {
     stockWeight: 0,
     avgWaste: 0,
     recentBatches: [] as RoastingBatch[],
-    lowStockCount: 0
+    lowStockCount: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
 
   const normalizeBatchStatus = (status: string): BatchStatus => {
-    if (status === 'Ready for Packaging' || status === BatchStatus.PACKAGING) return BatchStatus.PACKAGING;
+    if (status === 'Ready for Packaging' || status === BatchStatus.PACKAGING)
+      return BatchStatus.PACKAGING;
     if (status === 'Completed' || status === BatchStatus.COMPLETED) return BatchStatus.COMPLETED;
     if (status === 'QC Rejected' || status === BatchStatus.REJECTED) return BatchStatus.REJECTED;
-    if (status === 'Preparation' || status === BatchStatus.PREPARATION) return BatchStatus.PREPARATION;
-    if (status === 'Roasting' || status === 'In Progress' || status === BatchStatus.ROASTING) return BatchStatus.ROASTING;
+    if (status === 'Preparation' || status === BatchStatus.PREPARATION)
+      return BatchStatus.PREPARATION;
+    if (status === 'Roasting' || status === 'In Progress' || status === BatchStatus.ROASTING)
+      return BatchStatus.ROASTING;
     if (status === 'Cooling' || status === BatchStatus.COOLING) return BatchStatus.COOLING;
     if (status === 'Inspection' || status === BatchStatus.INSPECTION) return BatchStatus.INSPECTION;
     return BatchStatus.PREPARATION;
@@ -65,7 +92,7 @@ const DashboardView: React.FC = () => {
         .from('transactions')
         .select('total')
         .gte('created_at', todayStart.toISOString());
-      
+
       const totalSales = (salesData || []).reduce((acc, curr) => acc + curr.total, 0);
 
       // 2. Fetch Roasting Count (Recent week)
@@ -77,38 +104,46 @@ const DashboardView: React.FC = () => {
         .order('roast_date', { ascending: false });
 
       const recentBatches = (roastData || []).slice(0, 5);
-      const weeklyRoasts = (roastData || []).filter(b => new Date(b.roast_date) >= weekStart).length;
+      const weeklyRoasts = (roastData || []).filter(
+        (b) => new Date(b.roast_date) >= weekStart
+      ).length;
 
       // 3. Fetch Stock Levels
       const { data: gbData } = await supabase.from('green_beans').select('quantity');
       const totalStock = (gbData || []).reduce((acc, curr) => acc + curr.quantity, 0);
-      const lowStockCount = (gbData || []).filter(b => b.quantity < 100).length;
+      const lowStockCount = (gbData || []).filter((b) => b.quantity < 100).length;
 
       // 4. Calculate Waste Ratio
-      const completedRoasts = (roastData || []).filter(b => b.waste_percentage != null);
-      const avgWaste = completedRoasts.length > 0 
-        ? completedRoasts.reduce((acc, curr) => acc + curr.waste_percentage, 0) / completedRoasts.length 
-        : 0;
+      const completedRoasts = (roastData || []).filter((b) => b.waste_percentage != null);
+      const avgWaste =
+        completedRoasts.length > 0
+          ? completedRoasts.reduce((acc, curr) => acc + curr.waste_percentage, 0) /
+            completedRoasts.length
+          : 0;
 
       setStats({
         totalSales,
         roastCount: weeklyRoasts,
         stockWeight: totalStock,
         avgWaste,
-        recentBatches: recentBatches.map(b => ({
-          id: b.id,
-          beanId: b.bean_id,
-          roastDate: b.roast_date,
-          level: b.level,
-          preWeight: b.pre_weight,
-          postWeight: b.post_weight,
-          status: normalizeBatchStatus(b.status),
-          wastePercentage: b.waste_percentage
-        } as any)),
-        lowStockCount
+        recentBatches: recentBatches.map(
+          (b) =>
+            ({
+              id: b.id,
+              beanId: b.bean_id,
+              roastDate: b.roast_date,
+              level: b.level,
+              preWeight: b.pre_weight,
+              postWeight: b.post_weight,
+              status: normalizeBatchStatus(b.status),
+              wastePercentage: b.waste_percentage,
+            }) as any
+        ),
+        lowStockCount,
       });
     } catch (err) {
-      console.error("Dashboard fetch error:", err);
+      console.error('Dashboard fetch error:', err);
+      showError(t.actionFailed || 'Failed to load dashboard data');
     } finally {
       setIsLoading(false);
     }
@@ -175,23 +210,55 @@ const DashboardView: React.FC = () => {
       )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-        <StatCard title={t.totalSales} value={`${stats.totalSales.toLocaleString()} ${t.currency}`} icon={TrendingUp} color="amber" />
-        <StatCard title={t.roastingBatches} value={`${stats.roastCount} ${t.roastingBatches}`} icon={Flame} color="orange" />
-        <StatCard title={t.availableStock} value={`${stats.stockWeight.toLocaleString()} ${t.kg}`} icon={Package} color="blue" />
-        <StatCard title={t.wasteRatio} value={`${stats.avgWaste.toFixed(1)}%`} icon={AlertTriangle} color="red" />
+        <StatCard
+          title={t.totalSales}
+          value={`${stats.totalSales.toLocaleString()} ${t.currency}`}
+          icon={TrendingUp}
+          color="amber"
+        />
+        <StatCard
+          title={t.roastingBatches}
+          value={`${stats.roastCount} ${t.roastingBatches}`}
+          icon={Flame}
+          color="orange"
+        />
+        <StatCard
+          title={t.availableStock}
+          value={`${stats.stockWeight.toLocaleString()} ${t.kg}`}
+          icon={Package}
+          color="blue"
+        />
+        <StatCard
+          title={t.wasteRatio}
+          value={`${stats.avgWaste.toFixed(1)}%`}
+          icon={AlertTriangle}
+          color="red"
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
         <div className="bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-orange-100 transition-colors duration-300">
-          <h3 className="text-base md:text-lg font-bold mb-4 md:mb-6 text-black">{t.weeklyAnalysis}</h3>
+          <h3 className="text-base md:text-lg font-bold mb-4 md:mb-6 text-black">
+            {t.weeklyAnalysis}
+          </h3>
           <div className="h-64 md:h-80">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fed7aa" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={12} tick={{ fill: "#7c2d12" }} />
-                <YAxis axisLine={false} tickLine={false} fontSize={12} tick={{ fill: "#7c2d12" }} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', borderColor: '#fed7aa', borderRadius: '12px' }}
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  fontSize={12}
+                  tick={{ fill: '#7c2d12' }}
+                />
+                <YAxis axisLine={false} tickLine={false} fontSize={12} tick={{ fill: '#7c2d12' }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    borderColor: '#fed7aa',
+                    borderRadius: '12px',
+                  }}
                   itemStyle={{ color: '#7c2d12' }}
                 />
                 <Bar dataKey="sales" fill="#ea580c" radius={[4, 4, 0, 0]} />
@@ -201,18 +268,36 @@ const DashboardView: React.FC = () => {
         </div>
 
         <div className="bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-orange-100 transition-colors duration-300">
-          <h3 className="text-base md:text-lg font-bold mb-4 md:mb-6 text-black">{t.roastingActivity}</h3>
+          <h3 className="text-base md:text-lg font-bold mb-4 md:mb-6 text-black">
+            {t.roastingActivity}
+          </h3>
           <div className="h-64 md:h-80">
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fed7aa" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={12} tick={{ fill: "#7c2d12" }} />
-                <YAxis axisLine={false} tickLine={false} fontSize={12} tick={{ fill: "#7c2d12" }} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#fff', borderColor: '#fed7aa', borderRadius: '12px' }}
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  fontSize={12}
+                  tick={{ fill: '#7c2d12' }}
+                />
+                <YAxis axisLine={false} tickLine={false} fontSize={12} tick={{ fill: '#7c2d12' }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    borderColor: '#fed7aa',
+                    borderRadius: '12px',
+                  }}
                   itemStyle={{ color: '#7c2d12' }}
                 />
-                <Line type="monotone" dataKey="roast" stroke="#ea580c" strokeWidth={3} dot={{ r: 4, fill: '#ea580c', strokeWidth: 2, stroke: '#fff' }} />
+                <Line
+                  type="monotone"
+                  dataKey="roast"
+                  stroke="#ea580c"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#ea580c', strokeWidth: 2, stroke: '#fff' }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -243,14 +328,22 @@ const DashboardView: React.FC = () => {
                       {batch.level}
                     </span>
                   </td>
-                  <td className="px-6 py-4 font-mono text-black text-sm">{batch.postWeight || batch.preWeight} {t.kg}</td>
+                  <td className="px-6 py-4 font-mono text-black text-sm">
+                    {batch.postWeight || batch.preWeight} {t.kg}
+                  </td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                      batch.status === BatchStatus.PACKAGING
-                        ? 'bg-orange-600 text-white' 
-                        : 'bg-white text-black border border-orange-600'
-                    }`}>
-                      {batch.status === BatchStatus.PACKAGING ? t.ready : batch.status === BatchStatus.COMPLETED ? t.completed : t.inProgress}
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                        batch.status === BatchStatus.PACKAGING
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-white text-black border border-orange-600'
+                      }`}
+                    >
+                      {batch.status === BatchStatus.PACKAGING
+                        ? t.ready
+                        : batch.status === BatchStatus.COMPLETED
+                          ? t.completed
+                          : t.inProgress}
                     </span>
                   </td>
                 </tr>

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useLanguage } from '../App';
+import { useErrorToast } from '../hooks/useErrorToast';
 import { User, Mail, Save, Loader2 } from 'lucide-react';
 import { supabase } from '../supabaseClient';
 
 const ProfileView: React.FC = () => {
   const { t } = useLanguage();
   const { user, updateProfile } = useAuth();
+  const { showError } = useErrorToast();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     full_name: user?.name || '',
@@ -40,6 +42,7 @@ const ProfileView: React.FC = () => {
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
       console.error('Error updating profile:', err);
+      showError(err.message || t.actionFailed || 'Failed to update profile');
       setError(err.message || 'Failed to update profile');
     } finally {
       setIsLoading(false);
@@ -99,7 +102,9 @@ const ProfileView: React.FC = () => {
               disabled
               className="w-full px-4 py-3 rounded-2xl bg-gray-100 border border-gray-200 text-gray-500 cursor-not-allowed"
             />
-            <p className="text-xs text-gray-400 mt-1">{t.emailCannotChange || 'Email cannot be changed'}</p>
+            <p className="text-xs text-gray-400 mt-1">
+              {t.emailCannotChange || 'Email cannot be changed'}
+            </p>
           </div>
 
           <div className="pt-4">

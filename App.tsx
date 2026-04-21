@@ -1,6 +1,33 @@
-
 import React, { useState, useEffect, createContext, useContext, useCallback, useRef } from 'react';
-import { LayoutDashboard, Flame, Package, ClipboardList, ShoppingCart, BarChart3, Menu, X, Coffee, BrainCircuit, Languages, Sun, Moon, Keyboard, ChevronRight, ChevronLeft, Zap, UserCircle, LogOut, Clock, AlertTriangle, Settings, Loader2, Users, DollarSign, TrendingUp, User } from 'lucide-react';
+import {
+  LayoutDashboard,
+  Flame,
+  Package,
+  ClipboardList,
+  ShoppingCart,
+  BarChart3,
+  Menu,
+  X,
+  Coffee,
+  BrainCircuit,
+  Languages,
+  Sun,
+  Moon,
+  Keyboard,
+  ChevronRight,
+  ChevronLeft,
+  Zap,
+  UserCircle,
+  LogOut,
+  Clock,
+  AlertTriangle,
+  Settings,
+  Loader2,
+  Users,
+  DollarSign,
+  TrendingUp,
+  User,
+} from 'lucide-react';
 import DashboardView from './views/DashboardView';
 import RoastingView from './views/RoastingView';
 import InventoryView from './views/InventoryView';
@@ -19,8 +46,22 @@ import { UserRole } from './types';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useRoleGuard } from './hooks/useRoleGuard';
 import { AccessDeniedToast } from './components/common/AccessDeniedToast';
+import { ErrorBoundary } from './components/common/ErrorBoundary';
+import { ToastContainer, useToast } from './components/common/Toast';
 
-type TabId = 'dashboard' | 'staff' | 'roasting' | 'inventory' | 'pos' | 'reports' | 'branchPerformance' | 'branchFinancials' | 'crm' | 'ai' | 'configuration' | 'profile';
+type TabId =
+  | 'dashboard'
+  | 'staff'
+  | 'roasting'
+  | 'inventory'
+  | 'pos'
+  | 'reports'
+  | 'branchPerformance'
+  | 'branchFinancials'
+  | 'crm'
+  | 'ai'
+  | 'configuration'
+  | 'profile';
 
 const getDefaultTab = (role: UserRole): TabId => {
   switch (role) {
@@ -64,10 +105,27 @@ const WARNING_THRESHOLD = 5 * 60 * 1000; // 5 minutes before expiration
 const AppContent: React.FC = () => {
   const { lang, setLang, t } = useLanguage();
   const { theme, toggleTheme } = useTheme();
-  const { user, isAuthenticated, isLoading, logout, sessionExpiresAt, refreshSession, error } = useAuth();
+  const { user, isAuthenticated, isLoading, logout, sessionExpiresAt, refreshSession, error } =
+    useAuth();
+  const { toasts, dismiss: dismissToastNotification } = useToast();
 
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'staff' | 'roasting' | 'inventory' | 'pos' | 'reports' | 'branchPerformance' | 'branchFinancials' | 'crm' | 'ai' | 'configuration' | 'profile'>(() => (localStorage.getItem('activeTab') as any) || 'dashboard');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => localStorage.getItem('sidebarOpen') !== 'false');
+  const [activeTab, setActiveTab] = useState<
+    | 'dashboard'
+    | 'staff'
+    | 'roasting'
+    | 'inventory'
+    | 'pos'
+    | 'reports'
+    | 'branchPerformance'
+    | 'branchFinancials'
+    | 'crm'
+    | 'ai'
+    | 'configuration'
+    | 'profile'
+  >(() => (localStorage.getItem('activeTab') as any) || 'dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(
+    () => localStorage.getItem('sidebarOpen') !== 'false'
+  );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [showQuickActions, setShowQuickActions] = useState(false);
@@ -75,25 +133,93 @@ const AppContent: React.FC = () => {
   const [activeDetailId, setActiveDetailId] = useState<string | null>(null);
 
   const allMenuItems = [
-    { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR, UserRole.ROASTER, UserRole.WAREHOUSE_STAFF] },
-    { id: 'staff', label: t.staff, icon: Users, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR] },
-    { id: 'roasting', label: t.roasting, icon: Flame, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER] },
-    { id: 'inventory', label: t.inventory, icon: ClipboardList, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER, UserRole.WAREHOUSE_STAFF] },
-    { id: 'pos', label: t.pos, icon: ShoppingCart, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.CASHIER] },
-    { id: 'reports', label: t.reports, icon: BarChart3, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR, UserRole.CASHIER] },
-    { id: 'branchPerformance', label: t.branchPerformance || 'Branch Performance', icon: TrendingUp, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-    { id: 'branchFinancials', label: t.branchFinancials || 'Branch Financials', icon: DollarSign, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-    { id: 'crm', label: t.crm || 'CRM', icon: Users, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.CASHIER] },
+    {
+      id: 'dashboard',
+      label: t.dashboard,
+      icon: LayoutDashboard,
+      roles: [
+        UserRole.ADMIN,
+        UserRole.MANAGER,
+        UserRole.HR,
+        UserRole.ROASTER,
+        UserRole.WAREHOUSE_STAFF,
+      ],
+    },
+    {
+      id: 'staff',
+      label: t.staff,
+      icon: Users,
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR],
+    },
+    {
+      id: 'roasting',
+      label: t.roasting,
+      icon: Flame,
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER],
+    },
+    {
+      id: 'inventory',
+      label: t.inventory,
+      icon: ClipboardList,
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER, UserRole.WAREHOUSE_STAFF],
+    },
+    {
+      id: 'pos',
+      label: t.pos,
+      icon: ShoppingCart,
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.CASHIER],
+    },
+    {
+      id: 'reports',
+      label: t.reports,
+      icon: BarChart3,
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR, UserRole.CASHIER],
+    },
+    {
+      id: 'branchPerformance',
+      label: t.branchPerformance || 'Branch Performance',
+      icon: TrendingUp,
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    {
+      id: 'branchFinancials',
+      label: t.branchFinancials || 'Branch Financials',
+      icon: DollarSign,
+      roles: [UserRole.ADMIN, UserRole.MANAGER],
+    },
+    {
+      id: 'crm',
+      label: t.crm || 'CRM',
+      icon: Users,
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.CASHIER],
+    },
     { id: 'ai', label: t.ai, icon: BrainCircuit, roles: [UserRole.ADMIN, UserRole.MANAGER] },
-    { id: 'configuration', label: t.configuration, icon: Settings, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER, UserRole.WAREHOUSE_STAFF] },
-    { id: 'profile', label: t.profile, icon: User, roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR, UserRole.ROASTER, UserRole.CASHIER, UserRole.WAREHOUSE_STAFF] },
+    {
+      id: 'configuration',
+      label: t.configuration,
+      icon: Settings,
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.ROASTER, UserRole.WAREHOUSE_STAFF],
+    },
+    {
+      id: 'profile',
+      label: t.profile,
+      icon: User,
+      roles: [
+        UserRole.ADMIN,
+        UserRole.MANAGER,
+        UserRole.HR,
+        UserRole.ROASTER,
+        UserRole.CASHIER,
+        UserRole.WAREHOUSE_STAFF,
+      ],
+    },
   ];
 
   const userRole = user?.role || UserRole.CASHIER;
   const toggleLang = () => setLang(lang === 'ar' ? 'en' : 'ar');
-  const menuItems = allMenuItems.filter(item => item.roles.includes(userRole));
+  const menuItems = allMenuItems.filter((item) => item.roles.includes(userRole));
 
-  const currentMenuRoles = allMenuItems.find(m => m.id === activeTab)?.roles ?? [];
+  const currentMenuRoles = allMenuItems.find((m) => m.id === activeTab)?.roles ?? [];
   const { isAllowed, toastMessage, denyAccess, dismissToast } = useRoleGuard(currentMenuRoles);
 
   // Guard against unauthorized tab access (e.g. from localStorage or manually switching state)
@@ -101,8 +227,8 @@ const AppContent: React.FC = () => {
     if (!user) return;
 
     const allowedMenuIds = allMenuItems
-      .filter(item => item.roles.includes(user.role))
-      .map(item => item.id);
+      .filter((item) => item.roles.includes(user.role))
+      .map((item) => item.id);
 
     if (!allowedMenuIds.includes(activeTab)) {
       const fallback = getDefaultTab(user.role);
@@ -137,38 +263,68 @@ const AppContent: React.FC = () => {
     localStorage.setItem('theme', theme);
   }, [theme]);
 
-  useEffect(() => { 
-    if (isAuthenticated) localStorage.setItem('activeTab', activeTab); 
+  useEffect(() => {
+    if (isAuthenticated) localStorage.setItem('activeTab', activeTab);
   }, [activeTab, isAuthenticated]);
 
-  useEffect(() => { localStorage.setItem('sidebarOpen', isSidebarOpen.toString()); }, [isSidebarOpen]);
+  useEffect(() => {
+    localStorage.setItem('sidebarOpen', isSidebarOpen.toString());
+  }, [isSidebarOpen]);
 
-  const handleTabChange = useCallback((id: any) => {
-    const isAllowed = allMenuItems.find(item => item.id === id)?.roles.includes(userRole);
-    if (!isAllowed) return;
-    
-    setActiveTab(id);
-    setActiveDetailId(null);
-    setIsMobileMenuOpen(false);
-  }, [userRole, allMenuItems]);
+  const handleTabChange = useCallback(
+    (id: any) => {
+      const isAllowed = allMenuItems.find((item) => item.id === id)?.roles.includes(userRole);
+      if (!isAllowed) return;
+
+      setActiveTab(id);
+      setActiveDetailId(null);
+      setIsMobileMenuOpen(false);
+    },
+    [userRole, allMenuItems]
+  );
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (!isAuthenticated) return;
       if (e.altKey) {
         switch (e.key.toLowerCase()) {
-          case '1': case 'd': handleTabChange('dashboard'); break;
-          case '2': case 'r': handleTabChange('roasting'); break;
-          case '3': case 'i': handleTabChange('inventory'); break;
-          case '4': case 'p': handleTabChange('pos'); break;
-          case '5': case 'm': handleTabChange('reports'); break;
-          case '6': case 'a': handleTabChange('ai'); break;
-          case '7': case 's': handleTabChange('configuration'); break;
-          case 'l': setLang(lang === 'ar' ? 'en' : 'ar'); break;
-          case 'q': setShowQuickActions(prev => !prev); break;
+          case '1':
+          case 'd':
+            handleTabChange('dashboard');
+            break;
+          case '2':
+          case 'r':
+            handleTabChange('roasting');
+            break;
+          case '3':
+          case 'i':
+            handleTabChange('inventory');
+            break;
+          case '4':
+          case 'p':
+            handleTabChange('pos');
+            break;
+          case '5':
+          case 'm':
+            handleTabChange('reports');
+            break;
+          case '6':
+          case 'a':
+            handleTabChange('ai');
+            break;
+          case '7':
+          case 's':
+            handleTabChange('configuration');
+            break;
+          case 'l':
+            setLang(lang === 'ar' ? 'en' : 'ar');
+            break;
+          case 'q':
+            setShowQuickActions((prev) => !prev);
+            break;
         }
       }
-      if (e.key === '?') setShowShortcuts(prev => !prev);
+      if (e.key === '?') setShowShortcuts((prev) => !prev);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
@@ -176,10 +332,20 @@ const AppContent: React.FC = () => {
 
   const handleLoginSuccess = (role: string) => {
     switch (role) {
-      case UserRole.ADMIN: case UserRole.MANAGER: case UserRole.HR: setActiveTab('dashboard'); break;
-      case UserRole.ROASTER: setActiveTab('roasting'); break;
-      case UserRole.WAREHOUSE_STAFF: setActiveTab('inventory'); break;
-      default: setActiveTab('pos'); break;
+      case UserRole.ADMIN:
+      case UserRole.MANAGER:
+      case UserRole.HR:
+        setActiveTab('dashboard');
+        break;
+      case UserRole.ROASTER:
+        setActiveTab('roasting');
+        break;
+      case UserRole.WAREHOUSE_STAFF:
+        setActiveTab('inventory');
+        break;
+      default:
+        setActiveTab('pos');
+        break;
     }
   };
 
@@ -191,14 +357,20 @@ const AppContent: React.FC = () => {
     );
   }
 
-  if (error === "Account disabled") {
+  if (error === 'Account disabled') {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-white p-8 text-center" dir={t.dir}>
+      <div
+        className="h-screen w-screen flex flex-col items-center justify-center bg-white p-8 text-center"
+        dir={t.dir}
+      >
         <div className="bg-orange-50 p-6 rounded-full text-black mb-6 border-2 border-orange-600">
           <AlertTriangle size={64} />
         </div>
         <h1 className="text-3xl font-bold mb-4">{t.accountDisabled}</h1>
-        <button onClick={() => window.location.reload()} className="bg-orange-600 text-white px-8 py-3 rounded-2xl font-bold border-2 border-transparent  transition-all">
+        <button
+          onClick={() => window.location.reload()}
+          className="bg-orange-600 text-white px-8 py-3 rounded-2xl font-bold border-2 border-transparent  transition-all"
+        >
           {t.backToLogin}
         </button>
       </div>
@@ -210,16 +382,23 @@ const AppContent: React.FC = () => {
   }
 
   const Breadcrumbs = () => {
-    const activeItem = allMenuItems.find(i => i.id === activeTab);
+    const activeItem = allMenuItems.find((i) => i.id === activeTab);
     return (
       <nav className="flex items-center gap-2 text-xs md:text-sm text-black  mb-4 transition-all overflow-x-auto no-scrollbar whitespace-nowrap">
-        <button onClick={() => handleTabChange('dashboard')} className="hover:text-black  transition-colors">
+        <button
+          onClick={() => handleTabChange('dashboard')}
+          className="hover:text-black  transition-colors"
+        >
           {t.home}
         </button>
         {activeTab !== 'dashboard' && (
           <>
-            {t.dir === 'rtl' ? <ChevronLeft size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
-            <button 
+            {t.dir === 'rtl' ? (
+              <ChevronLeft size={14} className="shrink-0" />
+            ) : (
+              <ChevronRight size={14} className="shrink-0" />
+            )}
+            <button
               onClick={() => setActiveDetailId(null)}
               className={`hover:text-black  transition-colors ${!activeDetailId ? 'font-bold text-black ' : ''}`}
             >
@@ -229,10 +408,12 @@ const AppContent: React.FC = () => {
         )}
         {activeDetailId && (
           <>
-            {t.dir === 'rtl' ? <ChevronLeft size={14} className="shrink-0" /> : <ChevronRight size={14} className="shrink-0" />}
-            <span className="font-bold text-black ">
-              {activeDetailId}
-            </span>
+            {t.dir === 'rtl' ? (
+              <ChevronLeft size={14} className="shrink-0" />
+            ) : (
+              <ChevronRight size={14} className="shrink-0" />
+            )}
+            <span className="font-bold text-black ">{activeDetailId}</span>
           </>
         )}
       </nav>
@@ -241,7 +422,7 @@ const AppContent: React.FC = () => {
 
   const QuickActions = () => (
     <div className="relative">
-      <button 
+      <button
         onClick={() => setShowQuickActions(!showQuickActions)}
         className="flex items-center gap-2 bg-orange-600   text-white px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs md:text-sm font-bold shadow-lg transition-all active:scale-95 border-2 border-transparent  "
       >
@@ -251,20 +432,40 @@ const AppContent: React.FC = () => {
       {showQuickActions && (
         <>
           <div className="fixed inset-0 z-[60]" onClick={() => setShowQuickActions(false)} />
-          <div className={`absolute top-full mt-2 ${t.dir === 'rtl' ? 'left-0' : 'right-0'} w-48 bg-white  rounded-2xl shadow-2xl border border-orange-100  p-2 z-[70] animate-in fade-in zoom-in-95 duration-200`}>
+          <div
+            className={`absolute top-full mt-2 ${t.dir === 'rtl' ? 'left-0' : 'right-0'} w-48 bg-white  rounded-2xl shadow-2xl border border-orange-100  p-2 z-[70] animate-in fade-in zoom-in-95 duration-200`}
+          >
             {userRole !== UserRole.CASHIER && userRole !== UserRole.WAREHOUSE_STAFF && (
-              <button onClick={() => { handleTabChange('roasting'); setShowQuickActions(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-right">
+              <button
+                onClick={() => {
+                  handleTabChange('roasting');
+                  setShowQuickActions(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-right"
+              >
                 <Flame size={16} className="text-black " />
                 <span className="text-sm font-medium ">{t.newBatch}</span>
               </button>
             )}
             {userRole !== UserRole.ROASTER && userRole !== UserRole.WAREHOUSE_STAFF && (
-              <button onClick={() => { handleTabChange('pos'); setShowQuickActions(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-right">
+              <button
+                onClick={() => {
+                  handleTabChange('pos');
+                  setShowQuickActions(false);
+                }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-right"
+              >
                 <ShoppingCart size={16} className="text-black " />
                 <span className="text-sm font-medium ">{t.newSale}</span>
               </button>
             )}
-            <button onClick={() => { handleTabChange('inventory'); setShowQuickActions(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-right">
+            <button
+              onClick={() => {
+                handleTabChange('inventory');
+                setShowQuickActions(false);
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-colors text-right"
+            >
               <ClipboardList size={16} className="text-black " />
               <span className="text-sm font-medium ">{t.inventoryReport}</span>
             </button>
@@ -275,7 +476,10 @@ const AppContent: React.FC = () => {
   );
 
   return (
-    <div className={`flex h-screen bg-white overflow-hidden transition-colors duration-300 ${lang === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={t.dir}>
+    <div
+      className={`flex h-screen bg-white overflow-hidden transition-colors duration-300 ${lang === 'ar' ? 'font-arabic' : 'font-sans'}`}
+      dir={t.dir}
+    >
       {showSessionWarning && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-white/60 backdrop-blur-md animate-in fade-in duration-300">
           <div className="bg-white  rounded-[32px] p-8 max-md w-full shadow-2xl border border-orange-100  text-center">
@@ -287,66 +491,146 @@ const AppContent: React.FC = () => {
             <h3 className="text-2xl font-bold text-black  mb-4">{t.sessionTimeout}</h3>
             <p className="text-black  mb-8 leading-relaxed">{t.sessionWarning}</p>
             <div className="flex flex-col gap-3">
-              <button onClick={() => { setShowSessionWarning(false); refreshSession(); }} className="w-full py-4 bg-orange-600 text-white rounded-2xl font-bold shadow-xl  transition-all active:scale-95 border-2 border-transparent hover">{t.stayLoggedIn}</button>
-              <button onClick={() => { logout(); setShowSessionWarning(false); }} className="w-full py-4 text-black hover:text-black  font-bold transition-colors">{t.logout}</button>
+              <button
+                onClick={() => {
+                  setShowSessionWarning(false);
+                  refreshSession();
+                }}
+                className="w-full py-4 bg-orange-600 text-white rounded-2xl font-bold shadow-xl  transition-all active:scale-95 border-2 border-transparent hover"
+              >
+                {t.stayLoggedIn}
+              </button>
+              <button
+                onClick={() => {
+                  logout();
+                  setShowSessionWarning(false);
+                }}
+                className="w-full py-4 text-black hover:text-black  font-bold transition-colors"
+              >
+                {t.logout}
+              </button>
             </div>
           </div>
         </div>
       )}
-      {isMobileMenuOpen && <div className="fixed inset-0 bg-white/50 z-40 lg:hidden" onClick={() => setIsMobileMenuOpen(false)} />}
+      {isMobileMenuOpen && (
+        <div
+          className="fixed inset-0 bg-white/50 z-40 lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      )}
       {showShortcuts && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-white/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white  rounded-[32px] p-8 max-w-md w-full shadow-2xl border border-orange-100 ">
             <div className="flex justify-between items-center mb-6">
-              <h3 className="text-xl font-bold flex items-center gap-2 text-black "><Keyboard className="text-black " />{t.shortcuts}</h3>
-              <button onClick={() => setShowShortcuts(false)} className="p-2 rounded-full transition-colors"><X size={20} /></button>
+              <h3 className="text-xl font-bold flex items-center gap-2 text-black ">
+                <Keyboard className="text-black " />
+                {t.shortcuts}
+              </h3>
+              <button
+                onClick={() => setShowShortcuts(false)}
+                className="p-2 rounded-full transition-colors"
+              >
+                <X size={20} />
+              </button>
             </div>
             <div className="space-y-4">
               {menuItems.map((item, i) => (
-                <div key={item.id} className="flex justify-between items-center py-2 border-b border-orange-50  last:border-0">
+                <div
+                  key={item.id}
+                  className="flex justify-between items-center py-2 border-b border-orange-50  last:border-0"
+                >
                   <span className="text-black  text-sm">{item.label}</span>
-                  <kbd className="bg-white  px-2 py-1 rounded text-xs font-mono font-bold text-black  border border-orange-100 ">Alt + {item.id.charAt(0).toUpperCase()}</kbd>
+                  <kbd className="bg-white  px-2 py-1 rounded text-xs font-mono font-bold text-black  border border-orange-100 ">
+                    Alt + {item.id.charAt(0).toUpperCase()}
+                  </kbd>
                 </div>
               ))}
               <div className="flex justify-between items-center py-2 border-b border-orange-50  last:border-0">
                 <span className="text-black  text-sm">{t.changeLanguage}</span>
-                <kbd className="bg-white  px-2 py-1 rounded text-xs font-mono font-bold text-black  border border-orange-100 ">Alt + L</kbd>
+                <kbd className="bg-white  px-2 py-1 rounded text-xs font-mono font-bold text-black  border border-orange-100 ">
+                  Alt + L
+                </kbd>
               </div>
-
             </div>
           </div>
         </div>
       )}
-      <aside className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'right-0' : 'left-0'} z-50 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto ${isMobileMenuOpen ? 'translate-x-0' : (t.dir === 'rtl' ? 'translate-x-full' : '-translate-x-full')} bg-white  text-black  border-r border-orange-100  flex-shrink-0 flex flex-col shadow-xl ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
+      <aside
+        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'right-0' : 'left-0'} z-50 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto ${isMobileMenuOpen ? 'translate-x-0' : t.dir === 'rtl' ? 'translate-x-full' : '-translate-x-full'} bg-white  text-black  border-r border-orange-100  flex-shrink-0 flex flex-col shadow-xl ${isSidebarOpen ? 'w-64' : 'w-20'}`}
+      >
         <div className="p-4 flex items-center justify-between border-b border-orange-50 ">
-          <div className={`flex items-center gap-3 overflow-hidden transition-all ${!isSidebarOpen && 'opacity-0 w-0 lg:hidden'}`}>
-            <div className="bg-orange-600 p-2 rounded-lg"><Coffee className="w-6 h-6 text-white" /></div>
+          <div
+            className={`flex items-center gap-3 overflow-hidden transition-all ${!isSidebarOpen && 'opacity-0 w-0 lg:hidden'}`}
+          >
+            <div className="bg-orange-600 p-2 rounded-lg">
+              <Coffee className="w-6 h-6 text-white" />
+            </div>
             <span className="font-bold text-xl whitespace-nowrap">{t.appName}</span>
           </div>
-          <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-1 rounded hidden lg:block transition-colors">{isSidebarOpen ? (t.dir === 'rtl' ? <ChevronRight size={20} /> : <ChevronLeft size={20} />) : <Menu size={20} />}</button>
-          <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 rounded lg:hidden transition-colors"><X size={24} /></button>
+          <button
+            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            className="p-1 rounded hidden lg:block transition-colors"
+          >
+            {isSidebarOpen ? (
+              t.dir === 'rtl' ? (
+                <ChevronRight size={20} />
+              ) : (
+                <ChevronLeft size={20} />
+              )
+            ) : (
+              <Menu size={20} />
+            )}
+          </button>
+          <button
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="p-1 rounded lg:hidden transition-colors"
+          >
+            <X size={24} />
+          </button>
         </div>
         <nav className="flex-1 mt-6 px-3 space-y-2 overflow-y-auto no-scrollbar">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
-              <button key={item.id} onClick={() => handleTabChange(item.id)} className={`w-full flex items-center gap-4 px-3 py-3 rounded-xl transition-all duration-200 group relative ${isActive ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-black   '}`}>
-                <Icon size={22} className={`shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`} />
-                <span className={`font-medium whitespace-nowrap overflow-hidden transition-all ${!isSidebarOpen ? 'opacity-0 w-0' : 'opacity-100 w-auto'}`}>{item.label}</span>
-                {!isSidebarOpen && <div className={`absolute ${t.dir === 'rtl' ? 'right-full mr-4' : 'left-full ml-4'} px-2 py-1 bg-white text-orange-600 border border-orange-200 shadow-lg text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50`}>{item.label}</div>}
+              <button
+                key={item.id}
+                onClick={() => handleTabChange(item.id)}
+                className={`w-full flex items-center gap-4 px-3 py-3 rounded-xl transition-all duration-200 group relative ${isActive ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-black   '}`}
+              >
+                <Icon
+                  size={22}
+                  className={`shrink-0 transition-transform ${isActive ? 'scale-110' : 'group-hover:scale-110'}`}
+                />
+                <span
+                  className={`font-medium whitespace-nowrap overflow-hidden transition-all ${!isSidebarOpen ? 'opacity-0 w-0' : 'opacity-100 w-auto'}`}
+                >
+                  {item.label}
+                </span>
+                {!isSidebarOpen && (
+                  <div
+                    className={`absolute ${t.dir === 'rtl' ? 'right-full mr-4' : 'left-full ml-4'} px-2 py-1 bg-white text-orange-600 border border-orange-200 shadow-lg text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap z-50`}
+                  >
+                    {item.label}
+                  </div>
+                )}
               </button>
             );
           })}
         </nav>
         <div className="p-4 border-t border-orange-50">
-          <button 
+          <button
             onClick={logout}
             className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl   transition-colors ${!isSidebarOpen ? 'justify-center' : ''}`}
             title={t.logout}
           >
             <LogOut size={20} />
-            <span className={`font-medium whitespace-nowrap transition-all duration-300 ${!isSidebarOpen ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}>{t.logout}</span>
+            <span
+              className={`font-medium whitespace-nowrap transition-all duration-300 ${!isSidebarOpen ? 'opacity-0 w-0 hidden' : 'opacity-100'}`}
+            >
+              {t.logout}
+            </span>
           </button>
         </div>
       </aside>
@@ -354,16 +638,26 @@ const AppContent: React.FC = () => {
       <main className="flex-1 overflow-hidden flex flex-col relative">
         <header className="h-16 bg-white  shadow-sm flex items-center justify-between px-4 md:px-8 shrink-0 transition-colors duration-300 z-50">
           <div className="flex items-center gap-4">
-            <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 rounded-lg lg:hidden transition-colors"><Menu size={24} className="text-black " /></button>
-            <h2 className="text-xl font-bold text-black ">{allMenuItems.find(i => i.id === activeTab)?.label}</h2>
+            <button
+              onClick={() => setIsMobileMenuOpen(true)}
+              className="p-2 rounded-lg lg:hidden transition-colors"
+            >
+              <Menu size={24} className="text-black " />
+            </button>
+            <h2 className="text-xl font-bold text-black ">
+              {allMenuItems.find((i) => i.id === activeTab)?.label}
+            </h2>
           </div>
-          
+
           <div className="flex items-center gap-3 md:gap-6">
             <div className="hidden md:flex items-center gap-2">
               <QuickActions />
             </div>
 
-            <button onClick={toggleLang} className="flex items-center gap-2 text-xs font-bold px-3 py-2 bg-white border border-orange-100 rounded-full shadow-sm transition-colors">
+            <button
+              onClick={toggleLang}
+              className="flex items-center gap-2 text-xs font-bold px-3 py-2 bg-white border border-orange-100 rounded-full shadow-sm transition-colors"
+            >
               <Languages size={16} />
               {lang === 'ar' ? t.languageEnglish : t.languageArabic}
             </button>
@@ -384,36 +678,87 @@ const AppContent: React.FC = () => {
         <div className="flex-1 overflow-y-auto p-4 md:p-8">
           <div className="max-w-7xl mx-auto">
             <Breadcrumbs />
-            {activeTab === 'dashboard' && <DashboardView />}
-            {activeTab === 'staff' && <StaffView />}
-            {activeTab === 'roasting' && <RoastingView onDetailOpen={setActiveDetailId} />}
-            {activeTab === 'inventory' && <InventoryView />}
-            {activeTab === 'pos' && <POSView />}
-            {activeTab === 'reports' && <ReportsView />}
-            {activeTab === 'branchPerformance' && <BranchPerformanceView />}
-            {activeTab === 'branchFinancials' && <BranchFinancialsView />}
-            {activeTab === 'crm' && <CRMView />}
-            {activeTab === 'ai' && <AIInsights />}
-            {activeTab === 'configuration' && <ConfigurationView />}
-            {activeTab === 'profile' && <ProfileView />}
+            {activeTab === 'dashboard' && (
+              <ErrorBoundary>
+                <DashboardView />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'staff' && (
+              <ErrorBoundary>
+                <StaffView />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'roasting' && (
+              <ErrorBoundary>
+                <RoastingView onDetailOpen={setActiveDetailId} />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'inventory' && (
+              <ErrorBoundary>
+                <InventoryView />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'pos' && (
+              <ErrorBoundary>
+                <POSView />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'reports' && (
+              <ErrorBoundary>
+                <ReportsView />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'branchPerformance' && (
+              <ErrorBoundary>
+                <BranchPerformanceView />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'branchFinancials' && (
+              <ErrorBoundary>
+                <BranchFinancialsView />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'crm' && (
+              <ErrorBoundary>
+                <CRMView />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'ai' && (
+              <ErrorBoundary>
+                <AIInsights />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'configuration' && (
+              <ErrorBoundary>
+                <ConfigurationView />
+              </ErrorBoundary>
+            )}
+            {activeTab === 'profile' && (
+              <ErrorBoundary>
+                <ProfileView />
+              </ErrorBoundary>
+            )}
           </div>
         </div>
       </main>
-      {toastMessage && (
-        <AccessDeniedToast message={toastMessage} onDismiss={dismissToast} />
-      )}
+      {toastMessage && <AccessDeniedToast message={toastMessage} onDismiss={dismissToast} />}
+      <ToastContainer toasts={toasts} onDismiss={dismissToastNotification} />
     </div>
   );
 };
 
 const App: React.FC = () => {
-  const [lang, setLang] = useState<Language>(() => (localStorage.getItem('lang') as Language) || 'ar');
-  const [theme, setTheme] = useState<'light' | 'dark'>(() => (localStorage.getItem('theme') as 'light' | 'dark') || 'light');
-  
+  const [lang, setLang] = useState<Language>(
+    () => (localStorage.getItem('lang') as Language) || 'ar'
+  );
+  const [theme, setTheme] = useState<'light' | 'dark'>(
+    () => (localStorage.getItem('theme') as 'light' | 'dark') || 'light'
+  );
+
   const t = translations[lang];
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
 
   return (

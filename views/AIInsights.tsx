@@ -1,18 +1,30 @@
-
 import React, { useState, useEffect } from 'react';
-import { Sparkles, BrainCircuit, TrendingUp, AlertCircle, RefreshCw, Lightbulb, Loader2 } from 'lucide-react';
+import {
+  Sparkles,
+  BrainCircuit,
+  TrendingUp,
+  AlertCircle,
+  RefreshCw,
+  Lightbulb,
+  Loader2,
+} from 'lucide-react';
 import { useLanguage } from '../App';
+import { useErrorToast } from '../hooks/useErrorToast';
 import { supabase } from '../supabaseClient';
 
 const AIInsights: React.FC = () => {
   const { t, lang } = useLanguage();
+  const { showError } = useErrorToast();
   const [reportAr, setReportAr] = useState<string>('');
   const [reportEn, setReportEn] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
   const [stats, setStats] = useState<any>(null);
 
   const replaceParams = (template: string, params: Record<string, string | number>) =>
-    Object.entries(params).reduce((result, [key, value]) => result.replace(`{${key}}`, String(value)), template);
+    Object.entries(params).reduce(
+      (result, [key, value]) => result.replace(`{${key}}`, String(value)),
+      template
+    );
 
   const toDateKey = (value: string | Date) => {
     const d = typeof value === 'string' ? new Date(value) : value;
@@ -28,7 +40,8 @@ const AIInsights: React.FC = () => {
     return Number.isFinite(n) ? n : 0;
   };
 
-  const avg = (values: number[]) => values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  const avg = (values: number[]) =>
+    values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
 
   const quantile = (values: number[], q: number) => {
     if (!values.length) return null;
@@ -81,7 +94,7 @@ const AIInsights: React.FC = () => {
     });
 
     const totals = new Map<string, number>();
-    next7.forEach(d => {
+    next7.forEach((d) => {
       const dow = d.getDay();
       const seenBase = new Set<string>();
       byDow.forEach((vals, dowKey) => {
@@ -98,7 +111,7 @@ const AIInsights: React.FC = () => {
         bases.add(baseKey);
       });
 
-      bases.forEach(baseKey => {
+      bases.forEach((baseKey) => {
         const vals = byDow.get(`${baseKey}|${dow}`) || [];
         const predicted = avg(vals);
         totals.set(baseKey, (totals.get(baseKey) || 0) + predicted);
@@ -116,13 +129,16 @@ const AIInsights: React.FC = () => {
   const computeWasteInsights = (batches: any[], beansById: Map<string, any>) => {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const recent = batches.filter(b => {
+    const recent = batches.filter((b) => {
       const d = new Date(b.roast_date);
       return Number.isFinite(d.getTime()) && d >= monthStart;
     });
 
-    const byKey = new Map<string, { count: number; waste: number; qcTotal: number; qcPass: number }>();
-    recent.forEach(b => {
+    const byKey = new Map<
+      string,
+      { count: number; waste: number; qcTotal: number; qcPass: number }
+    >();
+    recent.forEach((b) => {
       const bean = beansById.get(b.bean_id);
       const origin = bean?.origin || 'UNKNOWN';
       const variety = bean?.variety || 'UNKNOWN';
@@ -143,74 +159,85 @@ const AIInsights: React.FC = () => {
       key,
       count: v.count,
       avgWaste: v.count ? v.waste / v.count : 0,
-      qcPassRate: v.qcTotal ? (v.qcPass / v.qcTotal) * 100 : null
+      qcPassRate: v.qcTotal ? (v.qcPass / v.qcTotal) * 100 : null,
     }));
 
     rows.sort((a, b) => b.avgWaste - a.avgWaste);
     return {
       topWaste: rows.slice(0, 5),
       lowWaste: [...rows].reverse().slice(0, 5),
-      monthAvgWaste: avg(rows.map(r => r.avgWaste))
+      monthAvgWaste: avg(rows.map((r) => r.avgWaste)),
     };
   };
 
   const computeRoastParameterSuggestions = (batches: any[]) => {
     const usable = batches
-      .map(b => {
+      .map((b) => {
         const waste = safeNumber(b.waste_percentage);
         const roastingSeconds = secondsBetween(b.roasting_started_at, b.roasting_ended_at);
-        const charge = b.roast_temp_charge !== null && b.roast_temp_charge !== undefined ? safeNumber(b.roast_temp_charge) : null;
+        const charge =
+          b.roast_temp_charge !== null && b.roast_temp_charge !== undefined
+            ? safeNumber(b.roast_temp_charge)
+            : null;
         return { waste, roastingSeconds, charge };
       })
-      .filter(r => r.waste > 0);
+      .filter((r) => r.waste > 0);
 
     const suggestions: Array<{ ar: string; en: string }> = [];
-    const overallWaste = avg(usable.map(u => u.waste));
+    const overallWaste = avg(usable.map((u) => u.waste));
 
-    const suggestForNumeric = (labelAr: string, labelEn: string, values: Array<{ x: number; waste: number }>, unitAr: string, unitEn: string) => {
-      const xs = values.map(v => v.x);
+    const suggestForNumeric = (
+      labelAr: string,
+      labelEn: string,
+      values: Array<{ x: number; waste: number }>,
+      unitAr: string,
+      unitEn: string
+    ) => {
+      const xs = values.map((v) => v.x);
       const q33 = quantile(xs, 0.33);
       const q66 = quantile(xs, 0.66);
       if (q33 === null || q66 === null) return;
-      const low = values.filter(v => v.x <= q33).map(v => v.waste);
-      const mid = values.filter(v => v.x > q33 && v.x <= q66).map(v => v.waste);
-      const high = values.filter(v => v.x > q66).map(v => v.waste);
+      const low = values.filter((v) => v.x <= q33).map((v) => v.waste);
+      const mid = values.filter((v) => v.x > q33 && v.x <= q66).map((v) => v.waste);
+      const high = values.filter((v) => v.x > q66).map((v) => v.waste);
       const aLow = avg(low);
       const aMid = avg(mid);
       const aHigh = avg(high);
       const best = Math.min(aLow || Infinity, aMid || Infinity, aHigh || Infinity);
       if (!Number.isFinite(best) || best >= overallWaste - 0.5) return;
       const bestBucket = best === aLow ? 'low' : best === aMid ? 'mid' : 'high';
-      const range = bestBucket === 'low'
-        ? `≤ ${Math.round(q33)} ${unitEn}`
-        : bestBucket === 'mid'
-          ? `${Math.round(q33)}–${Math.round(q66)} ${unitEn}`
-          : `≥ ${Math.round(q66)} ${unitEn}`;
-      const rangeAr = bestBucket === 'low'
-        ? `≤ ${Math.round(q33)} ${unitAr}`
-        : bestBucket === 'mid'
-          ? `${Math.round(q33)}–${Math.round(q66)} ${unitAr}`
-          : `≥ ${Math.round(q66)} ${unitAr}`;
+      const range =
+        bestBucket === 'low'
+          ? `≤ ${Math.round(q33)} ${unitEn}`
+          : bestBucket === 'mid'
+            ? `${Math.round(q33)}–${Math.round(q66)} ${unitEn}`
+            : `≥ ${Math.round(q66)} ${unitEn}`;
+      const rangeAr =
+        bestBucket === 'low'
+          ? `≤ ${Math.round(q33)} ${unitAr}`
+          : bestBucket === 'mid'
+            ? `${Math.round(q33)}–${Math.round(q66)} ${unitAr}`
+            : `≥ ${Math.round(q66)} ${unitAr}`;
       suggestions.push({
         ar: `أفضل نطاق لـ ${labelAr} هذا الشهر كان ${rangeAr} بمتوسط هدر ${best.toFixed(2)}% (مقابل ${overallWaste.toFixed(2)}% إجمالي).`,
-        en: `Best ${labelEn} band this month was ${range} with avg waste ${best.toFixed(2)}% (overall ${overallWaste.toFixed(2)}%).`
+        en: `Best ${labelEn} band this month was ${range} with avg waste ${best.toFixed(2)}% (overall ${overallWaste.toFixed(2)}%).`,
       });
     };
 
     const roastingValues = usable
-      .filter(u => u.roastingSeconds !== null)
-      .map(u => ({ x: u.roastingSeconds as number, waste: u.waste }));
+      .filter((u) => u.roastingSeconds !== null)
+      .map((u) => ({ x: u.roastingSeconds as number, waste: u.waste }));
     suggestForNumeric('زمن التحميص', 'Roasting time', roastingValues, 'ث', 's');
 
     const chargeValues = usable
-      .filter(u => u.charge !== null)
-      .map(u => ({ x: u.charge as number, waste: u.waste }));
+      .filter((u) => u.charge !== null)
+      .map((u) => ({ x: u.charge as number, waste: u.waste }));
     suggestForNumeric('حرارة الشحن (Charge)', 'Charge temperature', chargeValues, '°C', '°C');
 
     if (!suggestions.length && Number.isFinite(overallWaste)) {
       suggestions.push({
         ar: `لا توجد فروقات واضحة كفاية لاقتراح تعديل حرارة/وقت بناءً على بيانات الشهر الحالي. زد حجم العينة (أو ثبّت ملف تحميص واحد) للحصول على استنتاج أدق.`,
-        en: `No strong temperature/time signal detected in this month's data. Increase sample size (or standardize a roast profile) for clearer guidance.`
+        en: `No strong temperature/time signal detected in this month's data. Increase sample size (or standardize a roast profile) for clearer guidance.`,
       });
     }
 
@@ -237,10 +264,16 @@ const AIInsights: React.FC = () => {
       if (i.name) ingByName.set(i.name, i);
     });
 
-    const rows: Array<{ name: string; marginPct: number; suggestedPrice: number; cost: number; topIngredient?: string }> = [];
+    const rows: Array<{
+      name: string;
+      marginPct: number;
+      suggestedPrice: number;
+      cost: number;
+      topIngredient?: string;
+    }> = [];
     products
-      .filter(p => p.type === 'BEVERAGE')
-      .forEach(p => {
+      .filter((p) => p.type === 'BEVERAGE')
+      .forEach((p) => {
         const selling = p.selling_price ?? p.base_price ?? 0;
         const recipe = p.recipe;
         const ingredientsList = recipe?.ingredients || [];
@@ -253,7 +286,11 @@ const AIInsights: React.FC = () => {
           if (!inv) return;
           const unitCost = safeNumber(inv.cost_per_unit);
           const invUnit = inv.unit || '';
-          const qty = convertAmountToInventoryUnit(safeNumber(ing.amount), ing.unit || invUnit, invUnit);
+          const qty = convertAmountToInventoryUnit(
+            safeNumber(ing.amount),
+            ing.unit || invUnit,
+            invUnit
+          );
           const lineCost = qty * unitCost;
           cost += lineCost;
           if (lineCost > topCost) {
@@ -266,7 +303,13 @@ const AIInsights: React.FC = () => {
         const target = safeNumber(p.profit_margin) || 60;
         if (marginPct >= target - 5) return;
         const suggestedPrice = cost / (1 - target / 100);
-        rows.push({ name: p.name, marginPct: Math.round(marginPct * 10) / 10, suggestedPrice: Math.round(suggestedPrice * 100) / 100, cost: Math.round(cost * 100) / 100, topIngredient: topName || undefined });
+        rows.push({
+          name: p.name,
+          marginPct: Math.round(marginPct * 10) / 10,
+          suggestedPrice: Math.round(suggestedPrice * 100) / 100,
+          cost: Math.round(cost * 100) / 100,
+          topIngredient: topName || undefined,
+        });
       });
 
     rows.sort((a, b) => a.marginPct - b.marginPct);
@@ -293,21 +336,41 @@ const AIInsights: React.FC = () => {
         locationsRes,
         productsRes,
         ingredientsRes,
-        profitabilityRes
+        profitabilityRes,
       ] = await Promise.all([
-        supabase.from('transactions').select('total,created_at').gte('created_at', since30.toISOString()),
+        supabase
+          .from('transactions')
+          .select('total,created_at')
+          .gte('created_at', since30.toISOString()),
         supabase.from('inventory_items').select('name, stock').limit(5000),
-        supabase.from('roasting_batches').select('id,bean_id,roast_profile_id,roast_date,level,pre_weight,post_weight,waste_percentage,qc_status,roast_temp_charge,roasting_started_at,roasting_ended_at').gte('roast_date', since90.toISOString().split('T')[0]),
+        supabase
+          .from('roasting_batches')
+          .select(
+            'id,bean_id,roast_profile_id,roast_date,level,pre_weight,post_weight,waste_percentage,qc_status,roast_temp_charge,roasting_started_at,roasting_ended_at'
+          )
+          .gte('roast_date', since90.toISOString().split('T')[0]),
         supabase.from('green_beans').select('id,origin,variety'),
         supabase
           .from('inventory_movements')
-          .select('location_id,created_at,quantity,inventory_items!inner(product_id,name,type,size,batch_id)')
+          .select(
+            'location_id,created_at,quantity,inventory_items!inner(product_id,name,type,size,batch_id)'
+          )
           .eq('movement_type', 'SALE')
           .gte('created_at', since60.toISOString()),
         supabase.from('locations').select('id,name,type,is_roastery').eq('is_active', true),
-        supabase.from('product_definitions').select('id,name,type,selling_price,base_price,profit_margin,recipe'),
-        supabase.from('inventory_items').select('id,name,unit,cost_per_unit,type').eq('type', 'INGREDIENT').limit(5000),
-        supabase.from('product_profitability_report').select('total_revenue,total_cost,gross_profit,period_month').gte('period_month', new Date(now.getFullYear(), now.getMonth(), 1).toISOString()).lt('period_month', new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString())
+        supabase
+          .from('product_definitions')
+          .select('id,name,type,selling_price,base_price,profit_margin,recipe'),
+        supabase
+          .from('inventory_items')
+          .select('id,name,unit,cost_per_unit,type')
+          .eq('type', 'INGREDIENT')
+          .limit(5000),
+        supabase
+          .from('product_profitability_report')
+          .select('total_revenue,total_cost,gross_profit,period_month')
+          .gte('period_month', new Date(now.getFullYear(), now.getMonth(), 1).toISOString())
+          .lt('period_month', new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()),
       ]);
 
       const sales = salesRes.data || [];
@@ -320,7 +383,10 @@ const AIInsights: React.FC = () => {
       const ingredients = ingredientsRes.data || [];
       const profitability = profitabilityRes.data || [];
 
-      const totalRecentSales = sales.reduce((acc: number, curr: any) => acc + safeNumber(curr.total), 0);
+      const totalRecentSales = sales.reduce(
+        (acc: number, curr: any) => acc + safeNumber(curr.total),
+        0
+      );
       const lowStockCount = inventory.filter((i: any) => safeNumber(i.stock) < 10).length;
 
       const beansById = new Map<string, any>(beans.map((b: any) => [b.id, b]));
@@ -330,19 +396,25 @@ const AIInsights: React.FC = () => {
       const forecastRows = computeForecastNext7Days(movements);
       const locById = new Map<string, any>(locations.map((l: any) => [l.id, l]));
       const productById = new Map<string, any>(products.map((p: any) => [p.id, p]));
-      const forecastTop = forecastRows.slice(0, 10).map(r => ({
+      const forecastTop = forecastRows.slice(0, 10).map((r) => ({
         ...r,
         locationName: locById.get(r.locationId)?.name || 'Unknown',
-        productName: productById.get(r.productId)?.name || r.productId
+        productName: productById.get(r.productId)?.name || r.productId,
       }));
       const forecastTotal = forecastRows.reduce((sum, r) => sum + safeNumber(r.predictedQty), 0);
 
-      const qcEvaluated = batches.filter((b: any) => b.qc_status === 'PASSED' || b.qc_status === 'FAILED');
+      const qcEvaluated = batches.filter(
+        (b: any) => b.qc_status === 'PASSED' || b.qc_status === 'FAILED'
+      );
       const qcPass = qcEvaluated.filter((b: any) => b.qc_status === 'PASSED').length;
       const qcPassRate = qcEvaluated.length ? (qcPass / qcEvaluated.length) * 100 : 0;
 
-      const monthStartDateKey = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-      const thisMonthBatches = batches.filter((b: any) => (b.roast_date || '') >= monthStartDateKey);
+      const monthStartDateKey = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split('T')[0];
+      const thisMonthBatches = batches.filter(
+        (b: any) => (b.roast_date || '') >= monthStartDateKey
+      );
       const totalRoastedKg = thisMonthBatches.reduce((sum: number, b: any) => {
         const post = safeNumber(b.post_weight);
         const pre = safeNumber(b.pre_weight);
@@ -352,10 +424,17 @@ const AIInsights: React.FC = () => {
         const secs = secondsBetween(b.roasting_started_at, b.roasting_ended_at);
         return sum + (secs || 0);
       }, 0);
-      const roastingKgPerHour = totalRoastingSeconds > 0 ? (totalRoastedKg / (totalRoastingSeconds / 3600)) : 0;
+      const roastingKgPerHour =
+        totalRoastingSeconds > 0 ? totalRoastedKg / (totalRoastingSeconds / 3600) : 0;
 
-      const profitRevenue = profitability.reduce((sum: number, r: any) => sum + safeNumber(r.total_revenue), 0);
-      const profitGross = profitability.reduce((sum: number, r: any) => sum + safeNumber(r.gross_profit), 0);
+      const profitRevenue = profitability.reduce(
+        (sum: number, r: any) => sum + safeNumber(r.total_revenue),
+        0
+      );
+      const profitGross = profitability.reduce(
+        (sum: number, r: any) => sum + safeNumber(r.gross_profit),
+        0
+      );
       const grossMargin = profitRevenue > 0 ? (profitGross / profitRevenue) * 100 : 0;
 
       const recipeIssues = computeRecipeSuggestions(products, ingredients);
@@ -368,24 +447,26 @@ const AIInsights: React.FC = () => {
       arLines.push(`- الربحية (منتجات تامة): هامش إجمالي ${grossMargin.toFixed(1)}%`);
       arLines.push(``);
       arLines.push(`1) أنماط الهدر`);
-      wasteInsights.topWaste.forEach(r => {
+      wasteInsights.topWaste.forEach((r) => {
         arLines.push(`- أعلى هدر: ${r.key} | ${r.avgWaste.toFixed(2)}% | ${r.count} دفعات`);
       });
       arLines.push(``);
       arLines.push(`2) توقع الكمية المطلوبة (7 أيام)`);
-      forecastTop.forEach(r => {
+      forecastTop.forEach((r) => {
         arLines.push(`- ${r.locationName}: ${r.productName} ≈ ${r.predictedQty}`);
       });
       arLines.push(``);
       arLines.push(`3) اقتراحات تعديل الوقت/الحرارة لتقليل الهدر`);
-      roastParam.suggestions.forEach(s => arLines.push(`- ${s.ar}`));
+      roastParam.suggestions.forEach((s) => arLines.push(`- ${s.ar}`));
       arLines.push(``);
       arLines.push(`4) تحسينات على وصفات المشروبات (استهداف هامش 60% أو profit_margin)`);
       if (recipeIssues.length === 0) {
         arLines.push(`- لا توجد وصفات منخفضة الهامش بشكل واضح بناءً على بيانات التكلفة الحالية.`);
       } else {
-        recipeIssues.forEach(r => {
-          arLines.push(`- ${r.name}: هامش ${r.marginPct}% | تكلفة تقديرية ${r.cost} | سعر مقترح ${r.suggestedPrice}${r.topIngredient ? ` | أعلى تكلفة: ${r.topIngredient}` : ''}`);
+        recipeIssues.forEach((r) => {
+          arLines.push(
+            `- ${r.name}: هامش ${r.marginPct}% | تكلفة تقديرية ${r.cost} | سعر مقترح ${r.suggestedPrice}${r.topIngredient ? ` | أعلى تكلفة: ${r.topIngredient}` : ''}`
+          );
         });
       }
 
@@ -397,24 +478,26 @@ const AIInsights: React.FC = () => {
       enLines.push(`- Profitability (finished goods): gross margin ${grossMargin.toFixed(1)}%`);
       enLines.push(``);
       enLines.push(`1) Waste patterns`);
-      wasteInsights.topWaste.forEach(r => {
+      wasteInsights.topWaste.forEach((r) => {
         enLines.push(`- Highest waste: ${r.key} | ${r.avgWaste.toFixed(2)}% | ${r.count} batches`);
       });
       enLines.push(``);
       enLines.push(`2) Demand forecast (next 7 days)`);
-      forecastTop.forEach(r => {
+      forecastTop.forEach((r) => {
         enLines.push(`- ${r.locationName}: ${r.productName} ≈ ${r.predictedQty}`);
       });
       enLines.push(``);
       enLines.push(`3) Roast time/temperature suggestions`);
-      roastParam.suggestions.forEach(s => enLines.push(`- ${s.en}`));
+      roastParam.suggestions.forEach((s) => enLines.push(`- ${s.en}`));
       enLines.push(``);
       enLines.push(`4) Beverage recipe optimizations (target margin = 60% or profit_margin)`);
       if (recipeIssues.length === 0) {
         enLines.push(`- No clear low-margin recipes based on current cost data.`);
       } else {
-        recipeIssues.forEach(r => {
-          enLines.push(`- ${r.name}: margin ${r.marginPct}% | est. cost ${r.cost} | suggested price ${r.suggestedPrice}${r.topIngredient ? ` | top cost: ${r.topIngredient}` : ''}`);
+        recipeIssues.forEach((r) => {
+          enLines.push(
+            `- ${r.name}: margin ${r.marginPct}% | est. cost ${r.cost} | suggested price ${r.suggestedPrice}${r.topIngredient ? ` | top cost: ${r.topIngredient}` : ''}`
+          );
         });
       }
 
@@ -427,10 +510,11 @@ const AIInsights: React.FC = () => {
         forecastTotal,
         qcPassRate,
         grossMargin,
-        roastingKgPerHour
+        roastingKgPerHour,
       });
     } catch (error) {
-      console.error("AI Insight Error:", error);
+      console.error('AI Insight Error:', error);
+      showError(t.analysisFetchError || 'Failed to load analysis');
       setReportAr(t.analysisFetchError);
       setReportEn(t.analysisFetchError);
     } finally {
@@ -452,7 +536,7 @@ const AIInsights: React.FC = () => {
           </h2>
           <p className="text-black ">{t.advancedAnalytics}</p>
         </div>
-        <button 
+        <button
           onClick={fetchRealDataAndAnalyze}
           disabled={loading}
           className="flex items-center gap-2 bg-white  border border-orange-100  px-4 py-2 rounded-xl text-black  transition-all disabled:opacity-50 font-bold shadow-sm active:scale-95"
@@ -464,31 +548,45 @@ const AIInsights: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white  border border-orange-600 p-6 rounded-3xl text-black  shadow-xl transform transition-transform hover:-translate-y-1">
-          <div className="p-2 bg-white  rounded-lg w-fit mb-4"><TrendingUp size={24} /></div>
+          <div className="p-2 bg-white  rounded-lg w-fit mb-4">
+            <TrendingUp size={24} />
+          </div>
           <h4 className="font-bold text-lg mb-1">{t.forecastNext7DaysTitle}</h4>
           <p className="text-black  text-sm leading-relaxed">
-            {stats ? replaceParams(t.forecastNext7DaysDetail, { qty: Math.round(stats.forecastTotal || 0) }) : '...'}
+            {stats
+              ? replaceParams(t.forecastNext7DaysDetail, {
+                  qty: Math.round(stats.forecastTotal || 0),
+                })
+              : '...'}
           </p>
         </div>
         <div className="bg-white  border border-orange-100  p-6 rounded-3xl text-black  shadow-xl transform transition-transform hover:-translate-y-1">
-          <div className="p-2 bg-white  rounded-lg w-fit mb-4"><AlertCircle size={24} className="text-black " /></div>
+          <div className="p-2 bg-white  rounded-lg w-fit mb-4">
+            <AlertCircle size={24} className="text-black " />
+          </div>
           <h4 className="font-bold text-lg mb-1">{t.qcPassRateTitle}</h4>
           <p className="text-black  text-sm leading-relaxed">
-            {stats ? replaceParams(t.qcPassRateDetail, { rate: (stats.qcPassRate || 0).toFixed(1) }) : '...'}
+            {stats
+              ? replaceParams(t.qcPassRateDetail, { rate: (stats.qcPassRate || 0).toFixed(1) })
+              : '...'}
           </p>
         </div>
         <div className="bg-white  border border-orange-600 p-6 rounded-3xl text-black  shadow-xl transform transition-transform hover:-translate-y-1">
-          <div className="p-2 bg-white  rounded-lg w-fit mb-4"><Lightbulb size={24} /></div>
+          <div className="p-2 bg-white  rounded-lg w-fit mb-4">
+            <Lightbulb size={24} />
+          </div>
           <h4 className="font-bold text-lg mb-1">{t.avgWasteTitle}</h4>
           <p className="text-black  text-sm leading-relaxed">
-            {stats ? replaceParams(t.avgWasteDetail, { waste: (stats.avgWaste || 0).toFixed(1) }) : '...'}
+            {stats
+              ? replaceParams(t.avgWasteDetail, { waste: (stats.avgWaste || 0).toFixed(1) })
+              : '...'}
           </p>
         </div>
       </div>
 
       <div className="bg-white  p-6 md:p-10 rounded-[32px] md:rounded-[40px] shadow-sm border border-orange-100  relative overflow-hidden min-h-[400px] transition-colors duration-300">
         <div className="absolute top-0 left-0 w-full h-1 bg-orange-600" />
-        
+
         <div className="flex items-center gap-3 mb-8">
           <div className="bg-white  p-2 rounded-xl text-black ">
             <Sparkles size={24} />
@@ -503,15 +601,17 @@ const AIInsights: React.FC = () => {
             <div className="h-4 bg-white  rounded-full w-5/6 animate-pulse" />
             <div className="h-4 bg-white  rounded-full w-2/3 animate-pulse" />
             <div className="flex justify-center py-10">
-               <Loader2 className="animate-spin text-black " size={32} />
+              <Loader2 className="animate-spin text-black " size={32} />
             </div>
           </div>
         ) : (
-          <div className={`prose prose-stone  max-w-none text-black  leading-relaxed text-base md:text-lg whitespace-pre-line ${t.dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+          <div
+            className={`prose prose-stone  max-w-none text-black  leading-relaxed text-base md:text-lg whitespace-pre-line ${t.dir === 'rtl' ? 'text-right' : 'text-left'}`}
+          >
             {lang === 'ar' ? `${reportAr}\n\n${reportEn}` : `${reportEn}\n\n${reportAr}`}
           </div>
         )}
-        
+
         {!loading && (
           <div className="mt-12 flex items-center gap-2 text-black  text-sm font-medium border-t border-orange-50  pt-6">
             <BrainCircuit size={16} />

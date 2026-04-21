@@ -2,68 +2,100 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { 
-  Users, Plus, Search, FileText, Download, Clock, 
-  Edit, X, Upload, CreditCard, Printer, 
-  MapPin, Phone, User, Briefcase, Loader2,
-  Filter, Grid3X3, List, MoreVertical, Calendar,
-  TrendingUp, Award, Wallet, Building
+import {
+  Users,
+  Plus,
+  Search,
+  FileText,
+  Download,
+  Clock,
+  Edit,
+  X,
+  Upload,
+  CreditCard,
+  Printer,
+  MapPin,
+  Phone,
+  User,
+  Briefcase,
+  Loader2,
+  Filter,
+  Grid3X3,
+  List,
+  MoreVertical,
+  Calendar,
+  TrendingUp,
+  Award,
+  Wallet,
+  Building,
 } from 'lucide-react';
 import { useLanguage } from '../App';
+import { useErrorToast } from '../hooks/useErrorToast';
 import { Employee, UserRole, Location } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 
 // --- Zod Schema ---
-const createEmployeeSchema = (t: Record<string, string>) => z.object({
-  first_name_en: z.string().min(2, t.firstNameEnRequired || 'First name is required'),
-  last_name_en: z.string().min(2, t.lastNameEnRequired || 'Last name is required'),
-  first_name_ar: z.string().optional(),
-  last_name_ar: z.string().optional(),
-  national_id: z.string().optional(),
-  nationality: z.string().optional(),
-  dob: z.string().optional(),
-  gender: z.enum(['Male', 'Female'] as const).optional(),
-  marital_status: z.string().optional(),
-  
-  phone: z.string().min(8, t.phoneRequired || 'Phone is required'),
-  email: z.string().email(t.invalidEmail || 'Invalid email'),
-  emergency_contact_name: z.string().optional(),
-  emergency_contact_phone: z.string().optional(),
-  
-  hire_date: z.string().min(1, t.hireDateRequired || 'Hire date is required'),
-  department: z.string().optional(),
-  position: z.string().optional(),
-  role: z.nativeEnum(UserRole),
-  manager_id: z.string().optional(),
-  employment_type: z.enum(['Full-time', 'Part-time', 'Contract', 'Intern'] as const),
-  employment_status: z.enum(['Active', 'Probation', 'Suspended', 'Terminated', 'Resigned'] as const),
-  
-  qid: z.string().regex(/^\d{11}$/, t.qidDigits || 'QID must be 11 digits').optional().or(z.literal('')),
-  visa_status: z.string().optional(),
-  visa_expiry: z.string().optional(),
-  health_card_expiry: z.string().optional(),
-  
-  salary_base: z.number().min(0).optional(),
-  salary_allowances: z.number().min(0).optional(),
-  bank_name: z.string().optional(),
-  iban: z.string().optional(),
-  location_id: z.string().optional(),
-});
+const createEmployeeSchema = (t: Record<string, string>) =>
+  z.object({
+    first_name_en: z.string().min(2, t.firstNameEnRequired || 'First name is required'),
+    last_name_en: z.string().min(2, t.lastNameEnRequired || 'Last name is required'),
+    first_name_ar: z.string().optional(),
+    last_name_ar: z.string().optional(),
+    national_id: z.string().optional(),
+    nationality: z.string().optional(),
+    dob: z.string().optional(),
+    gender: z.enum(['Male', 'Female'] as const).optional(),
+    marital_status: z.string().optional(),
+
+    phone: z.string().min(8, t.phoneRequired || 'Phone is required'),
+    email: z.string().email(t.invalidEmail || 'Invalid email'),
+    emergency_contact_name: z.string().optional(),
+    emergency_contact_phone: z.string().optional(),
+
+    hire_date: z.string().min(1, t.hireDateRequired || 'Hire date is required'),
+    department: z.string().optional(),
+    position: z.string().optional(),
+    role: z.nativeEnum(UserRole),
+    manager_id: z.string().optional(),
+    employment_type: z.enum(['Full-time', 'Part-time', 'Contract', 'Intern'] as const),
+    employment_status: z.enum([
+      'Active',
+      'Probation',
+      'Suspended',
+      'Terminated',
+      'Resigned',
+    ] as const),
+
+    qid: z
+      .string()
+      .regex(/^\d{11}$/, t.qidDigits || 'QID must be 11 digits')
+      .optional()
+      .or(z.literal('')),
+    visa_status: z.string().optional(),
+    visa_expiry: z.string().optional(),
+    health_card_expiry: z.string().optional(),
+
+    salary_base: z.number().min(0).optional(),
+    salary_allowances: z.number().min(0).optional(),
+    bank_name: z.string().optional(),
+    iban: z.string().optional(),
+    location_id: z.string().optional(),
+  });
 
 type EmployeeFormValues = z.infer<ReturnType<typeof createEmployeeSchema>>;
 
 // --- Components ---
 
-const StatCard = ({ 
-  title, 
-  value, 
-  icon: Icon, 
+const StatCard = ({
+  title,
+  value,
+  icon: Icon,
   trend,
-  color = 'orange' 
-}: { 
-  title: string; 
-  value: string | number; 
+  color = 'orange',
+}: {
+  title: string;
+  value: string | number;
   icon: React.ElementType;
   trend?: { value: number; positive: boolean };
   color?: 'orange' | 'blue' | 'green' | 'purple';
@@ -78,12 +110,19 @@ const StatCard = ({
   return (
     <div className="bg-white rounded-2xl p-6 shadow-sm border border-stone-100 hover:shadow-md transition-all duration-300 group">
       <div className="flex items-start justify-between">
-        <div className={`${colorClasses[color]} p-3 rounded-xl text-white shadow-lg shadow-orange-500/20 group-hover:scale-110 transition-transform duration-300`}>
+        <div
+          className={`${colorClasses[color]} p-3 rounded-xl text-white shadow-lg shadow-orange-500/20 group-hover:scale-110 transition-transform duration-300`}
+        >
           <Icon size={24} />
         </div>
         {trend && (
-          <div className={`flex items-center gap-1 text-sm font-medium ${trend.positive ? 'text-emerald-600' : 'text-rose-600'}`}>
-            <span>{trend.positive ? '+' : ''}{trend.value}%</span>
+          <div
+            className={`flex items-center gap-1 text-sm font-medium ${trend.positive ? 'text-emerald-600' : 'text-rose-600'}`}
+          >
+            <span>
+              {trend.positive ? '+' : ''}
+              {trend.value}%
+            </span>
           </div>
         )}
       </div>
@@ -95,13 +134,13 @@ const StatCard = ({
   );
 };
 
-const EmployeeCard = ({ 
-  employee, 
-  onEdit, 
-  t, 
-  lang 
-}: { 
-  employee: Employee; 
+const EmployeeCard = ({
+  employee,
+  onEdit,
+  t,
+  lang,
+}: {
+  employee: Employee;
   onEdit: (emp: Employee) => void;
   t: Record<string, string>;
   lang: string;
@@ -123,20 +162,21 @@ const EmployeeCard = ({
     WAREHOUSE_STAFF: 'bg-cyan-100 text-cyan-700',
   };
 
-  const displayName = lang === 'ar' && employee.first_name_ar 
-    ? `${employee.first_name_ar} ${employee.last_name_ar || ''}`
-    : `${employee.first_name_en} ${employee.last_name_en}`;
+  const displayName =
+    lang === 'ar' && employee.first_name_ar
+      ? `${employee.first_name_ar} ${employee.last_name_ar || ''}`
+      : `${employee.first_name_en} ${employee.last_name_en}`;
 
   return (
-    <div 
+    <div
       className="bg-white rounded-2xl p-5 shadow-sm border border-stone-100 hover:shadow-lg hover:border-orange-200 transition-all duration-300 cursor-pointer group"
       onClick={() => onEdit(employee)}
     >
       <div className="flex items-start gap-4">
         <div className="relative">
           {employee.photo_url ? (
-            <img 
-              src={employee.photo_url} 
+            <img
+              src={employee.photo_url}
               alt={displayName}
               className="w-16 h-16 rounded-2xl object-cover border-2 border-stone-100 group-hover:border-orange-300 transition-colors"
             />
@@ -145,20 +185,24 @@ const EmployeeCard = ({
               <User className="text-orange-600" size={28} />
             </div>
           )}
-          <div className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white ${
-            employee.employment_status === 'Active' ? 'bg-emerald-500' : 'bg-amber-500'
-          }`} />
+          <div
+            className={`absolute -bottom-1 -right-1 w-5 h-5 rounded-full border-2 border-white ${
+              employee.employment_status === 'Active' ? 'bg-emerald-500' : 'bg-amber-500'
+            }`}
+          />
         </div>
-        
+
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between">
             <div>
               <h3 className="font-bold text-stone-900 truncate group-hover:text-orange-600 transition-colors">
                 {displayName}
               </h3>
-              <p className="text-sm text-stone-500 mt-0.5">{employee.position || t.noPosition || 'No Position'}</p>
+              <p className="text-sm text-stone-500 mt-0.5">
+                {employee.position || t.noPosition || 'No Position'}
+              </p>
             </div>
-            <button 
+            <button
               className="p-2 hover:bg-stone-100 rounded-xl transition-colors opacity-0 group-hover:opacity-100"
               onClick={(e) => {
                 e.stopPropagation();
@@ -168,22 +212,28 @@ const EmployeeCard = ({
               <Edit size={16} className="text-stone-400" />
             </button>
           </div>
-          
+
           <div className="flex items-center gap-2 mt-3 flex-wrap">
-            <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${roleColors[employee.role] || 'bg-stone-100 text-stone-600'}`}>
+            <span
+              className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${roleColors[employee.role] || 'bg-stone-100 text-stone-600'}`}
+            >
               {t[employee.role.toLowerCase()] || employee.role}
             </span>
-            <span className={`px-2.5 py-1 rounded-lg text-xs font-medium border ${statusColors[employee.employment_status] || statusColors.Active}`}>
+            <span
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border ${statusColors[employee.employment_status] || statusColors.Active}`}
+            >
               {t[employee.employment_status.toLowerCase()] || employee.employment_status}
             </span>
           </div>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-stone-100">
         <div className="flex items-center gap-2 text-sm text-stone-600">
           <Briefcase size={14} className="text-stone-400" />
-          <span className="truncate">{employee.department || t.noDepartment || 'No Department'}</span>
+          <span className="truncate">
+            {employee.department || t.noDepartment || 'No Department'}
+          </span>
         </div>
         <div className="flex items-center gap-2 text-sm text-stone-600">
           <Phone size={14} className="text-stone-400" />
@@ -213,14 +263,19 @@ const EmployeeModal = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'personal' | 'employment' | 'financial'>('personal');
   const employeeSchema = useMemo(() => createEmployeeSchema(t), [t]);
-  
-  const { register, handleSubmit, reset, formState: { errors } } = useForm<EmployeeFormValues>({
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeSchema),
     defaultValues: {
       role: UserRole.CASHIER,
       employment_type: 'Full-time',
       employment_status: 'Active',
-    }
+    },
   });
 
   useEffect(() => {
@@ -270,13 +325,12 @@ const EmployeeModal = ({
               {employee ? t.editEmployee || 'Edit Employee' : t.addEmployee || 'Add Employee'}
             </h2>
             <p className="text-sm text-stone-500 mt-1">
-              {employee ? t.updateDetails || 'Update employee details' : t.fillDetails || 'Fill in the employee details'}
+              {employee
+                ? t.updateDetails || 'Update employee details'
+                : t.fillDetails || 'Fill in the employee details'}
             </p>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-2 hover:bg-stone-100 rounded-xl transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-stone-100 rounded-xl transition-colors">
             <X size={20} className="text-stone-400" />
           </button>
         </div>
@@ -419,11 +473,13 @@ const EmployeeModal = ({
                       {...register('employment_status')}
                       className="w-full px-4 py-2.5 rounded-xl border border-stone-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all bg-white"
                     >
-                      {['Active', 'Probation', 'Suspended', 'Terminated', 'Resigned'].map((status) => (
-                        <option key={status} value={status}>
-                          {t[status.toLowerCase()] || status}
-                        </option>
-                      ))}
+                      {['Active', 'Probation', 'Suspended', 'Terminated', 'Resigned'].map(
+                        (status) => (
+                          <option key={status} value={status}>
+                            {t[status.toLowerCase()] || status}
+                          </option>
+                        )
+                      )}
                     </select>
                   </div>
                 </div>
@@ -461,7 +517,9 @@ const EmployeeModal = ({
                       className="w-full px-4 py-2.5 rounded-xl border border-stone-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all bg-white"
                     >
                       {['Full-time', 'Part-time', 'Contract', 'Intern'].map((type) => (
-                        <option key={type} value={type}>{type}</option>
+                        <option key={type} value={type}>
+                          {type}
+                        </option>
                       ))}
                     </select>
                   </div>
@@ -490,7 +548,9 @@ const EmployeeModal = ({
                   >
                     <option value="">{t.selectLocation || 'Select Location'}</option>
                     {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -564,12 +624,8 @@ const EmployeeModal = ({
               disabled={loading}
               className="flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-600 text-white font-semibold rounded-xl shadow-lg shadow-orange-500/25 hover:shadow-orange-500/40 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <SaveIcon size={18} />
-              )}
-              {employee ? (t.update || 'Update') : (t.create || 'Create')}
+              {loading ? <Loader2 size={18} className="animate-spin" /> : <SaveIcon size={18} />}
+              {employee ? t.update || 'Update' : t.create || 'Create'}
             </button>
           </div>
         </form>
@@ -580,7 +636,16 @@ const EmployeeModal = ({
 
 // Save icon component
 const SaveIcon = ({ size = 24 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
     <polyline points="17 21 17 13 7 13 7 21" />
     <polyline points="7 3 7 8 15 8" />
@@ -592,7 +657,8 @@ const SaveIcon = ({ size = 24 }: { size?: number }) => (
 export default function StaffView() {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
-  
+  const { showError } = useErrorToast();
+
   // State
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
@@ -608,28 +674,28 @@ export default function StaffView() {
   const fetchEmployees = useCallback(async () => {
     try {
       setLoading(true);
+      const tableName = user?.role === UserRole.MANAGER ? 'employees_for_manager' : 'employees';
       const { data, error } = await supabase
-        .from('employees')
+        .from(tableName)
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
       setEmployees(data || []);
     } catch (err) {
       console.error('Error fetching employees:', err);
+      showError(t.actionFailed || 'Failed to fetch employees');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.role]);
 
   const fetchLocations = useCallback(async () => {
     try {
-      const { data } = await supabase
-        .from('locations')
-        .select('*')
-        .eq('is_active', true);
+      const { data } = await supabase.from('locations').select('*').eq('is_active', true);
       if (data) setLocations(data);
     } catch (err) {
       console.error('Error fetching locations:', err);
+      showError(t.actionFailed || 'Failed to fetch locations');
     }
   }, []);
 
@@ -641,14 +707,16 @@ export default function StaffView() {
   // Filter employees
   const filteredEmployees = useMemo(() => {
     return employees.filter((emp) => {
-      const matchesSearch = 
-        `${emp.first_name_en} ${emp.last_name_en}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      const matchesSearch =
+        `${emp.first_name_en} ${emp.last_name_en}`
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
         emp.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         emp.phone?.includes(searchTerm);
-      
+
       const matchesRole = filterRole === 'ALL' || emp.role === filterRole;
       const matchesStatus = filterStatus === 'ALL' || emp.employment_status === filterStatus;
-      
+
       return matchesSearch && matchesRole && matchesStatus;
     });
   }, [employees, searchTerm, filterRole, filterStatus]);
@@ -656,14 +724,14 @@ export default function StaffView() {
   // Stats
   const stats = useMemo(() => {
     const total = employees.length;
-    const active = employees.filter(e => e.employment_status === 'Active').length;
-    const onLeave = employees.filter(e => e.is_on_leave).length;
-    const newThisMonth = employees.filter(e => {
+    const active = employees.filter((e) => e.employment_status === 'Active').length;
+    const onLeave = employees.filter((e) => e.is_on_leave).length;
+    const newThisMonth = employees.filter((e) => {
       const hireDate = new Date(e.hire_date);
       const now = new Date();
       return hireDate.getMonth() === now.getMonth() && hireDate.getFullYear() === now.getFullYear();
     }).length;
-    
+
     return { total, active, onLeave, newThisMonth };
   }, [employees]);
 
@@ -706,6 +774,7 @@ export default function StaffView() {
       setEditingEmployee(null);
     } catch (err: any) {
       console.error('Error saving employee:', err);
+      showError(err.message || t.actionFailed || 'Failed to save employee');
       alert(err.message || 'Failed to save employee');
     } finally {
       setLoading(false);
@@ -739,27 +808,27 @@ export default function StaffView() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <StatCard 
-            title={t.totalEmployees || 'Total Employees'} 
+          <StatCard
+            title={t.totalEmployees || 'Total Employees'}
             value={stats.total}
             icon={Users}
             color="orange"
           />
-          <StatCard 
-            title={t.activeStaff || 'Active Staff'} 
+          <StatCard
+            title={t.activeStaff || 'Active Staff'}
             value={stats.active}
             icon={Award}
             color="green"
             trend={{ value: 12, positive: true }}
           />
-          <StatCard 
-            title={t.onLeave || 'On Leave'} 
+          <StatCard
+            title={t.onLeave || 'On Leave'}
             value={stats.onLeave}
             icon={Calendar}
             color="blue"
           />
-          <StatCard 
-            title={t.newHires || 'New Hires'} 
+          <StatCard
+            title={t.newHires || 'New Hires'}
             value={stats.newThisMonth}
             icon={TrendingUp}
             color="purple"
@@ -780,7 +849,7 @@ export default function StaffView() {
               className="w-full pl-12 pr-4 py-3 rounded-xl border border-stone-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 outline-none transition-all"
             />
           </div>
-          
+
           <div className="flex gap-3">
             <select
               value={filterRole}
@@ -794,7 +863,7 @@ export default function StaffView() {
                 </option>
               ))}
             </select>
-            
+
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
@@ -837,8 +906,12 @@ export default function StaffView() {
           <div className="w-20 h-20 bg-stone-100 rounded-full flex items-center justify-center mb-4">
             <Users className="text-stone-400" size={32} />
           </div>
-          <h3 className="text-lg font-semibold text-stone-900">{t.noEmployees || 'No employees found'}</h3>
-          <p className="text-stone-500 mt-1">{t.tryAdjustingFilters || 'Try adjusting your filters or add a new employee'}</p>
+          <h3 className="text-lg font-semibold text-stone-900">
+            {t.noEmployees || 'No employees found'}
+          </h3>
+          <p className="text-stone-500 mt-1">
+            {t.tryAdjustingFilters || 'Try adjusting your filters or add a new employee'}
+          </p>
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
@@ -857,31 +930,46 @@ export default function StaffView() {
           <table className="w-full">
             <thead className="bg-stone-50 border-b border-stone-100">
               <tr>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-stone-700">{t.employee || 'Employee'}</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-stone-700">{t.role || 'Role'}</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-stone-700">{t.department || 'Department'}</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-stone-700">{t.status || 'Status'}</th>
-                <th className="text-left px-6 py-4 text-sm font-semibold text-stone-700">{t.contact || 'Contact'}</th>
-                <th className="text-right px-6 py-4 text-sm font-semibold text-stone-700">{t.actions || 'Actions'}</th>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-stone-700">
+                  {t.employee || 'Employee'}
+                </th>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-stone-700">
+                  {t.role || 'Role'}
+                </th>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-stone-700">
+                  {t.department || 'Department'}
+                </th>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-stone-700">
+                  {t.status || 'Status'}
+                </th>
+                <th className="text-left px-6 py-4 text-sm font-semibold text-stone-700">
+                  {t.contact || 'Contact'}
+                </th>
+                <th className="text-right px-6 py-4 text-sm font-semibold text-stone-700">
+                  {t.actions || 'Actions'}
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-100">
               {filteredEmployees.map((employee) => (
-                <tr 
-                  key={employee.id} 
-                  className="hover:bg-stone-50 transition-colors group"
-                >
+                <tr key={employee.id} className="hover:bg-stone-50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">
                       {employee.photo_url ? (
-                        <img src={employee.photo_url} alt="" className="w-10 h-10 rounded-xl object-cover" />
+                        <img
+                          src={employee.photo_url}
+                          alt=""
+                          className="w-10 h-10 rounded-xl object-cover"
+                        />
                       ) : (
                         <div className="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
                           <User size={18} className="text-orange-600" />
                         </div>
                       )}
                       <div>
-                        <p className="font-semibold text-stone-900">{employee.first_name_en} {employee.last_name_en}</p>
+                        <p className="font-semibold text-stone-900">
+                          {employee.first_name_en} {employee.last_name_en}
+                        </p>
                         <p className="text-sm text-stone-500">{employee.position || '-'}</p>
                       </div>
                     </div>
@@ -893,16 +981,24 @@ export default function StaffView() {
                   </td>
                   <td className="px-6 py-4 text-stone-600">{employee.department || '-'}</td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
-                      employee.employment_status === 'Active' ? 'bg-emerald-100 text-emerald-700' :
-                      employee.employment_status === 'Probation' ? 'bg-amber-100 text-amber-700' :
-                      'bg-stone-100 text-stone-700'
-                    }`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${
-                        employee.employment_status === 'Active' ? 'bg-emerald-500' :
-                        employee.employment_status === 'Probation' ? 'bg-amber-500' :
-                        'bg-stone-500'
-                      }`} />
+                    <span
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium ${
+                        employee.employment_status === 'Active'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : employee.employment_status === 'Probation'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-stone-100 text-stone-700'
+                      }`}
+                    >
+                      <span
+                        className={`w-1.5 h-1.5 rounded-full ${
+                          employee.employment_status === 'Active'
+                            ? 'bg-emerald-500'
+                            : employee.employment_status === 'Probation'
+                              ? 'bg-amber-500'
+                              : 'bg-stone-500'
+                        }`}
+                      />
                       {employee.employment_status}
                     </span>
                   </td>

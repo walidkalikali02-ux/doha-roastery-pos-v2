@@ -1,32 +1,28 @@
 import { supabase } from '../supabaseClient';
 import { Shift, Transaction, CashMovement } from '../types';
-
-const DEMO_USER_UUID = '00000000-0000-0000-0000-000000000000';
-
-const resolveUserId = (userId: string) => {
-  return userId === 'demo-user' ? DEMO_USER_UUID : userId;
-};
+import { isDemoMode, getDemoUserId } from '../utils/demoMode';
 
 export const shiftService = {
   async getOpenShift(userId: string): Promise<Shift | null> {
-    const validUserId = resolveUserId(userId);
+    const validUserId = isDemoMode() ? getDemoUserId() : userId;
     const { data, error } = await supabase
       .from('shifts')
       .select('*')
       .eq('cashier_id', validUserId)
       .eq('status', 'OPEN')
       .single();
-    
-    if (error && error.code !== 'PGRST116') { // PGRST116 is "Row not found"
+
+    if (error && error.code !== 'PGRST116') {
+      // PGRST116 is "Row not found"
       console.error('Error fetching open shift:', error);
       throw error;
     }
-    
+
     return data || null;
   },
 
   async startShift(userId: string, userName: string, initialCash: number): Promise<Shift> {
-    const validUserId = resolveUserId(userId);
+    const validUserId = isDemoMode() ? getDemoUserId() : userId;
     const newShift = {
       cashier_id: validUserId,
       cashier_name: userName,
@@ -34,14 +30,10 @@ export const shiftService = {
       initial_cash: initialCash,
       status: 'OPEN',
       total_cash_sales: 0,
-      total_cash_returns: 0
+      total_cash_returns: 0,
     };
 
-    const { data, error } = await supabase
-      .from('shifts')
-      .insert([newShift])
-      .select()
-      .single();
+    const { data, error } = await supabase.from('shifts').insert([newShift]).select().single();
 
     if (error) {
       console.error('Error starting shift:', error);
@@ -51,7 +43,13 @@ export const shiftService = {
     return data;
   },
 
-  async closeShift(shiftId: string, actualCash: number, sales: number, returns: number, notes?: string): Promise<Shift> {
+  async closeShift(
+    shiftId: string,
+    actualCash: number,
+    sales: number,
+    returns: number,
+    notes?: string
+  ): Promise<Shift> {
     const { data, error } = await supabase
       .from('shifts')
       .update({
@@ -60,7 +58,7 @@ export const shiftService = {
         actual_cash: actualCash,
         total_cash_sales: sales,
         total_cash_returns: returns,
-        notes: notes
+        notes: notes,
       })
       .eq('id', shiftId)
       .select()
@@ -75,14 +73,14 @@ export const shiftService = {
   },
 
   async addCashMovement(
-    shiftId: string, 
-    type: 'IN' | 'OUT', 
-    amount: number, 
+    shiftId: string,
+    type: 'IN' | 'OUT',
+    amount: number,
     reason: string,
     userId: string,
     userName: string
   ): Promise<CashMovement> {
-    const validUserId = resolveUserId(userId);
+    const validUserId = isDemoMode() ? getDemoUserId() : userId;
     const movement = {
       shift_id: shiftId,
       type,
@@ -90,7 +88,7 @@ export const shiftService = {
       reason,
       created_at: new Date().toISOString(),
       created_by_id: validUserId,
-      created_by_name: userName
+      created_by_name: userName,
     };
 
     const { data, error } = await supabase
@@ -107,7 +105,13 @@ export const shiftService = {
     return data;
   },
 
-  async getShiftTotals(shift: Shift): Promise<{ sales: number; returns: number; cashIn: number; cashOut: number; expected: number }> {
+  async getShiftTotals(shift: Shift): Promise<{
+    sales: number;
+    returns: number;
+    cashIn: number;
+    cashOut: number;
+    expected: number;
+  }> {
     // 1. Get Cash Sales (Transactions)
     const { data: transactions, error: txError } = await supabase
       .from('transactions')
@@ -120,10 +124,10 @@ export const shiftService = {
 
     // Filter by cashier if needed, but usually we want all transactions in the drawer
     // Assuming 1 drawer per machine, filtering by cashier might be safer if multiple share one machine
-    const myTransactions = transactions?.filter(tx => tx.cashier_name === shift.cashier_name) || [];
+    const myTransactions = transactions?.filter((tx) => tx.cashier_id === shift.cashier_id) || [];
 
     let cashSales = 0;
-    
+
     myTransactions.forEach((tx: Transaction) => {
       if (tx.paymentMethod === 'CASH') {
         cashSales += tx.total;
@@ -154,16 +158,16 @@ export const shiftService = {
     } catch (e) {
       console.warn('Exception fetching cash movements:', e);
     }
-    
+
     // Calculation: Initial + Sales + CashIn - CashOut
     const expected = shift.initial_cash + cashSales + cashIn - cashOut;
 
     return {
       sales: cashSales,
-      returns: 0, 
+      returns: 0,
       cashIn,
       cashOut,
-      expected
+      expected,
     };
-  }
+  },
 };
