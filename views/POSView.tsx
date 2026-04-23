@@ -1825,7 +1825,7 @@ const POSView: React.FC = () => {
                   <label className="text-[10px] font-black text-black uppercase tracking-widest flex items-center gap-2">
                     <PlusCircle size={14} /> {t.extras}
                   </label>
-                  <div className="grid grid-cols-2 gap-3">
+<div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {(customizingItem as any).add_ons.map((ao: AddOn) => {
                       const isSelected = tempCustoms.selectedAddOns?.some((s) => s.id === ao.id);
                       return (
@@ -2364,7 +2364,7 @@ const POSView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 animate-in fade-in duration-500">
+            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 animate-in fade-in duration-500">
               {isLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="bg-white rounded-2xl aspect-square animate-pulse"></div>
@@ -2691,7 +2691,7 @@ const POSView: React.FC = () => {
                 </div>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <button
                 onClick={() => handlePrint()}
                 className="py-4 bg-white  text-black  rounded-2xl font-bold flex items-center justify-center gap-2  transition-all active:scale-95"
@@ -2913,7 +2913,7 @@ const POSView: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
               <button
                 onClick={() => {
                   setCashMovementType('IN');
