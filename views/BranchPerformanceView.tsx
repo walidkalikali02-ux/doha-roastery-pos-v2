@@ -19,7 +19,20 @@ import {
   FileDown,
   Trash2,
   AlertTriangle,
+  Clock,
+  Activity,
+  Award
 } from 'lucide-react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip as RechartsTooltip,
+  ResponsiveContainer,
+  Legend
+} from 'recharts';
 import {
   fetchInvoicesByPeriod,
   exportInvoicesToExcel,
@@ -65,6 +78,9 @@ const BranchPerformanceView: React.FC = () => {
   const [deleteResult, setDeleteResult] = useState<{ success: boolean; count: number } | null>(
     null
   );
+  const [lastTransactionAt, setLastTransactionAt] = useState<string | null>(null);
+  const [lastTransactionByBranch, setLastTransactionByBranch] = useState<Record<string, string>>({});
+  const [selectedLastTransactionBranch, setSelectedLastTransactionBranch] = useState<string>('all');
 
   useEffect(() => {
     fetchBranchPerformance();
@@ -107,6 +123,30 @@ const BranchPerformanceView: React.FC = () => {
         .gte('created_at', dateFrom);
 
       const { data: staff } = await supabase.from('staff').select('id, location_id');
+      let latestTransactionAt: string | null = null;
+      const latestTransactionByBranch: Record<string, string> = {};
+      (transactions || []).forEach((transaction: any) => {
+        if (!transaction?.created_at) {
+          return;
+        }
+        if (
+          !latestTransactionAt ||
+          new Date(transaction.created_at).getTime() > new Date(latestTransactionAt).getTime()
+        ) {
+          latestTransactionAt = transaction.created_at;
+        }
+        const branchId = transaction.location_id;
+        if (
+          branchId &&
+          (!latestTransactionByBranch[branchId] ||
+            new Date(transaction.created_at).getTime() >
+              new Date(latestTransactionByBranch[branchId]).getTime())
+        ) {
+          latestTransactionByBranch[branchId] = transaction.created_at;
+        }
+      });
+      setLastTransactionAt(latestTransactionAt);
+      setLastTransactionByBranch(latestTransactionByBranch);
 
       const allStats: BranchStats = {
         id: 'all',
@@ -235,6 +275,10 @@ const BranchPerformanceView: React.FC = () => {
 
   const totalSystemSales = branchStats.reduce((sum, b) => sum + b.totalSales, 0);
   const totalSystemTransactions = branchStats.reduce((sum, b) => sum + b.totalTransactions, 0);
+  const displayedLastTransactionAt =
+    selectedLastTransactionBranch === 'all'
+      ? lastTransactionAt
+      : lastTransactionByBranch[selectedLastTransactionBranch] || null;
 
   const handleSort = (column: 'sales' | 'transactions' | 'growth') => {
     if (sortBy === column) {
@@ -403,6 +447,16 @@ const BranchPerformanceView: React.FC = () => {
     setShowDeleteModal(true);
   };
 
+  const chartData = useMemo(() => {
+    return sortedStats
+      .filter((b) => b.id !== 'all')
+      .map((b) => ({
+        name: b.name,
+        sales: b.totalSales,
+        transactions: b.totalTransactions,
+      }));
+  }, [sortedStats]);
+
   return (
     <div
       className="space-y-6 animate-in fade-in duration-500 pb-20"
@@ -464,66 +518,174 @@ const BranchPerformanceView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
+        {/* KPI 1 */}
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-[24px] p-6 border border-green-100/50 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <DollarSign size={80} />
+          </div>
+          <div className="flex items-center justify-between relative z-10">
             <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">
+              <p className="text-xs font-bold text-green-800 uppercase tracking-wider">
                 {t.totalSystemSales || 'Total System Sales'}
               </p>
-              <p className="text-2xl font-bold text-black mt-1">
-                {totalSystemSales.toFixed(2)} QAR
-              </p>
+              <div className="flex items-end gap-2 mt-2">
+                <p className="text-3xl font-black text-green-950">
+                  {totalSystemSales.toFixed(2)}
+                </p>
+                <p className="text-sm font-bold text-green-700 mb-1">QAR</p>
+              </div>
             </div>
-            <div className="p-3 bg-green-100 rounded-xl">
-              <DollarSign className="text-green-600" size={24} />
+            <div className="p-3 bg-green-600 rounded-xl shadow-md">
+              <DollarSign className="text-white" size={24} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
+        {/* KPI 2 */}
+        <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-[24px] p-6 border border-blue-100/50 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <Activity size={80} />
+          </div>
+          <div className="flex items-center justify-between relative z-10">
             <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">
+              <p className="text-xs font-bold text-blue-800 uppercase tracking-wider">
                 {t.transactionsCount || 'Total Transactions'}
               </p>
-              <p className="text-2xl font-bold text-black mt-1">{totalSystemTransactions}</p>
+              <div className="flex items-end gap-2 mt-2">
+                <p className="text-3xl font-black text-blue-950">{totalSystemTransactions}</p>
+                <p className="text-sm font-bold text-blue-700 mb-1">
+                  {(t as any).receipts || 'Receipts'}
+                </p>
+              </div>
             </div>
-            <div className="p-3 bg-blue-100 rounded-xl">
-              <TrendingUp className="text-blue-600" size={24} />
+            <div className="p-3 bg-blue-600 rounded-xl shadow-md">
+              <TrendingUp className="text-white" size={24} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
-          <div className="flex items-center justify-between">
+        {/* KPI 3 */}
+        <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-[24px] p-6 border border-orange-100/50 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 right-0 p-4 opacity-10">
+            <PieChart size={80} />
+          </div>
+          <div className="flex items-center justify-between relative z-10">
             <div>
-              <p className="text-xs font-bold text-gray-500 uppercase">
+              <p className="text-xs font-bold text-orange-800 uppercase tracking-wider">
                 {t.avgTransaction || 'Avg. Transaction'}
               </p>
-              <p className="text-2xl font-bold text-black mt-1">
-                {totalSystemTransactions > 0
-                  ? (totalSystemSales / totalSystemTransactions).toFixed(2)
-                  : 0}{' '}
-                QAR
-              </p>
+              <div className="flex items-end gap-2 mt-2">
+                <p className="text-3xl font-black text-orange-950">
+                  {totalSystemTransactions > 0
+                    ? (totalSystemSales / totalSystemTransactions).toFixed(2)
+                    : '0.00'}
+                </p>
+                <p className="text-sm font-bold text-orange-700 mb-1">QAR</p>
+              </div>
             </div>
-            <div className="p-3 bg-orange-100 rounded-xl">
-              <PieChart className="text-orange-600" size={24} />
+            <div className="p-3 bg-orange-500 rounded-xl shadow-md">
+              <PieChart className="text-white" size={24} />
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Chart section */}
+        <div className="lg:col-span-2 bg-white rounded-[24px] p-6 shadow-sm border border-gray-100">
+          <h3 className="font-bold text-black mb-6">{t.salesTotal || 'Sales'} vs {(t as any).transactions || 'Transactions'}</h3>
+          <div className="h-72 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
+                <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
+                <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#6b7280' }} />
+                <RechartsTooltip cursor={{ fill: 'rgba(0,0,0,0.02)' }} contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' }} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: '12px', paddingTop: '10px' }} />
+                <Bar yAxisId="left" dataKey="sales" name={t.salesTotal || 'Sales'} fill="#2563eb" radius={[4, 4, 0, 0]} barSize={32} />
+                <Bar yAxisId="right" dataKey="transactions" name={t.transactionsCount || 'Transactions'} fill="#f59e0b" radius={[4, 4, 0, 0]} barSize={32} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          <div className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 relative overflow-hidden">
+            <div className="absolute -right-4 -top-4 opacity-5 text-blue-600">
+              <Clock size={120} />
+            </div>
+            <div className="relative z-10">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                  <Clock size={20} />
+                </div>
+                <h3 className="font-bold text-black">
+                  {(t as any).lastTransaction || 'Last Transaction'}
+                </h3>
+              </div>
+              <select
+                value={selectedLastTransactionBranch}
+                onChange={(e) => setSelectedLastTransactionBranch(e.target.value)}
+                className="w-full mb-6 p-3 border border-gray-200 rounded-xl text-sm font-medium text-black bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500 outline-none transition-all"
+              >
+                <option value="all">{(t as any).allBranches || 'All Branches'}</option>
+                {locations
+                  .filter((location) => location.is_active !== false)
+                  .map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+              </select>
+              
+              <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                <p className="text-2xl font-black text-blue-950">
+                  {displayedLastTransactionAt
+                    ? new Date(displayedLastTransactionAt).toLocaleString(
+                        lang === 'ar' ? 'ar-QA' : 'en-US',
+                        {
+                          year: 'numeric',
+                          month: 'short',
+                          day: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }
+                      )
+                    : (t as any).noTransactions || 'No transactions'}
+                </p>
+                <p className="text-xs font-bold text-gray-500 mt-2 uppercase tracking-wider">
+                  {selectedPeriod === 'day'
+                    ? t.day || 'Day'
+                    : selectedPeriod === 'week'
+                      ? t.week || 'Week'
+                      : selectedPeriod === 'month'
+                        ? t.month || 'Month'
+                        : t.year || 'Year'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Table Section */}
+      <div className="bg-white rounded-[24px] shadow-sm border border-gray-100 overflow-hidden mb-6">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="font-bold text-black flex items-center gap-2">
+            <Award className="text-blue-600" size={20} />
+            {t.branchPerformance || 'Branch Performance'}
+          </h3>
+        </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="bg-gray-50">
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">
+              <tr className="bg-gray-50/50">
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">
                   {t.branch || 'Branch'}
                 </th>
                 <th
-                  className="text-left p-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                  className="text-left p-4 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('sales')}
                 >
                   <div className="flex items-center gap-1">
@@ -532,7 +694,7 @@ const BranchPerformanceView: React.FC = () => {
                   </div>
                 </th>
                 <th
-                  className="text-left p-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                  className="text-left p-4 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('transactions')}
                 >
                   <div className="flex items-center gap-1">
@@ -540,11 +702,11 @@ const BranchPerformanceView: React.FC = () => {
                     <ArrowUpDown size={14} />
                   </div>
                 </th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">
                   {t.avgTransaction || 'Avg. Value'}
                 </th>
                 <th
-                  className="text-left p-4 text-xs font-bold text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
+                  className="text-left p-4 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors"
                   onClick={() => handleSort('growth')}
                 >
                   <div className="flex items-center gap-1">
@@ -552,93 +714,106 @@ const BranchPerformanceView: React.FC = () => {
                     <ArrowUpDown size={14} />
                   </div>
                 </th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">
                   {t.staff || 'Staff'}
                 </th>
-                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase">
+                <th className="text-left p-4 text-xs font-bold text-gray-500 uppercase tracking-wider">
                   {(t as any).actions || 'Actions'}
                 </th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-50">
               {isLoading ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center">
-                    <div className="flex justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  <td colSpan={7} className="p-12 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3">
+                      <Loader2 className="animate-spin text-blue-600" size={32} />
+                      <p className="text-sm font-medium text-gray-500">Loading data...</p>
                     </div>
                   </td>
                 </tr>
               ) : sortedStats.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="p-8 text-center text-gray-500">
-                    {'No data available'}
+                  <td colSpan={7} className="p-12 text-center text-gray-500 font-medium">
+                    {'No data available for the selected period.'}
                   </td>
                 </tr>
               ) : (
                 sortedStats.map((branch, index) => (
-                  <tr key={branch.id} className="border-t border-gray-100 hover:bg-gray-50">
+                  <tr key={branch.id} className="hover:bg-blue-50/30 transition-colors group">
                     <td className="p-4">
                       <div className="flex items-center gap-3">
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold text-white ${
+                          className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-white shadow-sm ${
                             index === 0
-                              ? 'bg-yellow-500'
+                              ? 'bg-gradient-to-br from-yellow-400 to-yellow-600'
                               : index === 1
-                                ? 'bg-gray-400'
+                                ? 'bg-gradient-to-br from-gray-300 to-gray-500'
                                 : index === 2
-                                  ? 'bg-amber-600'
-                                  : 'bg-blue-600'
+                                  ? 'bg-gradient-to-br from-amber-600 to-amber-800'
+                                  : 'bg-gradient-to-br from-blue-500 to-blue-700'
                           }`}
                         >
                           {branch.name.charAt(0)}
                         </div>
-                        <span className="font-bold text-black">{branch.name}</span>
+                        <span className="font-bold text-gray-900 group-hover:text-blue-700 transition-colors">
+                          {branch.name}
+                        </span>
                       </div>
                     </td>
                     <td className="p-4">
-                      <span className="font-bold text-black font-mono">
-                        {branch.totalSales.toFixed(2)}
-                      </span>
-                      <span className="text-gray-500 text-xs mr-1">QAR</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-black text-gray-900 font-mono">
+                          {branch.totalSales.toFixed(2)}
+                        </span>
+                        <span className="text-gray-400 text-[10px] font-bold">QAR</span>
+                      </div>
                     </td>
                     <td className="p-4">
-                      <span className="font-bold text-black">{branch.totalTransactions}</span>
+                      <span className="font-bold text-gray-700 bg-gray-100 px-2.5 py-1 rounded-lg">
+                        {branch.totalTransactions}
+                      </span>
                     </td>
                     <td className="p-4">
-                      <span className="font-bold text-black font-mono">
-                        {branch.avgTransactionValue.toFixed(2)}
-                      </span>
-                      <span className="text-gray-500 text-xs mr-1">QAR</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-bold text-gray-700 font-mono">
+                          {branch.avgTransactionValue.toFixed(2)}
+                        </span>
+                        <span className="text-gray-400 text-[10px] font-bold">QAR</span>
+                      </div>
                     </td>
                     <td className="p-4">
                       <div
-                        className={`flex items-center gap-1 ${branch.growth >= 0 ? 'text-green-600' : 'text-red-600'}`}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg w-fit ${
+                          branch.growth >= 0 
+                            ? 'bg-green-50 text-green-700' 
+                            : 'bg-red-50 text-red-700'
+                        }`}
                       >
-                        {branch.growth >= 0 ? <TrendingUp size={16} /> : <TrendingDown size={16} />}
-                        <span className="font-bold">{Math.abs(branch.growth).toFixed(1)}%</span>
+                        {branch.growth >= 0 ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
+                        <span className="font-bold text-xs">{Math.abs(branch.growth).toFixed(1)}%</span>
                       </div>
                     </td>
                     <td className="p-4">
-                      <div className="flex items-center gap-1 text-gray-600">
-                        <Users size={16} />
-                        <span className="font-bold">{branch.staffCount}</span>
+                      <div className="flex items-center gap-1.5 text-gray-500 font-medium">
+                        <Users size={16} className="text-gray-400" />
+                        <span>{branch.staffCount}</span>
                       </div>
                     </td>
                     <td className="p-4">
                       {branch.id !== 'all' && (
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                           <button
                             onClick={() => handleExportInvoices(branch.id)}
                             disabled={isExporting}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-green-100 text-green-700 rounded-lg text-xs font-bold hover:bg-green-200 transition-colors disabled:opacity-50"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-bold hover:bg-green-100 transition-colors disabled:opacity-50"
                           >
                             <FileDown size={14} />
                             {(t as any).export || 'Export'}
                           </button>
                           <button
                             onClick={() => openDeleteModal(branch.id)}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-red-100 text-red-700 rounded-lg text-xs font-bold hover:bg-red-200 transition-colors"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-red-50 text-red-700 rounded-lg text-xs font-bold hover:bg-red-100 transition-colors"
                           >
                             <Trash2 size={14} />
                             {(t as any).delete || 'Delete'}
@@ -654,7 +829,7 @@ const BranchPerformanceView: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {sortedStats.slice(0, 4).map((branch) => (
           <div
             key={branch.id}
@@ -687,7 +862,7 @@ const BranchPerformanceView: React.FC = () => {
 
             <h4 className="font-bold text-black mt-6 mb-3 pt-4 border-t border-gray-100 flex items-center gap-2">
               <Users size={18} className="text-green-600" />
-              {t.cashierSales || 'Cashier Sales'}
+              {lang === 'ar' ? 'مبيعات الكاشير' : 'Cashier Sales'}
             </h4>
             <div className="space-y-2">
               {branch.cashierSales && branch.cashierSales.length > 0 ? (
@@ -699,7 +874,7 @@ const BranchPerformanceView: React.FC = () => {
                     <div>
                       <span className="font-medium text-black">{cs.cashier_name}</span>
                       <span className="text-xs text-gray-500 mr-2">
-                        ({cs.sales_count} {t.sales || 'sales'})
+                        ({cs.sales_count} {lang === 'ar' ? 'مبيعات' : 'sales'})
                       </span>
                     </div>
                     <span className="font-bold text-green-600">
@@ -708,13 +883,14 @@ const BranchPerformanceView: React.FC = () => {
                   </div>
                 ))
               ) : (
-                <p className="text-gray-500 text-sm">{t.noCashierData || 'No cashier data'}</p>
+                <p className="text-gray-500 text-sm">
+                  {lang === 'ar' ? 'لا توجد بيانات كاشير' : 'No cashier data'}
+                </p>
               )}
             </div>
           </div>
         ))}
       </div>
-
       {/* Convert Transactions Modal */}
       {showConvertModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -783,7 +959,9 @@ const BranchPerformanceView: React.FC = () => {
                 className={`mt-4 p-4 rounded-xl ${convertResult.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
               >
                 {convertResult.success
-                  ? `${t.successConverted || 'Successfully converted'} ${convertResult.count} ${t.transactions || 'transactions'}`
+                  ? `${t.successConverted || 'Successfully converted'} ${convertResult.count} ${
+                      lang === 'ar' ? 'معاملة' : 'transactions'
+                    }`
                   : t.conversionFailed || 'Conversion failed'}
               </div>
             )}
@@ -808,7 +986,7 @@ const BranchPerformanceView: React.FC = () => {
                     {t.converting || 'Converting...'}
                   </>
                 ) : (
-                  t.convert || 'Convert'
+                  lang === 'ar' ? 'تحويل' : 'Convert'
                 )}
               </button>
             </div>

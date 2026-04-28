@@ -26,6 +26,7 @@ import { useLanguage } from '../App';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { supabase } from '../supabaseClient';
 import { BatchStatus, RoastingBatch, Transaction } from '../types';
+import { alertService } from '../services/alertService';
 
 const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: any) => (
   <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-orange-100 transition-colors duration-300">
@@ -62,6 +63,17 @@ const DashboardView: React.FC = () => {
     lowStockCount: 0,
   });
   const [isLoading, setIsLoading] = useState(true);
+  const [dashboardAlerts, setDashboardAlerts] = useState<
+    Array<{
+      id: string;
+      product_name: string;
+      product_sku: string | null;
+      alert_type: 'LOW_STOCK' | 'OUT_OF_STOCK';
+      current_qty: number;
+      threshold_qty: number;
+      product_link: string;
+    }>
+  >([]);
 
   const normalizeBatchStatus = (status: string): BatchStatus => {
     if (status === 'Ready for Packaging' || status === BatchStatus.PACKAGING)
@@ -141,6 +153,19 @@ const DashboardView: React.FC = () => {
         ),
         lowStockCount,
       });
+
+      const alerts = await alertService.getDashboardAlerts();
+      setDashboardAlerts(
+        alerts.map((a: any) => ({
+          id: a.id,
+          product_name: a.product_name,
+          product_sku: a.product_sku,
+          alert_type: a.alert_type,
+          current_qty: a.current_qty,
+          threshold_qty: a.threshold_qty,
+          product_link: a.product_link,
+        }))
+      );
     } catch (err) {
       console.error('Dashboard fetch error:', err);
       showError(t.actionFailed || 'Failed to load dashboard data');
@@ -206,6 +231,37 @@ const DashboardView: React.FC = () => {
           <button className="w-full md:w-auto px-6 py-2 bg-orange-600 text-white rounded-xl text-xs font-bold  transition-colors shadow-lg">
             {t.reviewInventory}
           </button>
+        </div>
+      )}
+
+      {dashboardAlerts.length > 0 && (
+        <div className="bg-white border-2 border-red-600 p-4 md:p-5 rounded-3xl transition-colors">
+          <div className="flex items-center gap-3 text-black mb-3">
+            <div className="bg-red-600 text-white p-2 rounded-xl">
+              <AlertTriangle size={20} />
+            </div>
+            <h4 className="font-bold text-sm md:text-base">
+              {`Stock Alerts (${dashboardAlerts.length})`}
+            </h4>
+          </div>
+          <div className="space-y-2 max-h-52 overflow-auto">
+            {dashboardAlerts.map((alert) => (
+              <a
+                key={alert.id}
+                href={alert.product_link}
+                className="block rounded-xl border border-orange-200 px-3 py-2 text-xs md:text-sm hover:bg-orange-50 transition-colors"
+              >
+                <span className="font-bold">{alert.product_name}</span>
+                <span className="ml-2 text-[11px] opacity-80">{alert.product_sku || 'N/A'}</span>
+                <span className="ml-2 inline-block rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                  {alert.alert_type === 'OUT_OF_STOCK' ? 'Out' : 'Low'}
+                </span>
+                <span className="ml-2 text-[11px] opacity-80">
+                  {`Qty ${alert.current_qty} / Min ${alert.threshold_qty}`}
+                </span>
+              </a>
+            ))}
+          </div>
         </div>
       )}
 

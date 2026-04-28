@@ -9,6 +9,8 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   sessionExpiresAt: Date | null;
+  lastActivityAt: Date | null;
+  sessionTimeoutMinutes: number;
 }
 
 interface AuthContextType extends AuthState {
@@ -24,6 +26,8 @@ interface AuthContextType extends AuthState {
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const DEFAULT_SESSION_TIMEOUT_MINUTES = 30;
+const SESSION_CHECK_INTERVAL_MS = 30 * 1000;
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -38,7 +42,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     isLoading: true,
     error: null,
     sessionExpiresAt: null,
+    lastActivityAt: null,
+    sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
   });
+
+  const getConfiguredSessionTimeoutMinutes = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('session_timeout_minutes')
+      .limit(1)
+      .maybeSingle();
+    if (error) return DEFAULT_SESSION_TIMEOUT_MINUTES;
+    const minutes = Number((data as any)?.session_timeout_minutes || DEFAULT_SESSION_TIMEOUT_MINUTES);
+    if (!Number.isFinite(minutes)) return DEFAULT_SESSION_TIMEOUT_MINUTES;
+    return Math.min(480, Math.max(5, Math.floor(minutes)));
+  }, []);
 
   const getPermissionsForRole = (role: UserRole): string[] => {
     switch (role) {
@@ -98,18 +116,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const expireSession = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (_error) {
+      // no-op
+    } finally {
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: 'Session expired',
+        sessionExpiresAt: null,
+        lastActivityAt: null,
+        sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
+      });
+    }
+  }, []);
+
   const updateAuthStateFromSession = useCallback(async (session: any) => {
     setState((prev) => ({ ...prev, isLoading: true }));
     try {
       if (session) {
         const profile = await fetchUserProfile(session.user.id, session.user.email);
         if (profile) {
+          const sessionTimeoutMinutes = await getConfiguredSessionTimeoutMinutes();
           setState({
             user: profile,
             isAuthenticated: true,
             isLoading: false,
             error: null,
             sessionExpiresAt: session.expires_at ? new Date(session.expires_at * 1000) : null,
+            lastActivityAt: new Date(),
+            sessionTimeoutMinutes,
           });
         } else {
           await supabase.auth.signOut();
@@ -119,6 +158,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             isLoading: false,
             error: 'Account disabled',
             sessionExpiresAt: null,
+            lastActivityAt: null,
+            sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
           });
         }
       } else {
@@ -128,12 +169,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           isLoading: false,
           error: null,
           sessionExpiresAt: null,
+          lastActivityAt: null,
+          sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
         });
       }
     } catch (err) {
       console.error('Auth sync error:', err);
       setState((prev) => ({ ...prev, isLoading: false, isAuthenticated: false }));
     }
+  }, [getConfiguredSessionTimeoutMinutes]);
+
+  const recordActivity = useCallback(() => {
+    setState((prev) =>
+      prev.isAuthenticated ? { ...prev, lastActivityAt: new Date(), error: null } : prev
+    );
   }, []);
 
   useEffect(() => {
@@ -164,6 +213,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, [updateAuthStateFromSession]);
 
+  useEffect(() => {
+    if (!state.isAuthenticated) return;
+    const events: Array<keyof WindowEventMap> = [
+      'click',
+      'keydown',
+      'mousemove',
+      'scroll',
+      'touchstart',
+    ];
+    events.forEach((eventName) => window.addEventListener(eventName, recordActivity, { passive: true }));
+    return () => {
+      events.forEach((eventName) =>
+        window.removeEventListener(eventName, recordActivity as EventListener)
+      );
+    };
+  }, [state.isAuthenticated, recordActivity]);
+
+  useEffect(() => {
+    if (!state.isAuthenticated) return;
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      const inactiveMs = state.lastActivityAt ? now - state.lastActivityAt.getTime() : Number.MAX_SAFE_INTEGER;
+      const tokenExpired = state.sessionExpiresAt ? now >= state.sessionExpiresAt.getTime() : false;
+      const configuredTimeoutMs = state.sessionTimeoutMinutes * 60 * 1000;
+      if (inactiveMs >= configuredTimeoutMs || tokenExpired) {
+        void expireSession();
+      }
+    }, SESSION_CHECK_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [
+    state.isAuthenticated,
+    state.lastActivityAt,
+    state.sessionExpiresAt,
+    state.sessionTimeoutMinutes,
+    expireSession,
+  ]);
+
   const login = async (credentials: LoginCredentials) => {
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
@@ -193,6 +279,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLoading: false,
       error: 'Demo disabled',
       sessionExpiresAt: null,
+      lastActivityAt: null,
+      sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
     }));
   };
 
@@ -228,8 +316,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const checkSession = () => {
-    if (!state.sessionExpiresAt) return false;
-    return new Date() < state.sessionExpiresAt;
+    const now = Date.now();
+    if (!state.sessionExpiresAt || now >= state.sessionExpiresAt.getTime()) return false;
+    if (!state.lastActivityAt) return false;
+    return now - state.lastActivityAt.getTime() < state.sessionTimeoutMinutes * 60 * 1000;
   };
 
   const updateProfile = async (data: Partial<User>) => {

@@ -77,9 +77,21 @@ export const exportPdfPrint = (title: string, sections: ExportSection[]) => {
   const html = buildHtml(title, sections);
   const printWindow = window.open('', '_blank');
   if (!printWindow) return;
-  printWindow.document.open();
-  printWindow.document.write(html);
-  printWindow.document.close();
+
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  const doc = printWindow.document;
+  doc.title = parsed.title || title;
+
+  while (doc.head.firstChild) doc.head.removeChild(doc.head.firstChild);
+  while (doc.body.firstChild) doc.body.removeChild(doc.body.firstChild);
+
+  Array.from(parsed.head.childNodes).forEach((node) => {
+    doc.head.appendChild(doc.importNode(node, true));
+  });
+  Array.from(parsed.body.childNodes).forEach((node) => {
+    doc.body.appendChild(doc.importNode(node, true));
+  });
+
   printWindow.focus();
   setTimeout(() => printWindow.print(), 250);
 };

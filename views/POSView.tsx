@@ -49,6 +49,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { shiftService } from '../services/shiftService';
 import { crmService } from '../services/crmService';
+import { movementService } from '../services/movementService';
 import { Customer } from '../types';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -132,6 +133,8 @@ const POSView: React.FC = () => {
     }
     return '';
   });
+  const [cashierOptions, setCashierOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [selectedCashierName, setSelectedCashierName] = useState('');
 
   const persistLocation = (id: string) => {
     setSelectedLocationId(id);
@@ -205,6 +208,7 @@ const POSView: React.FC = () => {
       const shift = await shiftService.getOpenShift(user.id);
       if (shift) {
         setCurrentShift(shift);
+        setSelectedCashierName(shift.cashier_name);
         const totals = await shiftService.getShiftTotals(shift);
         setShiftTotals(totals);
       } else {
@@ -243,15 +247,16 @@ const POSView: React.FC = () => {
   }, [customerSearchQuery, showCustomerSearch]);
 
   const handleStartShift = async () => {
-    if (!startCash || isNaN(parseFloat(startCash))) return;
+    if (!startCash || isNaN(parseFloat(startCash)) || !selectedCashierName) return;
     setIsProcessing(true);
     try {
       const shift = await shiftService.startShift(
         user?.id || '',
-        user?.name || 'Cashier',
+        selectedCashierName,
         parseFloat(startCash)
       );
       setCurrentShift(shift);
+      setSelectedCashierName(shift.cashier_name);
       setShiftTotals({
         sales: 0,
         returns: 0,
@@ -410,6 +415,67 @@ const POSView: React.FC = () => {
   useEffect(() => {
     fetchLocations();
   }, [fetchLocations]);
+
+  const fetchCashierOptions = useCallback(async () => {
+    const fallbackName = currentShift?.cashier_name || user?.name || 'Cashier';
+    const isAdmin = user?.role === 'ADMIN';
+
+    try {
+      let query = supabase.from('staff').select(
+        'id, first_name_en, last_name_en, first_name_ar, last_name_ar, employment_status, location_id, role'
+      );
+
+      if (!isAdmin) {
+        query = query.eq('role', 'CASHIER');
+      }
+
+      if (!isAdmin && selectedLocationId) {
+        query = query.eq('location_id', selectedLocationId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const options = (data || [])
+        .filter(
+          (staff: any) =>
+            staff.employment_status !== 'Terminated' && staff.employment_status !== 'Resigned'
+        )
+        .map((staff: any) => {
+          const localizedName =
+            lang === 'ar' && staff.first_name_ar
+              ? `${staff.first_name_ar} ${staff.last_name_ar || ''}`.trim()
+              : `${staff.first_name_en || ''} ${staff.last_name_en || ''}`.trim();
+
+          return {
+            id: staff.id,
+            name: localizedName,
+          };
+        })
+        .filter((staff) => staff.name.length > 0)
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      const mergedOptions = options.some((staff) => staff.name === fallbackName)
+        ? options
+        : [{ id: 'current-user', name: fallbackName }, ...options];
+
+      setCashierOptions(mergedOptions);
+      setSelectedCashierName((prev) => {
+        if (prev && mergedOptions.some((staff) => staff.name === prev)) {
+          return prev;
+        }
+        return mergedOptions[0]?.name || fallbackName;
+      });
+    } catch (error) {
+      console.error('Failed to load cashier list', error);
+      setCashierOptions([{ id: 'current-user', name: fallbackName }]);
+      setSelectedCashierName((prev) => prev || fallbackName);
+    }
+  }, [currentShift?.cashier_name, lang, selectedLocationId, user?.name, user?.role]);
+
+  useEffect(() => {
+    fetchCashierOptions();
+  }, [fetchCashierOptions]);
 
   const fetchInventory = useCallback(async () => {
     setIsLoading(true);
@@ -697,117 +763,6 @@ const POSView: React.FC = () => {
     });
   };
 
-  const applyInventoryDeductions = async (
-    locationId: string,
-    deductions: Map<string, number>,
-    valuationMethod: string,
-    transactionId: string,
-    userId: string | null | undefined,
-    userName: string
-  ) => {
-    if (!locationId || deductions.size === 0) return;
-
-    const payload = Array.from(deductions.entries()).map(([item_id, quantity]) => ({
-      item_id,
-      quantity,
-    }));
-    const { error: deductError } = await supabase.rpc('deduct_inventory_with_cost', {
-      p_location_id: locationId,
-      p_items: payload,
-      p_method: valuationMethod || 'WEIGHTED_AVG',
-      p_transaction_id: transactionId,
-      p_user_id: userId || null,
-      p_user_name: userName,
-    });
-
-    if (!deductError) return;
-
-    const msg = `${deductError.message || ''} ${deductError.details || ''}`;
-    const missingFunction = deductError.code === '42883' || /does not exist|function/i.test(msg);
-    if (!missingFunction) throw deductError;
-
-    console.warn('deduct_inventory_with_cost not available; using direct stock updates fallback');
-    const itemIds = Array.from(deductions.keys());
-    const { data: currentRows, error: fetchErr } = await supabase
-      .from('inventory_items')
-      .select('id, stock')
-      .eq('location_id', locationId)
-      .in('id', itemIds);
-    if (fetchErr) throw fetchErr;
-
-    const currentMap = new Map(
-      (currentRows || []).map((row: any) => [row.id, Number(row.stock) || 0])
-    );
-    const now = new Date().toISOString();
-    const updates = payload.map(({ item_id, quantity }) => {
-      const currentStock = currentMap.get(item_id) ?? 0;
-      const nextStock = Math.max(0, currentStock - quantity);
-      return supabase
-        .from('inventory_items')
-        .update({ stock: nextStock, last_movement_at: now })
-        .eq('location_id', locationId)
-        .eq('id', item_id);
-    });
-
-    const results = await Promise.all(updates);
-    const failed = results.find((r) => r.error);
-    if (failed?.error) throw failed.error;
-  };
-
-  const applyInventoryAdditions = async (
-    locationId: string,
-    additions: Map<string, number>,
-    referenceId: string
-  ) => {
-    if (!locationId || additions.size === 0) return;
-
-    const payload = Array.from(additions.entries()).map(([item_id, quantity]) => ({
-      item_id,
-      quantity,
-    }));
-    const { error: addError } = await supabase.rpc('add_inventory_atomic', {
-      p_location_id: locationId,
-      p_items: payload,
-      p_reference_id: referenceId,
-      p_user_id: user?.id || null,
-      p_user_name: user?.name || null,
-      p_movement_type: 'RETURN',
-    });
-
-    if (!addError) return;
-
-    const msg = `${addError.message || ''} ${addError.details || ''}`;
-    const missingFunction = addError.code === '42883' || /does not exist|function/i.test(msg);
-    if (!missingFunction) throw addError;
-
-    console.warn('add_inventory_atomic not available; using direct stock updates fallback');
-    const itemIds = Array.from(additions.keys());
-    const { data: currentRows, error: fetchErr } = await supabase
-      .from('inventory_items')
-      .select('id, stock')
-      .eq('location_id', locationId)
-      .in('id', itemIds);
-    if (fetchErr) throw fetchErr;
-
-    const currentMap = new Map(
-      (currentRows || []).map((row: any) => [row.id, Number(row.stock) || 0])
-    );
-    const now = new Date().toISOString();
-    const updates = payload.map(({ item_id, quantity }) => {
-      const currentStock = currentMap.get(item_id) ?? 0;
-      const nextStock = currentStock + quantity;
-      return supabase
-        .from('inventory_items')
-        .update({ stock: nextStock, last_movement_at: now })
-        .eq('location_id', locationId)
-        .eq('id', item_id);
-    });
-
-    const results = await Promise.all(updates);
-    const failed = results.find((r) => r.error);
-    if (failed?.error) throw failed.error;
-  };
-
   // Removed unused removeFromCart function
 
   const totals = useMemo(() => {
@@ -835,26 +790,45 @@ const POSView: React.FC = () => {
         unit_price: item.price,
       }));
 
-      const { data: result, error: rpcError } = await supabase.rpc('process_checkout', {
-        p_items: checkoutItems,
-        p_payment_method: paymentMethod,
-        p_total: totals.total,
-        p_cashier_id: user?.id,
-        p_shift_id: currentShift?.id || null,
-        p_location_id: selectedLocationId,
+      const stockValidation = await movementService.validateCheckoutStock({
+        locationId: selectedLocationId,
+        items: checkoutItems,
+      });
+      if (!stockValidation.ok) {
+        const firstIssue = stockValidation.issues[0];
+        const message = firstIssue
+          ? `${t.insufficientStockAvailable}: ${firstIssue.productName} (${firstIssue.availableQty}/${firstIssue.requestedQty})`
+          : t.insufficientStockAvailable;
+        showErrorToast(message);
+        setIsProcessing(false);
+        return;
+      }
+
+      const result = await movementService.processCheckoutWithAutoDispatch({
+        items: checkoutItems,
+        paymentMethod,
+        total: totals.total,
+        cashierId: user?.id,
+        shiftId: currentShift?.id || null,
+        locationId: selectedLocationId,
       });
 
-      if (rpcError) {
-        showErrorToast(rpcError.message || 'Checkout failed. Please try again.');
+      if (!result?.success) {
+        const firstIssue = Array.isArray(result?.stock_issues) ? result.stock_issues[0] : null;
+        if (firstIssue) {
+          const name = firstIssue.product_name || 'Item';
+          const available = Number(firstIssue.available_qty) || 0;
+          const requested = Number(firstIssue.requested_qty) || 0;
+          showErrorToast(`${t.insufficientStockAvailable}: ${name} (${available}/${requested})`);
+        } else {
+          showErrorToast(result?.error || 'Checkout failed. Please try again.');
+        }
         setIsProcessing(false);
         return;
       }
 
-      if (!result?.success) {
-        showErrorToast(result?.error || 'Checkout failed. Please try again.');
-        setIsProcessing(false);
-        return;
-      }
+      const cashierNameForTransaction =
+        currentShift?.cashier_name || selectedCashierName || user?.name || 'Cashier';
 
       const transactionData = {
         id: result.transaction_id,
@@ -869,7 +843,7 @@ const POSView: React.FC = () => {
           paymentMethod === 'CARD' ? cardReference : breakdown?.card_reference || null,
         user_id: validUserId,
         cashier_id: user?.id,
-        cashier_name: user?.name || 'Cashier',
+        cashier_name: cashierNameForTransaction,
         received_amount: receivedAmount || totals.total,
         change_amount: receivedAmount ? Math.max(0, receivedAmount - totals.total) : 0,
       };
@@ -906,7 +880,10 @@ const POSView: React.FC = () => {
       checkShift();
     } catch (error: unknown) {
       if (error instanceof Error) {
-        showErrorToast(error.message);
+        const message = error.message || '';
+        const stockError =
+          /negative stock prevented/i.test(message) || /insufficient stock|out of stock/i.test(message);
+        showErrorToast(stockError ? t.insufficientStockAvailable : message);
       } else {
         showErrorToast('Checkout failed. Please try again.');
       }
@@ -1112,7 +1089,7 @@ const POSView: React.FC = () => {
           .select('*')
           .eq('location_id', returnLocationId);
         const invById = new Map((locInv || []).map((inv) => [inv.id, inv]));
-        const invByProductId = new Map((locInv || []).map((inv) => [inv.productId, inv]));
+        const invByProductId = new Map((locInv || []).map((inv: any) => [inv.product_id, inv]));
         const invByName = new Map((locInv || []).map((inv) => [inv.name, inv]));
         const additions = new Map<string, number>();
         const addRestock = (itemId: string | undefined, qty: number) => {
@@ -1168,7 +1145,16 @@ const POSView: React.FC = () => {
           }
         }
         if (additions.size > 0) {
-          await applyInventoryAdditions(returnLocationId, additions, requestId);
+          await movementService.returnToInventory({
+            locationId: returnLocationId,
+            lines: Array.from(additions.entries()).map(([inventoryItemId, quantity]) => ({
+              inventoryItemId,
+              quantity,
+            })),
+            originalTransactionId: requestId,
+            actorId: user?.id || null,
+            actorName: user?.name || null,
+          });
         }
 
         // Update original transaction status
@@ -2557,8 +2543,12 @@ const POSView: React.FC = () => {
             >
               <Banknote size={14} />
               {discountAmount > 0
-                ? t.editDiscount || 'Edit Discount'
-                : t.addDiscount || 'Add Discount'}
+                ? lang === 'ar'
+                  ? 'تعديل الخصم'
+                  : 'Edit Discount'
+                : lang === 'ar'
+                  ? 'إضافة خصم'
+                  : 'Add Discount'}
             </button>
 
             {/* Discount Input */}
@@ -2599,7 +2589,11 @@ const POSView: React.FC = () => {
             <button
               onClick={() => {
                 if (
-                  confirm(t.cancelOrderConfirm || 'Are you sure you want to cancel this order?')
+                  confirm(
+                    lang === 'ar'
+                      ? 'هل أنت متأكد أنك تريد إلغاء هذا الطلب؟'
+                      : 'Are you sure you want to cancel this order?'
+                  )
                 ) {
                   setCart([]);
                   setSelectedCustomer(null);
@@ -2610,7 +2604,7 @@ const POSView: React.FC = () => {
               disabled={isProcessing}
               className="w-full py-3 mb-3 rounded-xl bg-red-50 border-2 border-red-200 text-red-600 font-black text-xs uppercase flex items-center justify-center gap-2 disabled:opacity-50 transition-colors hover:bg-red-100"
             >
-              <X size={18} /> {t.cancelOrder || 'Cancel Order'}
+              <X size={18} /> {lang === 'ar' ? 'إلغاء الطلب' : 'Cancel Order'}
             </button>
           )}
 
@@ -2829,6 +2823,21 @@ const POSView: React.FC = () => {
                   ))}
               </select>
 
+              <select
+                value={selectedCashierName}
+                onChange={(e) => setSelectedCashierName(e.target.value)}
+                className="w-full p-4 bg-white rounded-2xl font-bold text-sm border border-orange-100 outline-none focus:border-orange-600 transition-all text-black"
+              >
+                <option value="" disabled>
+                  -- {t.cashierLabel || 'Cashier'} --
+                </option>
+                {cashierOptions.map((cashier) => (
+                  <option key={cashier.id} value={cashier.name}>
+                    {cashier.name}
+                  </option>
+                ))}
+              </select>
+
               <input
                 type="number"
                 autoFocus
@@ -2841,7 +2850,7 @@ const POSView: React.FC = () => {
 
             <button
               onClick={handleStartShift}
-              disabled={!startCash || !selectedLocationId || isProcessing}
+              disabled={!startCash || !selectedLocationId || !selectedCashierName || isProcessing}
               className="w-full py-5 bg-orange-600 text-white rounded-[24px] font-black text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-3 border-2 border-orange-600 hover"
             >
               {isProcessing ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{' '}
