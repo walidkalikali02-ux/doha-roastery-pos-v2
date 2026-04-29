@@ -480,8 +480,11 @@ const POSView: React.FC = () => {
   const fetchInventory = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Fetch all inventory items regardless of location
-      const inventoryQuery = supabase.from('inventory_items').select('*');
+      // Scope inventory to the currently selected branch/location.
+      let inventoryQuery = supabase.from('inventory_items').select('*');
+      if (selectedLocationId) {
+        inventoryQuery = inventoryQuery.eq('location_id', selectedLocationId);
+      }
 
       const [prodRes, invRes, settingsRes] = await Promise.all([
         supabase.from('product_definitions').select('*'),
@@ -515,7 +518,13 @@ const POSView: React.FC = () => {
 
       if (prodRes.data) {
         prodRes.data
-          .filter((p) => getProductStatus(p) === 'ACTIVE')
+          .filter((p) => {
+            if (getProductStatus(p) !== 'ACTIVE') return false;
+            if (!selectedLocationId) return true;
+            const linkedInv = invByProductId.get(p.id) || [];
+            // Strict branch isolation: only show products stocked in the selected branch.
+            return linkedInv.length > 0;
+          })
           .forEach((p) => {
             const linkedInv = invByProductId.get(p.id) || [];
             const stock =
