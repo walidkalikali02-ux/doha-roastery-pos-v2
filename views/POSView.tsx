@@ -1221,7 +1221,7 @@ const POSView: React.FC = () => {
 
   return (
     <div
-      className="flex flex-col lg:flex-row h-[calc(100vh-100px)] md:h-[calc(100vh-120px)] gap-2 md:gap-4 animate-in fade-in duration-500 relative p-2 md:p-4"
+      className="flex flex-col lg:flex-row h-[calc(100vh-100px)] md:h-[calc(100vh-120px)] gap-2 md:gap-3 animate-in fade-in duration-500 relative p-2 md:p-3 lg:p-4"
       dir={t.dir}
     >
       {/* Thermal Receipt Styling */}
@@ -1864,16 +1864,16 @@ const POSView: React.FC = () => {
       )}
 
       {/* Main Catalog or History View */}
-      <div className="flex-1 flex flex-col gap-4 overflow-hidden h-full">
+      <div className="flex-1 flex flex-col gap-3 md:gap-4 overflow-hidden h-full min-w-0">
         {/* Top Bar: Search & Categories */}
-        <div className="bg-white p-3 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2 shrink-0">
-          <div className="flex items-center gap-2">
+        <div className="bg-white p-2.5 sm:p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2 md:gap-3 shrink-0">
+          <div className="flex items-center gap-2 md:gap-3">
             {/* Location Selector */}
-            <div className="relative">
+            <div className="relative shrink-0">
               <select
                 value={selectedLocationId}
                 onChange={(e) => persistLocation(e.target.value)}
-                className="appearance-none px-3 py-2 pr-8 rounded-lg font-medium text-xs border outline-none transition-all bg-gray-50 border-gray-200 focus:ring-2 focus:ring-orange-500"
+                className="appearance-none px-3 md:px-4 py-2.5 md:py-3 pr-10 rounded-lg md:rounded-xl font-medium text-sm border outline-none transition-all bg-gray-50 border-gray-200 focus:ring-2 focus:ring-orange-500 min-h-[44px]"
               >
                 <option value="" disabled>
                   {t.locationName || 'Location'}
@@ -1885,8 +1885,8 @@ const POSView: React.FC = () => {
                 ))}
               </select>
               <ChevronDown
-                className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none opacity-40"
-                size={14}
+                className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-40"
+                size={18}
               />
             </div>
 
@@ -1898,15 +1898,16 @@ const POSView: React.FC = () => {
                   setShowShiftDetails(true);
                 }
               }}
-              className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors shrink-0"
+              className="p-2.5 md:p-3 bg-gray-100 rounded-lg md:rounded-xl hover:bg-gray-200 transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center"
+              aria-label="Shift details"
             >
-              <Banknote size={18} className="text-gray-600" />
+              <Banknote size={20} className="text-gray-600" />
             </button>
 
-            <div className="relative flex-1">
+            <div className="relative flex-1 min-w-0">
               <Search
-                className={`absolute ${t.dir === 'rtl' ? 'right-3' : 'left-3'} top-1/2 -translate-y-1/2 text-gray-400`}
-                size={16}
+                className={`absolute ${t.dir === 'rtl' ? 'right-4' : 'left-4'} top-1/2 -translate-y-1/2 text-gray-400`}
+                size={20}
               />
               <input
                 type="text"
@@ -1917,7 +1918,7 @@ const POSView: React.FC = () => {
                     ? setHistorySearch(e.target.value)
                     : setSearchTerm(e.target.value)
                 }
-                className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-10 pr-4 py-2 text-sm outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all"
+                className="w-full bg-gray-50 border border-gray-200 rounded-lg md:rounded-xl pl-12 pr-4 py-2.5 md:py-3 text-base md:text-sm outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all min-h-[44px]"
               />
             </div>
 
@@ -1956,7 +1957,7 @@ const POSView: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-1.5 md:gap-2 overflow-x-auto no-scrollbar pb-1">
             {[
               { id: 'ALL', label: t.all, icon: LayoutGrid },
               { id: 'DRINKS', label: t.drinks, icon: Coffee },
@@ -1967,13 +1968,14 @@ const POSView: React.FC = () => {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
+                className={`flex items-center gap-2 px-3 md:px-4 py-2.5 md:py-3 rounded-lg md:rounded-xl text-sm font-medium transition-all whitespace-nowrap min-h-[44px] ${
                   activeTab === tab.id
                     ? 'bg-orange-600 text-white shadow-sm'
                     : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-200'
                 }`}
               >
-                <tab.icon size={14} /> {tab.label}
+                <tab.icon size={18} className="shrink-0" /> 
+                <span className="hidden sm:inline">{tab.label}</span>
               </button>
             ))}
           </div>
@@ -2359,7 +2361,7 @@ const POSView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 animate-in fade-in duration-500">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4 animate-in fade-in duration-500">
               {isLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="bg-white rounded-2xl aspect-square animate-pulse"></div>
@@ -2368,9 +2370,10 @@ const POSView: React.FC = () => {
                     <button
                       key={item.id}
                       onClick={() => openCustomization(item)}
-                      className="group bg-white p-3 rounded-2xl border border-orange-100 shadow-sm hover:shadow-lg transition-all flex flex-col h-full active:scale-95"
+                      className="group bg-white p-2 sm:p-3 rounded-xl sm:rounded-2xl border border-orange-100 shadow-sm hover:shadow-lg transition-all flex flex-col h-full touch-manipulation"
+                      style={{ WebkitTapHighlightColor: 'transparent' }}
                     >
-                      <div className="aspect-square rounded-xl overflow-hidden mb-2 bg-gray-50 relative">
+                      <div className="aspect-square rounded-lg sm:rounded-xl overflow-hidden mb-2 bg-gray-50 relative">
                         <img
                           src={item.image}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
@@ -2378,16 +2381,16 @@ const POSView: React.FC = () => {
                           loading="lazy"
                         />
                       </div>
-                      <div className="flex-1 flex flex-col">
-                        <h4 className="font-bold text-sm text-gray-800 line-clamp-2 mb-1 leading-tight">
+                      <div className="flex-1 flex flex-col min-h-0">
+                        <h4 className="font-bold text-xs sm:text-sm text-gray-800 line-clamp-2 mb-1 leading-tight">
                           {item.name}
                         </h4>
-                        <div className="mt-auto flex items-center justify-between">
-                          <span className="font-bold text-orange-600">
-                            {item.price} <span className="text-xs">{t.currency}</span>
+                        <div className="mt-auto flex items-center justify-between gap-1">
+                          <span className="font-bold text-orange-600 text-sm sm:text-base">
+                            {item.price} <span className="text-[10px] sm:text-xs">{t.currency}</span>
                           </span>
-                          <div className="w-8 h-8 bg-orange-600 text-white rounded-lg flex items-center justify-center shadow-sm">
-                            <Plus size={16} strokeWidth={2.5} />
+                          <div className="w-9 h-9 sm:w-8 sm:h-8 bg-orange-600 text-white rounded-lg flex items-center justify-center shadow-sm shrink-0">
+                            <Plus size={18} strokeWidth={2.5} />
                           </div>
                         </div>
                       </div>
@@ -2400,7 +2403,7 @@ const POSView: React.FC = () => {
 
       {/* Cart Sidebar */}
       <aside
-        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'left-0' : 'right-0'} z-[100] w-full md:w-[340px] lg:w-[320px] transform transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${showMobileCart ? 'translate-x-0' : t.dir === 'rtl' ? '-translate-x-full' : 'translate-x-full'} flex flex-col bg-white border-l border-gray-200 shadow-xl lg:shadow-none h-full`}
+        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'left-0' : 'right-0'} z-[100] w-full md:w-[360px] lg:w-[380px] transform transition-all duration-300 ease-in-out md:static md:translate-x-0 ${showMobileCart ? 'translate-x-0' : t.dir === 'rtl' ? '-translate-x-full' : 'translate-x-full'} flex flex-col bg-white border-l border-gray-200 shadow-xl md:shadow-none h-full md:min-w-[320px] md:max-w-[400px]`}
       >
         {/* Header */}
         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white z-10 shrink-0">
@@ -2417,9 +2420,10 @@ const POSView: React.FC = () => {
           </div>
           <button
             onClick={() => setShowMobileCart(false)}
-            className="lg:hidden p-2 hover:bg-gray-100 rounded-full"
+            className="md:hidden p-3 hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="Close cart"
           >
-            <X size={20} />
+            <X size={24} />
           </button>
         </div>
 
@@ -2500,21 +2504,25 @@ const POSView: React.FC = () => {
                         </span>
                       ))}
                     </div>
-                    <div className="flex items-center gap-1 bg-white  p-1 rounded-lg">
+                    <div className="flex items-center bg-white border border-gray-200 rounded-lg overflow-hidden">
                       <button
                         onClick={() => updateQuantity((item as any).cartId, -1)}
-                        className="w-6 h-6 flex items-center justify-center rounded-md transition-colors"
+                        className="w-10 h-10 flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                        aria-label="Decrease quantity"
                       >
-                        <Minus size={12} strokeWidth={3} />
+                        <Minus size={16} strokeWidth={2.5} />
                       </button>
-                      <span className="w-6 text-center font-black font-mono text-xs">
+                      <span className="w-10 text-center font-bold text-sm border-x border-gray-200">
                         {item.quantity}
                       </span>
                       <button
                         onClick={() => updateQuantity((item as any).cartId, 1)}
-                        className="w-6 h-6 flex items-center justify-center rounded-md transition-colors"
+                        className="w-10 h-10 flex items-center justify-center hover:bg-gray-50 active:bg-gray-100 transition-colors touch-manipulation"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                        aria-label="Increase quantity"
                       >
-                        <Plus size={12} strokeWidth={3} />
+                        <Plus size={16} strokeWidth={2.5} />
                       </button>
                     </div>
                   </div>
@@ -2548,9 +2556,10 @@ const POSView: React.FC = () => {
             {/* Discount Input Toggle */}
             <button
               onClick={() => setShowDiscountInput(!showDiscountInput)}
-              className="w-full py-2 text-xs font-bold text-orange-600 flex items-center justify-center gap-1 hover:bg-orange-50 rounded-lg transition-colors"
+              className="w-full py-3 text-sm font-bold text-orange-600 flex items-center justify-center gap-2 hover:bg-orange-50 rounded-xl transition-colors touch-manipulation min-h-[44px]"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              <Banknote size={14} />
+              <Percent size={18} />
               {discountAmount > 0
                 ? lang === 'ar'
                   ? 'تعديل الخصم'
@@ -2621,30 +2630,34 @@ const POSView: React.FC = () => {
             <button
               onClick={() => setShowCashModal(true)}
               disabled={cart.length === 0 || isProcessing}
-              className="py-4 rounded-xl bg-white  text-black  font-black text-xs uppercase flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+              className="py-5 md:py-6 rounded-xl bg-white border-2 border-gray-200 text-gray-800 font-bold text-sm md:text-base flex items-center justify-center gap-2 disabled:opacity-50 transition-all hover:border-orange-300 hover:bg-orange-50 active:scale-[0.98] touch-manipulation min-h-[56px]"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              <Banknote size={18} /> {t.cash}
+              <Banknote size={22} className="text-orange-600" /> {t.cash}
             </button>
             <button
               onClick={() => setShowCardInput(true)}
               disabled={cart.length === 0 || isProcessing}
-              className="py-4 rounded-xl bg-white  text-black  font-black text-xs uppercase flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+              className="py-5 md:py-6 rounded-xl bg-white border-2 border-gray-200 text-gray-800 font-bold text-sm md:text-base flex items-center justify-center gap-2 disabled:opacity-50 transition-all hover:border-orange-300 hover:bg-orange-50 active:scale-[0.98] touch-manipulation min-h-[56px]"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              <CreditCard size={18} /> {t.card}
+              <CreditCard size={22} className="text-orange-600" /> {t.card}
             </button>
             <button
               onClick={() => handleCheckout('MOBILE')}
               disabled={cart.length === 0 || isProcessing}
-              className="py-4 rounded-xl bg-white  text-black  font-black text-xs uppercase flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+              className="py-4 md:py-5 rounded-xl bg-gray-100 text-gray-700 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all hover:bg-gray-200 active:scale-[0.98] touch-manipulation min-h-[48px]"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              <Smartphone size={18} /> {t.mobile}
+              <Smartphone size={20} /> {t.mobile}
             </button>
             <button
               onClick={() => setShowSplitModal(true)}
               disabled={cart.length === 0 || isProcessing}
-              className="py-4 rounded-xl bg-orange-600 text-white  font-black text-xs uppercase flex items-center justify-center gap-2 disabled:opacity-50 transition-colors shadow-lg"
+              className="py-4 md:py-5 rounded-xl bg-orange-600 text-white font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all hover:bg-orange-700 active:scale-[0.98] shadow-lg shadow-orange-600/20 touch-manipulation min-h-[48px]"
+              style={{ WebkitTapHighlightColor: 'transparent' }}
             >
-              <Scissors size={18} /> {t.split}
+              <Scissors size={20} /> {t.split}
             </button>
           </div>
         </div>
@@ -3234,14 +3247,16 @@ const POSView: React.FC = () => {
         </div>
       )}
 
-      {/* Mobile Cart Floating Button */}
+      {/* Mobile/Tablet Cart Floating Button */}
       {cart.length > 0 && !showMobileCart && (
         <button
           onClick={() => setShowMobileCart(true)}
-          className="lg:hidden fixed bottom-6 right-6 z-[90] bg-orange-600 text-white p-4 rounded-full shadow-2xl flex items-center gap-2"
+          className="md:hidden fixed bottom-6 right-6 z-[90] bg-orange-600 text-white p-4 rounded-full shadow-2xl flex items-center gap-2 min-h-[56px] min-w-[56px] touch-manipulation"
+          style={{ WebkitTapHighlightColor: 'transparent' }}
+          aria-label={`View cart - ${cart.length} items`}
         >
           <ShoppingCart size={24} />
-          <span className="bg-white text-orange-600 rounded-full px-2 py-0.5 text-xs font-bold">
+          <span className="bg-white text-orange-600 rounded-full px-2.5 py-1 text-xs font-bold min-w-[24px]">
             {cart.length}
           </span>
         </button>
