@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { escapeHtml } from '../utils/escaper';
+import { exportExcelHtml } from '../utils/reportExport';
 import {
   Package,
   Search,
@@ -61,6 +62,8 @@ import {
   FileText,
   Settings as SettingsIcon,
   XCircle,
+  PlusCircle,
+  Factory,
 } from 'lucide-react';
 import { useLanguage } from '../App';
 import { GreenBean, Location, InventoryItem, ProductDefinition, UserRole } from '../types';
@@ -70,6 +73,7 @@ import { useErrorToast } from '../hooks/useErrorToast';
 import { ConfirmationModal } from '../components/common/ConfirmationModal';
 import { useTimeoutFn } from '../hooks/useTimeout';
 import { isDemoMode } from '../utils/demoMode';
+import { movementService } from '../services/movementService';
 
 type TransferStatus =
   | 'DRAFT'
@@ -236,7 +240,7 @@ const InventoryView: React.FC = () => {
   const theme = 'light';
 
   const [activeTab, setActiveTab] = useState<
-    'locations' | 'packaged' | 'transfers' | 'adjustments' | 'purchases' | 'counts'
+    'locations' | 'branchReport' | 'packaged' | 'transfers' | 'adjustments' | 'purchases' | 'counts'
   >('locations');
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -244,6 +248,8 @@ const InventoryView: React.FC = () => {
   const [stagnantDays, setStagnantDays] = useState('30');
 
   const [showAdjustmentModal, setShowAdjustmentModal] = useState(false);
+  const [showQuickStockModal, setShowQuickStockModal] = useState(false);
+  const [quickStockQty, setQuickStockQty] = useState('100');
   const [showSuccess, setShowSuccess] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
@@ -684,6 +690,93 @@ const InventoryView: React.FC = () => {
       grandTotal,
     };
   }, [packagedItems, locations, searchTerm]);
+
+  const branchReportLocations = useMemo(
+    () => inventoryMatrix.locations.filter((loc) => loc.type !== 'WAREHOUSE'),
+    [inventoryMatrix.locations]
+  );
+
+  const branchReportRows = useMemo(() => {
+    return inventoryMatrix.products.map((product) => ({
+      productKey: product.productKey,
+      productName: product.productName,
+      unit: product.unit || '',
+      totalStock: product.totalStock,
+      byLocation: branchReportLocations.map((loc) => ({
+        locationId: loc.id,
+        locationName: loc.name,
+        stock: product.stockByLocation.get(loc.id)?.stock || 0,
+      })),
+    }));
+  }, [branchReportLocations, inventoryMatrix.products]);
+
+  const branchReportLocationTotals = useMemo(() => {
+    return branchReportLocations.map((loc) => {
+      let totalStock = 0;
+      let activeProducts = 0;
+      branchReportRows.forEach((row) => {
+        const stock = row.byLocation.find((entry) => entry.locationId === loc.id)?.stock || 0;
+        totalStock += stock;
+        if (stock > 0) activeProducts += 1;
+      });
+      return {
+        locationId: loc.id,
+        locationName: loc.name,
+        locationType: loc.type || 'BRANCH',
+        totalStock,
+        activeProducts,
+      };
+    });
+  }, [branchReportLocations, branchReportRows]);
+
+  const branchReportTotalStock = useMemo(
+    () => branchReportLocationTotals.reduce((sum, row) => sum + row.totalStock, 0),
+    [branchReportLocationTotals]
+  );
+
+  const handleExportBranchStockExcel = () => {
+    const headers = [
+      'Product',
+      'Unit',
+      ...branchReportLocations.map((loc) => loc.name),
+      'Total Stock',
+    ];
+    const rows = branchReportRows.map((row) => [
+      row.productName,
+      row.unit,
+      ...branchReportLocations.map((loc) => row.byLocation.find((entry) => entry.locationId === loc.id)?.stock || 0),
+      row.totalStock,
+    ]);
+
+    const summaryRows = branchReportLocationTotals.map((row) => [
+      row.locationName,
+      row.locationType,
+      row.activeProducts,
+      row.totalStock,
+    ]);
+
+    exportExcelHtml(
+      `branch_stock_report_${new Date().toISOString().split('T')[0]}.xls`,
+      'Branch Stock Report',
+      [
+        {
+          title: 'Branch Summary',
+          columns: [
+            { label: 'Branch' },
+            { label: 'Type' },
+            { label: 'Products With Stock' },
+            { label: 'Total Stock' },
+          ],
+          rows: summaryRows,
+        },
+        {
+          title: 'Stock By Branch',
+          columns: headers.map((label) => ({ label })),
+          rows,
+        },
+      ]
+    );
+  };
 
   const filteredCountTasks = useMemo(() => {
     const term = String(searchTerm || '').toLowerCase();
@@ -1907,6 +2000,34 @@ const InventoryView: React.FC = () => {
   };
 
   const isWarehouseStaff = user?.role === UserRole.WAREHOUSE_STAFF;
+  const isAdminOrManager = user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER;
+  
+  const handleQuickStockAdd = async () => {
+    if (!isAdminOrManager) {
+      showError(t.notAuthorized || 'Not authorized');
+      return;
+    }
+    const qty = Number(quickStockQty);
+    if (!qty || qty <= 0) {
+      showError('Enter valid quantity');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      const result = await movementService.bulkAddStock({ quantity: qty });
+      setSuccessMsg(`Added ${qty} pcs to ${result.itemsUpdated} items in ${result.locationsUpdated} locations`);
+      setShowSuccess(true);
+      setQuickStockQty('100');
+      setShowQuickStockModal(false);
+      fetchPackagedItems();
+      setTimeout(() => setShowSuccess(false), 5000);
+    } catch (err: any) {
+      showError(err.message || 'Failed to add stock');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const openNewLocation = () => {
     setLocationForm({
       name: '',
@@ -2090,6 +2211,12 @@ const InventoryView: React.FC = () => {
             <MapPin size={16} /> {t.locations}
           </button>
           <button
+            onClick={() => setActiveTab('branchReport')}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'branchReport' ? 'bg-orange-600 text-white shadow-md' : 'text-black hover:text-black'}`}
+          >
+            <FileSpreadsheet size={16} /> Branch Report
+          </button>
+          <button
             onClick={() => setActiveTab('packaged')}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${activeTab === 'packaged' ? 'bg-orange-600 text-white shadow-md' : 'text-black hover:text-black'}`}
           >
@@ -2143,6 +2270,15 @@ const InventoryView: React.FC = () => {
               className="bg-orange-600 text-white px-6 py-4 rounded-2xl font-bold shadow-lg  flex items-center gap-2 w-full md:w-auto justify-center transition-all active:scale-95"
             >
               <Plus size={20} /> <span>{t.newLocation}</span>
+            </button>
+          )}
+          {/* Quick Stock Factory Button - Available on all tabs */}
+          {(activeTab === 'packaged' || activeTab === 'adjustments') && isAdminOrManager && (
+            <button
+              onClick={() => setShowQuickStockModal(true)}
+              className="bg-emerald-600 text-white px-6 py-4 rounded-2xl font-bold shadow-lg  flex items-center gap-2 w-full md:w-auto justify-center transition-all active:scale-95"
+            >
+              <Factory size={20} /> <span>{t.quickStock || 'Quick Stock'}</span>
             </button>
           )}
           {activeTab === 'transfers' && (
@@ -2208,6 +2344,14 @@ const InventoryView: React.FC = () => {
               className="bg-white  text-black  px-6 py-4 rounded-2xl font-bold shadow-sm flex items-center gap-2 w-full md:w-auto justify-center transition-all active:scale-95"
             >
               <FileDown size={20} /> <span>{t.export}</span>
+            </button>
+          )}
+          {activeTab === 'branchReport' && (
+            <button
+              onClick={handleExportBranchStockExcel}
+              className="bg-white  text-black  px-6 py-4 rounded-2xl font-bold shadow-sm flex items-center gap-2 w-full md:w-auto justify-center transition-all active:scale-95"
+            >
+              <FileSpreadsheet size={20} /> <span>{t.exportExcel || 'Export Excel'}</span>
             </button>
           )}
         </div>
@@ -2390,6 +2534,135 @@ const InventoryView: React.FC = () => {
                 </div>
               </div>
             ))}
+          </div>
+        ) : activeTab === 'branchReport' ? (
+          <div className="flex flex-col gap-6 p-6 md:p-8">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="bg-white border border-orange-100 rounded-3xl p-5">
+                <div className="text-[10px] font-black uppercase tracking-widest text-black">
+                  Branches
+                </div>
+                <div className="mt-1 text-3xl font-black text-black">
+                  {branchReportLocations.length}
+                </div>
+              </div>
+              <div className="bg-white border border-orange-100 rounded-3xl p-5">
+                <div className="text-[10px] font-black uppercase tracking-widest text-black">
+                  Products
+                </div>
+                <div className="mt-1 text-3xl font-black text-black">
+                  {branchReportRows.length}
+                </div>
+              </div>
+              <div className="bg-white border border-orange-100 rounded-3xl p-5">
+                <div className="text-[10px] font-black uppercase tracking-widest text-black">
+                  Total Stock
+                </div>
+                <div className="mt-1 text-3xl font-black text-black">
+                  {branchReportTotalStock.toLocaleString()}
+                </div>
+              </div>
+              <div className="bg-white border border-orange-100 rounded-3xl p-5">
+                <div className="text-[10px] font-black uppercase tracking-widest text-black">
+                  Stocked Branches
+                </div>
+                <div className="mt-1 text-3xl font-black text-black">
+                  {branchReportLocationTotals.filter((row) => row.totalStock > 0).length}
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white border border-orange-100 rounded-3xl px-6 py-5">
+              <div className="text-xs font-black uppercase tracking-widest text-black mb-4">
+                Branch Totals
+              </div>
+              <div className="overflow-x-auto">
+                <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
+                  <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
+                    <tr>
+                      <th className="px-4 py-3">Branch</th>
+                      <th className="px-4 py-3">Type</th>
+                      <th className="px-4 py-3">Products With Stock</th>
+                      <th className="px-4 py-3">Total Stock</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-orange-50">
+                    {branchReportLocationTotals.map((row) => (
+                      <tr key={row.locationId} className="hover:bg-orange-50">
+                        <td className="px-4 py-3 font-bold">{row.locationName}</td>
+                        <td className="px-4 py-3 text-black">{row.locationType}</td>
+                        <td className="px-4 py-3 font-mono font-black">{row.activeProducts}</td>
+                        <td className="px-4 py-3 font-mono font-black">
+                          {row.totalStock.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))}
+                    {branchReportLocationTotals.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-4 py-6 text-center text-sm text-black">
+                          {t.noItemsFound}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="bg-white border border-orange-100 rounded-3xl px-6 py-5">
+              <div className="text-xs font-black uppercase tracking-widest text-black mb-4">
+                Stock By Branch
+              </div>
+              <div className="overflow-x-auto">
+                <table className={`w-full ${lang === 'ar' ? 'text-right' : 'text-left'} text-sm`}>
+                  <thead className="bg-white text-black uppercase text-[10px] font-black tracking-widest border-b border-orange-50">
+                    <tr>
+                      <th className="px-4 py-3 sticky left-0 bg-white z-10 min-w-[220px]">
+                        Product
+                      </th>
+                      <th className="px-4 py-3">Unit</th>
+                      {branchReportLocations.map((loc) => (
+                        <th key={loc.id} className="px-4 py-3 text-center whitespace-nowrap">
+                          <div className="font-bold">{loc.name}</div>
+                        </th>
+                      ))}
+                      <th className="px-4 py-3 text-center bg-orange-50">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-orange-50">
+                    {branchReportRows.map((row) => (
+                      <tr key={row.productKey} className="hover:bg-orange-50">
+                        <td className="px-4 py-3 font-bold sticky left-0 bg-white z-10">
+                          {row.productName}
+                        </td>
+                        <td className="px-4 py-3 text-black">{row.unit || '-'}</td>
+                        {branchReportLocations.map((loc) => {
+                          const stock = row.byLocation.find((entry) => entry.locationId === loc.id)?.stock || 0;
+                          return (
+                            <td key={loc.id} className="px-4 py-3 text-center font-mono font-black">
+                              {stock > 0 ? stock : '-'}
+                            </td>
+                          );
+                        })}
+                        <td className="px-4 py-3 text-center font-mono font-black bg-orange-50">
+                          {row.totalStock}
+                        </td>
+                      </tr>
+                    ))}
+                    {branchReportRows.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={branchReportLocations.length + 3}
+                          className="px-4 py-6 text-center text-sm text-black"
+                        >
+                          {t.noItemsFound}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         ) : activeTab === 'transfers' ? (
           <div className="overflow-x-auto">
@@ -5246,10 +5519,92 @@ const InventoryView: React.FC = () => {
                   {isSaving ? <Loader2 className="animate-spin" /> : t.save}
                 </button>
               </div>
-            </form>
+</form>
           </div>
         </div>
       )}
+
+      {/* Quick Stock Factory Modal */}
+      {showQuickStockModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[200] flex items-center justify-center p-4 animate-in fade-in">
+          <div className="bg-white rounded-[40px] p-8 max-w-md w-full shadow-2xl animate-in zoom-in-95">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-3 bg-emerald-100 rounded-2xl">
+                  <Factory size={28} className="text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900">{t.quickStock || 'Quick Stock Factory'}</h3>
+                  <p className="text-xs text-gray-500">Add stock to all locations</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowQuickStockModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <X size={24} className="text-gray-400" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-bold text-gray-700 mb-2">
+                  {t.quantityToAdd || 'Quantity to Add'}
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    value={quickStockQty}
+                    onChange={(e) => setQuickStockQty(e.target.value)}
+                    className="w-full bg-gray-50 border-2 border-gray-200 rounded-2xl px-6 py-4 text-2xl font-bold text-gray-900 outline-none focus:border-emerald-500 focus:ring-0"
+                    placeholder="100"
+                    min="1"
+                  />
+                  <span className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 font-bold">
+                    {t.pcs || 'pcs'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-emerald-50 p-4 rounded-2xl border border-emerald-100">
+                <div className="flex items-center gap-2 text-emerald-700">
+                  <AlertCircle size={18} />
+                  <span className="text-sm font-bold">This will add stock to ALL products in ALL locations</span>
+                </div>
+                <p className="text-xs text-emerald-600 mt-1">
+                  Current stock + {quickStockQty || 0} = New stock level
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickStockModal(false)}
+                  className="flex-1 py-4 bg-gray-100 text-gray-700 rounded-2xl font-bold hover:bg-gray-200 transition-colors"
+                >
+                  {t.cancel || 'Cancel'}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleQuickStockAdd}
+                  disabled={isSaving || !quickStockQty}
+                  className="flex-1 py-4 bg-emerald-600 text-white rounded-2xl font-bold hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSaving ? (
+                    <Loader2 size={20} className="animate-spin" />
+                  ) : (
+                    <>
+                      <PlusCircle size={20} />
+                      {t.addStock || 'Add Stock'}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <ConfirmationModal
         open={showApproveTransferConfirm}
         title={t.confirmUpdateTransfer || 'Confirm'}

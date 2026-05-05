@@ -198,9 +198,26 @@ export const alertService = {
     return triggered;
   },
 
-  // ALT-003
-  async getDashboardAlerts() {
+  async evaluateAlertsForProductsAtLocation(input: { locationId: string; productIds: string[] }) {
+    const productIds = Array.from(new Set((input.productIds || []).filter(Boolean)));
+    if (!productIds.length) return [];
+
     const { data, error } = await supabase
+      .from('inventory_items')
+      .select('id')
+      .eq('location_id', input.locationId)
+      .in('product_id', productIds);
+    if (error) throw error;
+
+    return alertService.evaluateAlertsAfterMovement({
+      locationId: input.locationId,
+      inventoryItemIds: (data || []).map((row: any) => row.id),
+    });
+  },
+
+  // ALT-003
+  async getDashboardAlerts(input?: { locationId?: string }) {
+    let query = supabase
       .from('inventory_alerts')
       .select(
         'id,inventory_item_id,product_id,location_id,alert_type,status,threshold_qty,current_qty,updated_at,product_definitions(name,sku)'
@@ -208,6 +225,12 @@ export const alertService = {
       .eq('status', 'ACTIVE')
       .in('alert_type', ['LOW_STOCK', 'OUT_OF_STOCK'])
       .order('updated_at', { ascending: false });
+
+    if (input?.locationId) {
+      query = query.eq('location_id', input.locationId);
+    }
+
+    const { data, error } = await query;
     if (error) throw error;
 
     return (data || []).map((row: any) => ({
@@ -219,6 +242,7 @@ export const alertService = {
       status: row.status,
       threshold_qty: toNumber(row.threshold_qty, 0),
       current_qty: toNumber(row.current_qty, 0),
+      last_triggered_at: row.last_triggered_at || null,
       product_name: row.product_definitions?.name || 'Unknown Product',
       product_sku: row.product_definitions?.sku || null,
       product_link: `/configuration?productId=${row.product_id}`,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { useTimeoutFn } from '../hooks/useTimeout';
 import { ToastContainer } from '../components/common/Toast';
@@ -13,6 +13,7 @@ import {
   Coffee,
   X,
   Box,
+  Package,
   Loader2,
   CheckCircle2,
   AlertTriangle,
@@ -50,6 +51,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { shiftService } from '../services/shiftService';
 import { crmService } from '../services/crmService';
 import { movementService } from '../services/movementService';
+import { alertService } from '../services/alertService';
 import { Customer } from '../types';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -82,7 +84,11 @@ const toNumber = (value: unknown, fallback = 0) => {
 const POSView: React.FC = () => {
   const { lang, t } = useLanguage();
   const { user } = useAuth();
-  const { showError: showErrorToast, showSuccess: showSuccessToast } = useErrorToast();
+  const {
+    showError: showErrorToast,
+    showSuccess: showSuccessToast,
+    showWarning: showWarningToast,
+  } = useErrorToast();
   const { schedule: scheduleTimeout } = useTimeoutFn();
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -104,6 +110,20 @@ const POSView: React.FC = () => {
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
+  const [branchAlerts, setBranchAlerts] = useState<
+    Array<{
+      id: string;
+      product_name: string;
+      product_sku?: string | null;
+      alert_type: 'LOW_STOCK' | 'OUT_OF_STOCK';
+      current_qty: number;
+      threshold_qty: number;
+      location_id: string;
+      updated_at?: string | null;
+      last_triggered_at?: string | null;
+    }>
+  >([]);
+  const alertedBranchAlertKeysRef = useRef(new Set<string>());
 
   // Return Processing State
   const [searchingInvoice, setSearchingInvoice] = useState(false);
@@ -416,6 +436,65 @@ const POSView: React.FC = () => {
     fetchLocations();
   }, [fetchLocations]);
 
+  const fetchBranchAlerts = useCallback(async () => {
+    if (!selectedLocationId) {
+      setBranchAlerts([]);
+      return;
+    }
+
+    try {
+      const alerts = await alertService.getDashboardAlerts({ locationId: selectedLocationId });
+      setBranchAlerts(alerts as any);
+
+      for (const alert of alerts as any[]) {
+        const alertKey = `${alert.id}:${alert.last_triggered_at || alert.updated_at || ''}`;
+        if (alertedBranchAlertKeysRef.current.has(alertKey)) continue;
+        alertedBranchAlertKeysRef.current.add(alertKey);
+
+        const message =
+          alert.alert_type === 'OUT_OF_STOCK'
+            ? `${alert.product_name} ${t.insufficientStockAvailable}`
+            : `${t.branchLowStockAlert}: ${alert.product_name}`;
+
+        if (alert.alert_type === 'OUT_OF_STOCK') {
+          showErrorToast(message);
+        } else {
+          showWarningToast(message);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load branch alerts', error);
+    }
+  }, [selectedLocationId, showErrorToast, showWarningToast, t]);
+
+  useEffect(() => {
+    fetchBranchAlerts();
+  }, [fetchBranchAlerts]);
+
+  useEffect(() => {
+    if (!selectedLocationId) return;
+
+    const channel = supabase
+      .channel(`pos_branch_alerts_${selectedLocationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_alerts',
+          filter: `location_id=eq.${selectedLocationId}`,
+        },
+        () => {
+          fetchBranchAlerts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchBranchAlerts, selectedLocationId]);
+
   const fetchCashierOptions = useCallback(async () => {
     const fallbackName = currentShift?.cashier_name || user?.name || 'Cashier';
     const isAdmin = user?.role === 'ADMIN';
@@ -584,6 +663,30 @@ const POSView: React.FC = () => {
     }
   }, [selectedLocationId]);
 
+  useEffect(() => {
+    if (!selectedLocationId) return;
+
+    const channel = supabase
+      .channel(`pos_inventory_${selectedLocationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'inventory_items',
+          filter: `location_id=eq.${selectedLocationId}`,
+        },
+        () => {
+          fetchInventory();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [fetchInventory, selectedLocationId]);
+
   const fetchHistory = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -694,8 +797,10 @@ const POSView: React.FC = () => {
     return Math.max(0, item.stock - reserved - damaged);
   };
 
+  const isStockManagedItem = (item: InventoryItem) => item.type !== 'BEVERAGE';
+
   const warnIfLowStock = (item: InventoryItem, nextQty: number) => {
-    if (item.type === 'BEVERAGE') return;
+    if (!isStockManagedItem(item)) return;
     const available = getAvailableStock(item);
     const remaining = available - nextQty;
     if (remaining >= 0 && remaining <= 5) {
@@ -731,7 +836,6 @@ const POSView: React.FC = () => {
       const existingTotal = prev
         .filter((i) => i.id === item.id)
         .reduce((sum, i) => sum + i.quantity, 0);
-
       if (existing) {
         const nextQty = existingTotal + 1;
         warnIfLowStock(item, nextQty);
@@ -798,20 +902,6 @@ const POSView: React.FC = () => {
         quantity: item.quantity,
         unit_price: item.price,
       }));
-
-      const stockValidation = await movementService.validateCheckoutStock({
-        locationId: selectedLocationId,
-        items: checkoutItems,
-      });
-      if (!stockValidation.ok) {
-        const firstIssue = stockValidation.issues[0];
-        const message = firstIssue
-          ? `${t.insufficientStockAvailable}: ${firstIssue.productName} (${firstIssue.availableQty}/${firstIssue.requestedQty})`
-          : t.insufficientStockAvailable;
-        showErrorToast(message);
-        setIsProcessing(false);
-        return;
-      }
 
       const result = await movementService.processCheckoutWithAutoDispatch({
         items: checkoutItems,
@@ -1979,6 +2069,55 @@ const POSView: React.FC = () => {
               </button>
             ))}
           </div>
+
+          {branchAlerts.length > 0 && (
+            <div className="mt-2 rounded-2xl border border-red-200 bg-red-50/80 p-3 md:p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-600 text-white shrink-0">
+                    <AlertTriangle size={18} />
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-black text-black uppercase tracking-widest">
+                      {t.branchLowStockAlert || 'Branch Stock Notification'}
+                    </h4>
+                    <p className="text-xs font-medium text-gray-700">
+                      {(t.branchLowStockDetail || 'There are {count} low-stock items in this branch.')
+                        .replace('{count}', branchAlerts.length.toString())}
+                    </p>
+                  </div>
+                </div>
+                <span className="rounded-full bg-red-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
+                  {branchAlerts.length}
+                </span>
+              </div>
+              <div className="mt-3 space-y-2">
+                {branchAlerts.slice(0, 3).map((alert) => (
+                  <div
+                    key={alert.id}
+                    className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-xs border border-red-100"
+                  >
+                    <div className="min-w-0">
+                      <p className="font-bold text-black truncate">{alert.product_name}</p>
+                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+                        {alert.product_sku || 'N/A'}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="block text-[10px] font-black uppercase text-red-600">
+                        {alert.alert_type === 'OUT_OF_STOCK'
+                          ? 'Out of stock'
+                          : 'Low stock'}
+                      </span>
+                      <span className="text-[10px] text-gray-500">
+                        {alert.current_qty} / {alert.threshold_qty}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Content Area */}
@@ -2361,41 +2500,112 @@ const POSView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3 md:gap-4 animate-in fade-in duration-500">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 animate-in fade-in duration-500">
               {isLoading
-                ? Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="bg-white rounded-2xl aspect-square animate-pulse"></div>
-                  ))
-                : filteredItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => openCustomization(item)}
-                      className="group bg-white p-2 sm:p-3 rounded-xl sm:rounded-2xl border border-orange-100 shadow-sm hover:shadow-lg transition-all flex flex-col h-full touch-manipulation"
-                      style={{ WebkitTapHighlightColor: 'transparent' }}
-                    >
-                      <div className="aspect-square rounded-lg sm:rounded-xl overflow-hidden mb-2 bg-gray-50 relative">
-                        <img
-                          src={item.image}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                          alt={item.name}
-                          loading="lazy"
-                        />
+                ? Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-orange-100">
+                      <div className="aspect-[4/3] bg-gray-100 animate-pulse"></div>
+                      <div className="p-3 space-y-2">
+                        <div className="h-3 bg-gray-100 rounded animate-pulse w-3/4"></div>
+                        <div className="h-4 bg-gray-100 rounded animate-pulse w-1/2"></div>
                       </div>
-                      <div className="flex-1 flex flex-col min-h-0">
-                        <h4 className="font-bold text-xs sm:text-sm text-gray-800 line-clamp-2 mb-1 leading-tight">
-                          {item.name}
-                        </h4>
-                        <div className="mt-auto flex items-center justify-between gap-1">
-                          <span className="font-bold text-orange-600 text-sm sm:text-base">
-                            {item.price} <span className="text-[10px] sm:text-xs">{t.currency}</span>
-                          </span>
-                          <div className="w-9 h-9 sm:w-8 sm:h-8 bg-orange-600 text-white rounded-lg flex items-center justify-center shadow-sm shrink-0">
-                            <Plus size={18} strokeWidth={2.5} />
+                    </div>
+                  ))
+                : filteredItems.map((item) => {
+                    const isBeverage = item.type === 'BEVERAGE';
+                    const isPackaged = item.type === 'PACKAGED_COFFEE';
+
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => {
+                          openCustomization(item);
+                        }}
+                        className="group relative bg-white rounded-2xl overflow-hidden border border-orange-200 shadow-sm transition-all duration-300 flex flex-col h-full touch-manipulation hover:border-orange-400 hover:shadow-xl hover:-translate-y-1"
+                        style={{ WebkitTapHighlightColor: 'transparent' }}
+                      >
+                        {/* Image Container */}
+                        <div className="relative aspect-[4/3] overflow-hidden bg-gray-50">
+                          <img
+                            src={item.image}
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            alt={item.name}
+                            loading="lazy"
+                          />
+                          
+                          {/* Gradient Overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+
+                          {/* Category Badge */}
+                          <div className="absolute top-2 left-2">
+                            {isBeverage ? (
+                              <div className="flex items-center gap-1 px-2 py-1 bg-blue-500 text-white rounded-full text-[10px] font-bold shadow-lg">
+                                <Coffee size={10} />
+                                <span>{t.drink || 'Drink'}</span>
+                              </div>
+                            ) : isPackaged ? (
+                              <div className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded-full text-[10px] font-bold shadow-lg">
+                                <Package size={10} />
+                                <span>{t.packaged || 'Packaged'}</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded-full text-[10px] font-bold shadow-lg">
+                                <Box size={10} />
+                                <span>{t.other || 'Other'}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Add Button Overlay on Hover */}
+                          <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+                            <div className="w-10 h-10 bg-orange-600 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-white">
+                              <Plus size={20} strokeWidth={3} />
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </button>
-                  ))}
+
+                        {/* Content */}
+                        <div className="flex-1 flex flex-col p-3 sm:p-4 min-h-0">
+                          {/* Product Name */}
+                          <h4 className="font-bold text-sm text-gray-900 line-clamp-2 mb-1.5 leading-snug group-hover:text-orange-700 transition-colors">
+                            {item.name}
+                          </h4>
+
+                          {/* Coffee Details */}
+                          {(isPackaged || item.roast_level) && (item.bean_origin || item.roast_level) && (
+                            <div className="flex flex-wrap gap-1 mb-2">
+                              {item.roast_level && (
+                                <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[9px] font-bold border border-orange-100">
+                                  {item.roast_level}
+                                </span>
+                              )}
+                              {item.bean_origin && (
+                                <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[9px] font-bold border border-gray-200">
+                                  {item.bean_origin}
+                                </span>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Price Row */}
+                          <div className="mt-auto flex items-center justify-between pt-2 border-t border-gray-100">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">{t.price || 'Price'}</span>
+                              <span className="font-black text-orange-600 text-base sm:text-lg">
+                                {item.price.toFixed(2)}
+                                <span className="text-xs text-gray-400 font-bold ml-1">{t.currency}</span>
+                              </span>
+                            </div>
+                            
+                            {/* Add Button (Mobile/Always Visible) */}
+                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm transition-all duration-200 bg-orange-100 text-orange-600 group-hover:bg-orange-600 group-hover:text-white">
+                              <Plus size={16} strokeWidth={2.5} />
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
             </div>
           )}
         </div>

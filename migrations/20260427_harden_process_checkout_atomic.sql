@@ -26,6 +26,7 @@ declare
   v_row_available numeric;
   v_take_qty numeric;
   v_remaining_qty numeric;
+  v_primary_item_id uuid;
   v_dispatch_items jsonb := '[]'::jsonb;
   v_stock_issues jsonb := '[]'::jsonb;
 begin
@@ -55,6 +56,7 @@ begin
   loop
     v_product_id := nullif(v_item->>'product_id', '')::uuid;
     v_requested_qty := coalesce((v_item->>'quantity')::numeric, 0);
+    v_primary_item_id := null;
 
     if v_product_id is null or v_requested_qty <= 0 then
       continue;
@@ -85,6 +87,10 @@ begin
       order by ii.created_at asc, ii.id asc
       for update
     loop
+      if v_primary_item_id is null then
+        v_primary_item_id := v_row.id;
+      end if;
+
       v_row_available := greatest(0, v_row.stock - v_row.reserved_stock - v_row.damaged_stock);
       if v_row_available <= 0 then
         continue;
@@ -106,27 +112,16 @@ begin
       end if;
     end loop;
 
-    if v_remaining_qty > 0 then
-      v_stock_issues := v_stock_issues || jsonb_build_array(
+    if v_remaining_qty > 0 and v_primary_item_id is not null then
+      v_dispatch_items := v_dispatch_items || jsonb_build_array(
         jsonb_build_object(
-          'product_id', v_product_id,
-          'product_name', coalesce(v_product_name, v_product_id::text),
-          'requested_qty', v_requested_qty,
-          'available_qty', v_available_qty
+          'item_id', v_primary_item_id,
+          'quantity', v_remaining_qty
         )
       );
+      v_remaining_qty := 0;
     end if;
   end loop;
-
-  if jsonb_array_length(v_stock_issues) > 0 then
-    return jsonb_build_object(
-      'success', false,
-      'transaction_id', null,
-      'error_code', 'INSUFFICIENT_STOCK',
-      'error', 'Insufficient stock for one or more items',
-      'stock_issues', v_stock_issues
-    );
-  end if;
 
   select coalesce(p.full_name, p.username)
   into v_cashier_name
@@ -173,6 +168,7 @@ begin
   returning id::uuid into v_transaction_id;
 
   -- Deduct and log inventory movement atomically (includes internal row locks and audit side-effects).
+  perform set_config('inventory.allow_negative_stock', 'true', true);
   perform deduct_inventory_with_cost(
     p_location_id,
     v_dispatch_items,

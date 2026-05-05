@@ -224,15 +224,18 @@ export const productService = {
     if (productError) throw productError;
 
     const { error: inventoryError } = await supabase.from('inventory_items').insert({
+      name: product.name,
+      category: input.category.trim(),
+      type: 'PACKAGED_COFFEE',
+      price: input.price ?? 0,
       product_id: product.id,
       location_id: input.locationId,
       stock: input.initialQuantity,
       minimum_stock: input.minimumThreshold,
       reserved_stock: 0,
       damaged_stock: 0,
-      unit: input.unitOfMeasure.trim(),
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      last_movement_at: new Date().toISOString(),
     });
     if (inventoryError) throw inventoryError;
 

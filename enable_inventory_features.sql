@@ -1633,6 +1633,7 @@ declare
   qty numeric;
   remaining_qty numeric;
   current_stock numeric;
+  allow_negative_stock boolean;
   item_cost numeric;
   line_cost numeric;
   total_cost numeric := 0;
@@ -1645,6 +1646,7 @@ begin
   perform set_config('inventory.reference_id', coalesce(p_transaction_id, ''), true);
   perform set_config('inventory.actor_id', coalesce(p_user_id::text, ''), true);
   perform set_config('inventory.actor_name', coalesce(p_user_name, ''), true);
+  allow_negative_stock := lower(coalesce(current_setting('inventory.allow_negative_stock', true), 'false')) in ('1', 'true', 't', 'yes', 'on');
   for item in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb))
   loop
     item_id := (item->>'item_id')::uuid;
@@ -1660,7 +1662,8 @@ begin
     if not found then
       raise exception 'ITEM_NOT_FOUND';
     end if;
-    if current_stock < qty then
+    current_stock := coalesce(current_stock, 0);
+    if not allow_negative_stock and current_stock < qty then
       raise exception 'INSUFFICIENT_STOCK';
     end if;
 

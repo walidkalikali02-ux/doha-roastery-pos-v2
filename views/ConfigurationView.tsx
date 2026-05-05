@@ -54,6 +54,7 @@ import {
 } from 'lucide-react';
 import { useLanguage, useTheme } from '../App';
 import { useErrorToast } from '../hooks/useErrorToast';
+import { alertService } from '../services/alertService';
 import {
   PackageTemplate,
   ProductDefinition,
@@ -2260,21 +2261,33 @@ NOTIFY pgrst, 'reload schema';
       if (error) throw error;
 
       const branchesToUpdate = productForm.allBranches
-        ? locations.filter((l) => l.type === 'BRANCH' || l.is_roastery).map((l) => l.id)
+        ? getSellableLocations().map((l) => l.id)
         : productForm.selectedBranchIds;
 
-      if (!editingId && branchesToUpdate.length > 0 && productData?.id) {
-        const inventoryItems = branchesToUpdate.map((branchId) => ({
-          product_id: productData.id,
-          location_id: branchId,
-          stock: parseFloat(productForm.branchStock[branchId] || '0'),
-          reserved_stock: 0,
-          damaged_stock: 0,
-          created_at: new Date().toISOString(),
-        }));
+      if (productData?.id && branchesToUpdate.length > 0) {
+        const { error: syncError } = await supabase.rpc('replace_product_branch_inventory', {
+          p_product_id: productData.id,
+          p_location_ids: branchesToUpdate,
+          p_stocks: productForm.branchStock,
+        });
 
-        const { error: invError } = await supabase.from('inventory_items').upsert(inventoryItems);
-        if (invError) console.error('Failed to create inventory items:', invError);
+        if (syncError) {
+          console.error('Failed to sync branch inventory visibility:', syncError);
+          throw syncError;
+        }
+
+        try {
+          await Promise.all(
+            branchesToUpdate.map((locationId) =>
+              alertService.evaluateAlertsForProductsAtLocation({
+                locationId,
+                productIds: [productData.id],
+              })
+            )
+          );
+        } catch (alertError) {
+          console.error('Failed to refresh stock notifications:', alertError);
+        }
       }
 
       await fetchInitialData();
@@ -2288,6 +2301,56 @@ NOTIFY pgrst, 'reload schema';
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const openEditProduct = (product: ProductDefinition) => {
+    setEditingId(product.id);
+    const currentBranchStock = productLocationStock[product.id] || {};
+    const allBranchIds = getSellableLocations().map((location) => location.id);
+    const currentBranchIds = Object.keys(currentBranchStock).filter((id) =>
+      allBranchIds.includes(id)
+    );
+    const editBranchIds = currentBranchIds.length > 0 ? currentBranchIds : allBranchIds;
+    const editBranchStock = Object.fromEntries(
+      editBranchIds.map((id) => [id, String(currentBranchStock[id] ?? 0)])
+    );
+    const editAllBranchesSelected =
+      allBranchIds.length > 0 && editBranchIds.length === allBranchIds.length;
+
+    setProductForm({
+      name: product.name,
+      description: product.description || '',
+      category: product.category,
+      mainCategory: product.mainCategory || '',
+      subCategory: product.subCategory || '',
+      variantOf: product.variantOf || '',
+      variantLabel: product.variantLabel || '',
+      variantSize: product.variantSize || '',
+      variantFlavor: product.variantFlavor || '',
+      unit: product.unit || 'piece',
+      roastLevel: product.roastLevel || RoastingLevel.MEDIUM,
+      templateId: product.templateId || '',
+      basePrice: product.basePrice.toString(),
+      image: product.image || '',
+      sku: product.sku || '',
+      supplier: product.supplier || '',
+      isActive: product.productStatus === 'ACTIVE',
+      productStatus: product.productStatus || (product.isActive ? 'ACTIVE' : 'DISABLED'),
+      isPerishable: product.isPerishable || false,
+      expiryDate: product.expiryDate || '',
+      type: product.type || 'PACKAGED_COFFEE',
+      beanId: product.beanId || '',
+      laborCost: (product.laborCost || 0).toString(),
+      roastingOverhead: (product.roastingOverhead || 0).toString(),
+      estimatedGreenBeanCost: (product.estimatedGreenBeanCost || 0).toString(),
+      allBranches: editAllBranchesSelected,
+      selectedBranchIds: editBranchIds,
+      branchStock: editBranchStock,
+    });
+    setRecipeIngredients(product.recipe?.ingredients || []);
+    setBomComponents(product.bom || []);
+    setProductAddOns(product.add_ons || []);
+    setShowProductModal(true);
   };
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -2315,6 +2378,11 @@ NOTIFY pgrst, 'reload schema';
       setIsSaving(false);
     }
   };
+
+  const getSellableLocations = () =>
+    locations.filter(
+      (location) => location.is_active !== false && location.type !== 'WAREHOUSE'
+    );
 
   const resetProductForm = () => {
     setEditingId(null);
@@ -2860,6 +2928,7 @@ NOTIFY pgrst, 'reload schema';
     () => greenBeanRecords.reduce((sum, bean) => sum + toNumber(bean.quantity), 0),
     [greenBeanRecords]
   );
+  const sellableLocations = getSellableLocations();
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -3169,46 +3238,8 @@ NOTIFY pgrst, 'reload schema';
                     </div>
                     <div className="mt-auto flex justify-end gap-2">
                       <button
-                        onClick={() => {
-                          setEditingId(product.id);
-                          setProductForm({
-                            name: product.name,
-                            description: product.description || '',
-                            category: product.category,
-                            mainCategory: product.mainCategory || '',
-                            subCategory: product.subCategory || '',
-                            variantOf: product.variantOf || '',
-                            variantLabel: product.variantLabel || '',
-                            variantSize: product.variantSize || '',
-                            variantFlavor: product.variantFlavor || '',
-                            unit: product.unit || 'piece',
-                            roastLevel: product.roastLevel || RoastingLevel.MEDIUM,
-                            templateId: product.templateId || '',
-                            basePrice: product.basePrice.toString(),
-                            image: product.image || '',
-                            sku: product.sku || '',
-                            supplier: product.supplier || '',
-                            isActive: product.productStatus === 'ACTIVE',
-                            productStatus:
-                              product.productStatus || (product.isActive ? 'ACTIVE' : 'DISABLED'),
-                            isPerishable: product.isPerishable || false,
-                            expiryDate: product.expiryDate || '',
-                            type: product.type || 'PACKAGED_COFFEE',
-                            beanId: product.beanId || '',
-                            laborCost: (product.laborCost || 0).toString(),
-                            roastingOverhead: (product.roastingOverhead || 0).toString(),
-                            estimatedGreenBeanCost: (
-                              product.estimatedGreenBeanCost || 0
-                            ).toString(),
-                            allBranches: true,
-                            selectedBranchIds: [],
-                            branchStock: {},
-                          });
-                          setRecipeIngredients(product.recipe?.ingredients || []);
-                          setBomComponents(product.bom || []);
-                          setProductAddOns(product.add_ons || []);
-                          setShowProductModal(true);
-                        }}
+                        type="button"
+                        onClick={() => openEditProduct(product)}
                         className="p-2.5 text-black  rounded-xl transition-all"
                       >
                         <Edit3 size={18} />
@@ -4515,9 +4546,7 @@ NOTIFY pgrst, 'reload schema';
                     </div>
                     {!productForm.allBranches && (
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto custom-scrollbar p-3 bg-orange-50 rounded-2xl">
-                        {locations
-                          .filter((l) => l.type === 'BRANCH' || l.is_roastery)
-                          .map((loc) => (
+                        {sellableLocations.map((loc) => (
                             <label
                               key={loc.id}
                               className="flex items-center gap-2 text-xs font-bold cursor-pointer hover:bg-orange-100 p-2 rounded-lg transition-colors"
@@ -4551,8 +4580,8 @@ NOTIFY pgrst, 'reload schema';
                       </label>
                       <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto custom-scrollbar p-3 bg-orange-50 rounded-2xl">
                         {(productForm.allBranches
-                          ? locations.filter((l) => l.type === 'BRANCH' || l.is_roastery)
-                          : locations.filter((l) => productForm.selectedBranchIds.includes(l.id))
+                          ? sellableLocations
+                          : sellableLocations.filter((l) => productForm.selectedBranchIds.includes(l.id))
                         ).map((loc) => (
                           <div key={loc.id} className="flex flex-col gap-1">
                             <span className="text-xs font-bold text-gray-700 truncate">

@@ -578,4 +578,50 @@ export const movementService = {
       isAdmin: input.isAdmin,
     });
   },
+
+  // FACTORY: Quick stock add to all locations
+  async bulkAddStock(input: { quantity: number; reasonCode?: MovementReasonCode }) {
+    if (!input.quantity || input.quantity <= 0) {
+      throw new Error('Quantity must be positive');
+    }
+
+    const { data: locations, error: locError } = await supabase
+      .from('locations')
+      .select('id')
+      .in('type', ['BRANCH', 'WAREHOUSE', 'ROASTERY'])
+      .eq('is_active', true);
+
+    if (locError) throw locError;
+    if (!locations || locations.length === 0) {
+      throw new Error('No active locations found');
+    }
+
+    const { data: items, error: itemError } = await supabase
+      .from('inventory_items')
+      .select('id, location_id, stock');
+
+    if (itemError) throw itemError;
+    if (!items || items.length === 0) {
+      throw new Error('No inventory items found');
+    }
+
+    const updates = items.map((item: any) => ({
+      id: item.id,
+      stock: (item.stock || 0) + input.quantity,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error: updateError } = await supabase
+      .from('inventory_items')
+      .upsert(updates, { onConflict: 'id' });
+
+    if (updateError) throw updateError;
+
+    return {
+      success: true,
+      message: `Added ${input.quantity} pcs to ${items.length} items across ${locations.length} locations`,
+      itemsUpdated: items.length,
+      locationsUpdated: locations.length,
+    };
+  },
 };
