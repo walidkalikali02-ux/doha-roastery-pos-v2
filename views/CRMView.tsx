@@ -30,9 +30,7 @@ interface Customer {
   created_by?: string;
 }
 
-interface CRMViewProps {}
-
-const CRMView: React.FC<CRMViewProps> = () => {
+const CRMView: React.FC = () => {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const { showError } = useErrorToast();
