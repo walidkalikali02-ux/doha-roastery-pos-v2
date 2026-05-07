@@ -1,15 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+const SUPABASE_URL_DEFAULT = 'https://lweiutdbssdjltphimyo.supabase.co';
+const SUPABASE_ANON_KEY_DEFAULT = 'sb_publishable_l8YdLI-83WJU1iyadrS5aQ_rCpDM6PT';
+
 const supabaseUrl =
-  (import.meta.env.VITE_SUPABASE_URL ||
-    process.env.VITE_SUPABASE_URL ||
-    import.meta.env.NEXT_PUBLIC_SUPABASE_URL) ?? '';
+  import.meta.env.VITE_SUPABASE_URL ||
+  import.meta.env.NEXT_PUBLIC_SUPABASE_URL ||
+  SUPABASE_URL_DEFAULT;
 const supabaseAnonKey =
-  (import.meta.env.VITE_SUPABASE_ANON_KEY ||
-    process.env.VITE_SUPABASE_ANON_KEY ||
-    import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-    import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) ?? '';
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  SUPABASE_ANON_KEY_DEFAULT;
 
 const isSupabaseConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 const missingVars = [
