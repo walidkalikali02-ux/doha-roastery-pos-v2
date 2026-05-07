@@ -15,6 +15,7 @@ const missingVars = [
 ]
   .filter(Boolean)
   .join(', ');
+const missingEnvMessage = `Supabase configuration is missing: ${missingVars}`;
 
 const createErrorResponse = (message: string) => ({
   data: null,
@@ -106,22 +107,16 @@ const createNoopChannel = () => ({
 
 const createNoopSupabaseClient = (message: string): SupabaseClient =>
   ({
-  auth: createNoopAuth(message),
-  from: () => createNoopQuery(message),
-  rpc: async () => createErrorResponse(message),
-  storage: createNoopStorage(message),
-  channel: () => createNoopChannel(),
-  removeChannel: () => undefined,
+    auth: createNoopAuth(message),
+    from: () => createNoopQuery(message),
+    rpc: async () => createErrorResponse(message),
+    storage: createNoopStorage(message),
+    channel: () => createNoopChannel(),
+    removeChannel: () => undefined,
   } as unknown as SupabaseClient);
-
-const missingEnvMessage = `Supabase configuration is missing: ${missingVars}`;
-
-if (!isSupabaseConfigured) {
-  console.warn(missingEnvMessage);
-}
 
 export const supabase = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : createNoopSupabaseClient(missingEnvMessage);
 
-export { isSupabaseConfigured };
+export { isSupabaseConfigured, missingEnvMessage };

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useLanguage, useTheme } from '../App';
 import { useAuth } from '../contexts/AuthContext';
+import { isSupabaseConfigured, missingEnvMessage } from '../supabaseClient';
 import { LoginCredentials } from '../types';
 
 interface LoginViewProps {
@@ -162,6 +163,18 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
                     <h2 className="text-3xl font-bold text-black  mb-2">{t.welcomeBack}</h2>
                     <p className="text-black  text-sm">{t.loginToManage}</p>
                   </div>
+
+                  {!isSupabaseConfigured && (
+                    <div className="mb-6 rounded-2xl border-2 border-orange-600 bg-orange-50 p-4 text-left">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle className="mt-0.5 shrink-0 text-orange-600" size={18} />
+                        <div className="space-y-1">
+                          <p className="text-sm font-bold text-black">Configuration required</p>
+                          <p className="text-xs text-black">{missingEnvMessage}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <form onSubmit={handleSubmit(onLoginSubmit)} className="space-y-5">
                     <div className="space-y-1">

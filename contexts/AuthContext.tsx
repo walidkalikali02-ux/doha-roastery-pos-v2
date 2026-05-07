@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { isSupabaseConfigured, supabase } from '../supabaseClient';
+import { isSupabaseConfigured, missingEnvMessage, supabase } from '../supabaseClient';
 import { User, UserRole, LoginCredentials } from '../types';
 import { isDemoMode } from '../utils/demoMode';
 
@@ -201,7 +201,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         user: null,
         isAuthenticated: false,
         isLoading: false,
-        error: 'Supabase environment variables are not configured',
+        error: missingEnvMessage,
         sessionExpiresAt: null,
         lastActivityAt: null,
         sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
@@ -275,7 +275,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (credentials: LoginCredentials) => {
     if (!isSupabaseConfigured) {
-      const error = new Error('Supabase environment variables are not configured');
+      const error = new Error(missingEnvMessage);
       setState((prev) => ({ ...prev, isLoading: false, error: error.message }));
       throw error;
     }
@@ -330,7 +330,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const forgotPassword = async (email: string) => {
     if (!isSupabaseConfigured) {
-      throw new Error('Supabase environment variables are not configured');
+      throw new Error(missingEnvMessage);
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) throw error;
@@ -338,7 +338,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const resetPassword = async (newPassword: string) => {
     if (!isSupabaseConfigured) {
-      throw new Error('Supabase environment variables are not configured');
+      throw new Error(missingEnvMessage);
     }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
@@ -346,7 +346,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const changePassword = async (newPassword: string) => {
     if (!isSupabaseConfigured) {
-      throw new Error('Supabase environment variables are not configured');
+      throw new Error(missingEnvMessage);
     }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
@@ -354,7 +354,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshSession = async () => {
     if (!isSupabaseConfigured) {
-      throw new Error('Supabase environment variables are not configured');
+      throw new Error(missingEnvMessage);
     }
     const {
       data: { session },
