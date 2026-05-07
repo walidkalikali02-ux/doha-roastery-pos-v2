@@ -15,8 +15,11 @@ View your app in AI Studio: https://ai.studio/apps/drive/19f3X-RsBRC31qSu1IpqBvB
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
+2. Set the Supabase env vars in [.env.local](.env.local):
+   `VITE_SUPABASE_URL`
+   `VITE_SUPABASE_ANON_KEY`
+3. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+4. Run the app:
    `npm run dev`
 
 ## Cash Management Features

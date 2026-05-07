@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase } from '../supabaseClient';
+import { isSupabaseConfigured, supabase } from '../supabaseClient';
 import { User, UserRole, LoginCredentials } from '../types';
 import { isDemoMode } from '../utils/demoMode';
 
@@ -28,6 +28,36 @@ interface AuthContextType extends AuthState {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const DEFAULT_SESSION_TIMEOUT_MINUTES = 30;
 const SESSION_CHECK_INTERVAL_MS = 30 * 1000;
+type SessionTimeoutSettings = {
+  session_timeout_minutes?: number | string | null;
+};
+
+type SupabaseSession = {
+  user: {
+    id: string;
+    email: string;
+  };
+  expires_at?: number | null;
+} | null;
+
+const getPermissionsForRole = (role: UserRole): string[] => {
+  switch (role) {
+    case UserRole.ADMIN:
+      return ['can_delete', 'can_edit_stock', 'can_roast', 'can_sell', 'can_view_reports', 'can_export_invoices'];
+    case UserRole.MANAGER:
+      return ['can_edit_stock', 'can_roast', 'can_sell', 'can_view_reports'];
+    case UserRole.HR:
+      return ['can_view_reports'];
+    case UserRole.ROASTER:
+      return ['can_roast', 'can_edit_stock'];
+    case UserRole.CASHIER:
+      return ['can_sell', 'can_view_own_stats', 'can_manage_shift'];
+    case UserRole.WAREHOUSE_STAFF:
+      return ['can_edit_stock'];
+    default:
+      return [];
+  }
+};
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
@@ -53,75 +83,55 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .limit(1)
       .maybeSingle();
     if (error) return DEFAULT_SESSION_TIMEOUT_MINUTES;
-    const minutes = Number((data as any)?.session_timeout_minutes || DEFAULT_SESSION_TIMEOUT_MINUTES);
+    const minutes = Number(
+      (data as SessionTimeoutSettings | null)?.session_timeout_minutes ??
+        DEFAULT_SESSION_TIMEOUT_MINUTES
+    );
     if (!Number.isFinite(minutes)) return DEFAULT_SESSION_TIMEOUT_MINUTES;
     return Math.min(480, Math.max(5, Math.floor(minutes)));
   }, []);
 
-  const getPermissionsForRole = (role: UserRole): string[] => {
-    switch (role) {
-      case UserRole.ADMIN:
-        return [
-          'can_delete',
-          'can_edit_stock',
-          'can_roast',
-          'can_sell',
-          'can_view_reports',
-          'can_export_invoices',
-        ];
-      case UserRole.MANAGER:
-        return ['can_edit_stock', 'can_roast', 'can_sell', 'can_view_reports'];
-      case UserRole.HR:
-        return ['can_view_reports'];
-      case UserRole.ROASTER:
-        return ['can_roast', 'can_edit_stock'];
-      case UserRole.CASHIER:
-        return ['can_sell', 'can_view_own_stats', 'can_manage_shift'];
-      case UserRole.WAREHOUSE_STAFF:
-        return ['can_edit_stock'];
-      default:
-        return [];
-    }
-  };
+  const fetchUserProfile = useCallback(
+    async (userId: string, email: string): Promise<User | null> => {
+      try {
+        const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
 
-  const fetchUserProfile = async (userId: string, email: string): Promise<User | null> => {
-    try {
-      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+        if (error || !data) {
+          return {
+            id: userId,
+            email: email,
+            name: email.split('@')[0],
+            role: UserRole.ADMIN,
+            permissions: getPermissionsForRole(UserRole.ADMIN),
+          };
+        }
 
-      if (error || !data) {
+        if (data.is_active === false) return null;
+
         return {
-          id: userId,
+          id: data.id,
           email: email,
-          name: email.split('@')[0],
-          role: UserRole.ADMIN,
-          permissions: getPermissionsForRole(UserRole.ADMIN),
+          name: data.full_name || data.username || email.split('@')[0],
+          role: (data.role as UserRole) || UserRole.CASHIER,
+          permissions:
+            data.permissions || getPermissionsForRole((data.role as UserRole) || UserRole.CASHIER),
+          avatar: data.avatar_url,
+          location_id: data.location_id || undefined,
         };
+      } catch (e) {
+        console.error('Profile fetch error:', e);
+        return null;
       }
-
-      if (data.is_active === false) return null;
-
-      return {
-        id: data.id,
-        email: email,
-        name: data.full_name || data.username || email.split('@')[0],
-        role: (data.role as UserRole) || UserRole.CASHIER,
-        permissions:
-          data.permissions || getPermissionsForRole((data.role as UserRole) || UserRole.CASHIER),
-        avatar: data.avatar_url,
-        location_id: data.location_id || undefined,
-      };
-    } catch (e) {
-      console.error('Profile fetch error:', e);
-      return null;
-    }
-  };
+    },
+    []
+  );
 
   const expireSession = useCallback(async () => {
     try {
       await supabase.auth.signOut();
-    } catch (_error) {
-      // no-op
-    } finally {
+      } catch {
+        // no-op
+      } finally {
       setState({
         user: null,
         isAuthenticated: false,
@@ -134,7 +144,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const updateAuthStateFromSession = useCallback(async (session: any) => {
+  const updateAuthStateFromSession = useCallback(async (session: SupabaseSession) => {
     setState((prev) => ({ ...prev, isLoading: true }));
     try {
       if (session) {
@@ -177,7 +187,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Auth sync error:', err);
       setState((prev) => ({ ...prev, isLoading: false, isAuthenticated: false }));
     }
-  }, [getConfiguredSessionTimeoutMinutes]);
+  }, [fetchUserProfile, getConfiguredSessionTimeoutMinutes]);
 
   const recordActivity = useCallback(() => {
     setState((prev) =>
@@ -186,6 +196,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: 'Supabase environment variables are not configured',
+        sessionExpiresAt: null,
+        lastActivityAt: null,
+        sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
+      });
+      return;
+    }
+
     if (localStorage.getItem('demo_mode') === 'true') {
       localStorage.removeItem('demo_mode');
       localStorage.removeItem('demo_role');
@@ -251,6 +274,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ]);
 
   const login = async (credentials: LoginCredentials) => {
+    if (!isSupabaseConfigured) {
+      const error = new Error('Supabase environment variables are not configured');
+      setState((prev) => ({ ...prev, isLoading: false, error: error.message }));
+      throw error;
+    }
+
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
     try {
       const email = credentials.identifier.includes('@')
@@ -263,8 +292,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) throw error;
-    } catch (err: any) {
-      setState((prev) => ({ ...prev, isLoading: false, error: err.message }));
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Login failed';
+      setState((prev) => ({ ...prev, isLoading: false, error: message }));
       throw err;
     }
   };
@@ -285,6 +315,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    if (!isSupabaseConfigured) {
+      localStorage.removeItem('demo_mode');
+      localStorage.removeItem('demo_role');
+      setState((prev) => ({ ...prev, isAuthenticated: false, isLoading: false }));
+      return;
+    }
+
     localStorage.removeItem('demo_mode');
     localStorage.removeItem('demo_role');
     setState((prev) => ({ ...prev, isLoading: true }));
@@ -292,21 +329,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const forgotPassword = async (email: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase environment variables are not configured');
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email);
     if (error) throw error;
   };
 
   const resetPassword = async (newPassword: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase environment variables are not configured');
+    }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
   };
 
   const changePassword = async (newPassword: string) => {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase environment variables are not configured');
+    }
     const { error } = await supabase.auth.updateUser({ password: newPassword });
     if (error) throw error;
   };
 
   const refreshSession = async () => {
+    if (!isSupabaseConfigured) {
+      throw new Error('Supabase environment variables are not configured');
+    }
     const {
       data: { session },
       error,
