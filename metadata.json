@@ -1,0 +1,7 @@
+{
+  "name": "Doha Roastery Management System",
+  "description": "An integrated platform for coffee roasting management, inventory tracking, packaging, and Point of Sale (POS), designed specifically for Doha Roastery.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

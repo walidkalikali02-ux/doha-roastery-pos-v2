@@ -1,0 +1,415 @@
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+} from 'recharts';
+import {
+  ArrowUpRight,
+  ArrowDownRight,
+  Package,
+  Flame,
+  TrendingUp,
+  AlertTriangle,
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+} from 'lucide-react';
+import { useLanguage } from '../App';
+import { useErrorToast } from '../hooks/useErrorToast';
+import { supabase } from '../supabaseClient';
+import { BatchStatus, RoastingBatch, Transaction } from '../types';
+import { alertService } from '../services/alertService';
+
+const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: any) => (
+  <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-orange-100 transition-colors duration-300">
+    <div className="flex justify-between items-start">
+      <div className={`p-2 rounded-xl bg-orange-600 text-white transition-colors`}>
+        <Icon size={24} />
+      </div>
+      {change && (
+        <div className={`flex items-center text-xs font-bold text-black`}>
+          {change}
+          {isPositive ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+        </div>
+      )}
+    </div>
+    <div className="mt-4">
+      <h3 className="text-black text-xs md:text-sm font-medium">{title}</h3>
+      <p className="text-xl md:text-2xl font-bold mt-1 truncate text-black transition-colors">
+        {value}
+      </p>
+    </div>
+  </div>
+);
+
+const DashboardView: React.FC = () => {
+  const { t } = useLanguage();
+  const { showError } = useErrorToast();
+  const theme = 'light';
+  const [stats, setStats] = useState({
+    totalSales: 0,
+    roastCount: 0,
+    stockWeight: 0,
+    avgWaste: 0,
+    recentBatches: [] as RoastingBatch[],
+    lowStockCount: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [dashboardAlerts, setDashboardAlerts] = useState<
+    Array<{
+      id: string;
+      product_name: string;
+      product_sku: string | null;
+      alert_type: 'LOW_STOCK' | 'OUT_OF_STOCK';
+      current_qty: number;
+      threshold_qty: number;
+      product_link: string;
+    }>
+  >([]);
+
+  const normalizeBatchStatus = (status: string): BatchStatus => {
+    if (status === 'Ready for Packaging' || status === BatchStatus.PACKAGING)
+      return BatchStatus.PACKAGING;
+    if (status === 'Completed' || status === BatchStatus.COMPLETED) return BatchStatus.COMPLETED;
+    if (status === 'QC Rejected' || status === BatchStatus.REJECTED) return BatchStatus.REJECTED;
+    if (status === 'Preparation' || status === BatchStatus.PREPARATION)
+      return BatchStatus.PREPARATION;
+    if (status === 'Roasting' || status === 'In Progress' || status === BatchStatus.ROASTING)
+      return BatchStatus.ROASTING;
+    if (status === 'Cooling' || status === BatchStatus.COOLING) return BatchStatus.COOLING;
+    if (status === 'Inspection' || status === BatchStatus.INSPECTION) return BatchStatus.INSPECTION;
+    return BatchStatus.PREPARATION;
+  };
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    setIsLoading(true);
+    try {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+
+      // 1. Fetch Today's Sales
+      const { data: salesData } = await supabase
+        .from('transactions')
+        .select('total')
+        .gte('created_at', todayStart.toISOString());
+
+      const totalSales = (salesData || []).reduce((acc, curr) => acc + curr.total, 0);
+
+      // 2. Fetch Roasting Count (Recent week)
+      const weekStart = new Date();
+      weekStart.setDate(weekStart.getDate() - 7);
+      const { data: roastData } = await supabase
+        .from('roasting_batches')
+        .select('*')
+        .order('roast_date', { ascending: false });
+
+      const recentBatches = (roastData || []).slice(0, 5);
+      const weeklyRoasts = (roastData || []).filter(
+        (b) => new Date(b.roast_date) >= weekStart
+      ).length;
+
+      // 3. Fetch Stock Levels
+      const { data: gbData } = await supabase.from('green_beans').select('quantity');
+      const totalStock = (gbData || []).reduce((acc, curr) => acc + curr.quantity, 0);
+      const lowStockCount = (gbData || []).filter((b) => b.quantity < 100).length;
+
+      // 4. Calculate Waste Ratio
+      const completedRoasts = (roastData || []).filter((b) => b.waste_percentage != null);
+      const avgWaste =
+        completedRoasts.length > 0
+          ? completedRoasts.reduce((acc, curr) => acc + curr.waste_percentage, 0) /
+            completedRoasts.length
+          : 0;
+
+      setStats({
+        totalSales,
+        roastCount: weeklyRoasts,
+        stockWeight: totalStock,
+        avgWaste,
+        recentBatches: recentBatches.map(
+          (b) =>
+            ({
+              id: b.id,
+              beanId: b.bean_id,
+              roastDate: b.roast_date,
+              level: b.level,
+              preWeight: b.pre_weight,
+              postWeight: b.post_weight,
+              status: normalizeBatchStatus(b.status),
+              wastePercentage: b.waste_percentage,
+            }) as any
+        ),
+        lowStockCount,
+      });
+
+      const alerts = await alertService.getDashboardAlerts();
+      setDashboardAlerts(
+        alerts.map((a: any) => ({
+          id: a.id,
+          product_name: a.product_name,
+          product_sku: a.product_sku,
+          alert_type: a.alert_type,
+          current_qty: a.current_qty,
+          threshold_qty: a.threshold_qty,
+          product_link: a.product_link,
+        }))
+      );
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+      showError(t.actionFailed || 'Failed to load dashboard data');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const chartData = [
+    { name: t.daySat, sales: 4000, roast: 2400 },
+    { name: t.daySun, sales: 3000, roast: 1398 },
+    { name: t.dayMon, sales: 2000, roast: 9800 },
+    { name: t.dayTue, sales: 2780, roast: 3908 },
+    { name: t.dayWed, sales: 1890, roast: 4800 },
+    { name: t.dayThu, sales: 2390, roast: 3800 },
+    { name: t.dayFri, sales: 3490, roast: 4300 },
+  ];
+
+  const strokeColor = '#f5f5f5';
+  const textColor = '#78716c';
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-4 h-full">
+        <Loader2 className="animate-spin text-orange-600" size={48} />
+        <p className="font-bold text-black">{t.loading}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500">
+      <section className="relative overflow-hidden rounded-[32px] border border-orange-100 shadow-sm">
+        <img
+          src="https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=crop&w=1800&q=80"
+          alt="Doha Roastery hero"
+          className="h-48 w-full object-cover md:h-64"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/30 to-transparent" />
+        <div className="absolute inset-0 flex items-end p-6 md:p-8">
+          <div className="max-w-xl text-white">
+            <h1 className="text-2xl font-black md:text-4xl">{t.appName}</h1>
+            <p className="mt-2 text-xs font-bold uppercase tracking-wider text-orange-100 md:text-sm">
+              {t.weeklyAnalysis} • {t.roastingActivity}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {stats.lowStockCount > 0 && (
+        <div className="bg-white border-2 border-orange-600 p-4 md:p-5 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4 animate-pulse-once transition-colors">
+          <div className="flex items-center gap-4 text-black">
+            <div className="bg-orange-600 text-white p-2 rounded-xl">
+              <AlertCircle size={24} />
+            </div>
+            <div>
+              <h4 className="font-bold text-sm md:text-base">{t.lowStockWarning}</h4>
+              <p className="text-xs opacity-80">
+                {t.lowStockDetail.replace('{count}', stats.lowStockCount.toString())}
+              </p>
+            </div>
+          </div>
+          <button className="w-full md:w-auto px-6 py-2 bg-orange-600 text-white rounded-xl text-xs font-bold  transition-colors shadow-lg">
+            {t.reviewInventory}
+          </button>
+        </div>
+      )}
+
+      {dashboardAlerts.length > 0 && (
+        <div className="bg-white border-2 border-red-600 p-4 md:p-5 rounded-3xl transition-colors">
+          <div className="flex items-center gap-3 text-black mb-3">
+            <div className="bg-red-600 text-white p-2 rounded-xl">
+              <AlertTriangle size={20} />
+            </div>
+            <h4 className="font-bold text-sm md:text-base">
+              {`Stock Alerts (${dashboardAlerts.length})`}
+            </h4>
+          </div>
+          <div className="space-y-2 max-h-52 overflow-auto">
+            {dashboardAlerts.map((alert) => (
+              <a
+                key={alert.id}
+                href={alert.product_link}
+                className="block rounded-xl border border-orange-200 px-3 py-2 text-xs md:text-sm hover:bg-orange-50 transition-colors"
+              >
+                <span className="font-bold">{alert.product_name}</span>
+                <span className="ml-2 text-[11px] opacity-80">{alert.product_sku || 'N/A'}</span>
+                <span className="ml-2 inline-block rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">
+                  {alert.alert_type === 'OUT_OF_STOCK' ? 'Out' : 'Low'}
+                </span>
+                <span className="ml-2 text-[11px] opacity-80">
+                  {`Qty ${alert.current_qty} / Min ${alert.threshold_qty}`}
+                </span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <StatCard
+          title={t.totalSales}
+          value={`${stats.totalSales.toLocaleString()} ${t.currency}`}
+          icon={TrendingUp}
+          color="amber"
+        />
+        <StatCard
+          title={t.roastingBatches}
+          value={`${stats.roastCount} ${t.roastingBatches}`}
+          icon={Flame}
+          color="orange"
+        />
+        <StatCard
+          title={t.availableStock}
+          value={`${stats.stockWeight.toLocaleString()} ${t.kg}`}
+          icon={Package}
+          color="blue"
+        />
+        <StatCard
+          title={t.wasteRatio}
+          value={`${stats.avgWaste.toFixed(1)}%`}
+          icon={AlertTriangle}
+          color="red"
+        />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
+        <div className="bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-orange-100 transition-colors duration-300">
+          <h3 className="text-base md:text-lg font-bold mb-4 md:mb-6 text-black">
+            {t.weeklyAnalysis}
+          </h3>
+          <div className="h-64 md:h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fed7aa" />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  fontSize={12}
+                  tick={{ fill: '#7c2d12' }}
+                />
+                <YAxis axisLine={false} tickLine={false} fontSize={12} tick={{ fill: '#7c2d12' }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    borderColor: '#fed7aa',
+                    borderRadius: '12px',
+                  }}
+                  itemStyle={{ color: '#7c2d12' }}
+                />
+                <Bar dataKey="sales" fill="#ea580c" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 md:p-8 rounded-2xl shadow-sm border border-orange-100 transition-colors duration-300">
+          <h3 className="text-base md:text-lg font-bold mb-4 md:mb-6 text-black">
+            {t.roastingActivity}
+          </h3>
+          <div className="h-64 md:h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#fed7aa" />
+                <XAxis
+                  dataKey="name"
+                  axisLine={false}
+                  tickLine={false}
+                  fontSize={12}
+                  tick={{ fill: '#7c2d12' }}
+                />
+                <YAxis axisLine={false} tickLine={false} fontSize={12} tick={{ fill: '#7c2d12' }} />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: '#fff',
+                    borderColor: '#fed7aa',
+                    borderRadius: '12px',
+                  }}
+                  itemStyle={{ color: '#7c2d12' }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="roast"
+                  stroke="#ea580c"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: '#ea580c', strokeWidth: 2, stroke: '#fff' }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm border border-orange-100 overflow-hidden transition-colors duration-300">
+        <div className="p-4 md:p-6 border-b border-orange-50 flex justify-between items-center bg-white">
+          <h3 className="text-base md:text-lg font-bold text-black">{t.recentBatches}</h3>
+          <button className="text-black text-sm font-semibold hover:underline">{t.viewAll}</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className={`w-full ${t.dir === 'rtl' ? 'text-right' : 'text-left'}`}>
+            <thead>
+              <tr className="bg-white text-black text-sm uppercase tracking-wider">
+                <th className="px-6 py-4 font-bold">{t.batchId}</th>
+                <th className="px-6 py-4 font-bold">{t.roastLevel}</th>
+                <th className="px-6 py-4 font-bold">{t.netWeight}</th>
+                <th className="px-6 py-4 font-bold">{t.status}</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-orange-50">
+              {stats.recentBatches.map((batch, idx) => (
+                <tr key={idx} className=" transition-colors">
+                  <td className="px-6 py-4 font-medium text-sm text-black">{batch.id}</td>
+                  <td className="px-6 py-4">
+                    <span className="px-3 py-1 bg-white text-black rounded-full text-xs font-semibold whitespace-nowrap border border-stone-200">
+                      {batch.level}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 font-mono text-black text-sm">
+                    {batch.postWeight || batch.preWeight} {t.kg}
+                  </td>
+                  <td className="px-6 py-4">
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                        batch.status === BatchStatus.PACKAGING
+                          ? 'bg-orange-600 text-white'
+                          : 'bg-white text-black border border-orange-600'
+                      }`}
+                    >
+                      {batch.status === BatchStatus.PACKAGING
+                        ? t.ready
+                        : batch.status === BatchStatus.COMPLETED
+                          ? t.completed
+                          : t.inProgress}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DashboardView;

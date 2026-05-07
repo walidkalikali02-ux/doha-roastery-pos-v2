@@ -1,0 +1,359 @@
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { supabase } from '../supabaseClient';
+import { User, UserRole, LoginCredentials } from '../types';
+import { isDemoMode } from '../utils/demoMode';
+
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  error: string | null;
+  sessionExpiresAt: Date | null;
+  lastActivityAt: Date | null;
+  sessionTimeoutMinutes: number;
+}
+
+interface AuthContextType extends AuthState {
+  login: (credentials: LoginCredentials) => Promise<void>;
+  loginAsGuest: (role: UserRole) => void;
+  logout: () => Promise<void>;
+  forgotPassword: (email: string) => Promise<void>;
+  resetPassword: (newPassword: string) => Promise<void>;
+  changePassword: (newPassword: string) => Promise<void>;
+  refreshSession: () => Promise<void>;
+  checkSession: () => boolean;
+  updateProfile: (data: Partial<User>) => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const DEFAULT_SESSION_TIMEOUT_MINUTES = 30;
+const SESSION_CHECK_INTERVAL_MS = 30 * 1000;
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};
+
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [state, setState] = useState<AuthState>({
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
+    error: null,
+    sessionExpiresAt: null,
+    lastActivityAt: null,
+    sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
+  });
+
+  const getConfiguredSessionTimeoutMinutes = useCallback(async () => {
+    const { data, error } = await supabase
+      .from('system_settings')
+      .select('session_timeout_minutes')
+      .limit(1)
+      .maybeSingle();
+    if (error) return DEFAULT_SESSION_TIMEOUT_MINUTES;
+    const minutes = Number((data as any)?.session_timeout_minutes || DEFAULT_SESSION_TIMEOUT_MINUTES);
+    if (!Number.isFinite(minutes)) return DEFAULT_SESSION_TIMEOUT_MINUTES;
+    return Math.min(480, Math.max(5, Math.floor(minutes)));
+  }, []);
+
+  const getPermissionsForRole = (role: UserRole): string[] => {
+    switch (role) {
+      case UserRole.ADMIN:
+        return [
+          'can_delete',
+          'can_edit_stock',
+          'can_roast',
+          'can_sell',
+          'can_view_reports',
+          'can_export_invoices',
+        ];
+      case UserRole.MANAGER:
+        return ['can_edit_stock', 'can_roast', 'can_sell', 'can_view_reports'];
+      case UserRole.HR:
+        return ['can_view_reports'];
+      case UserRole.ROASTER:
+        return ['can_roast', 'can_edit_stock'];
+      case UserRole.CASHIER:
+        return ['can_sell', 'can_view_own_stats', 'can_manage_shift'];
+      case UserRole.WAREHOUSE_STAFF:
+        return ['can_edit_stock'];
+      default:
+        return [];
+    }
+  };
+
+  const fetchUserProfile = async (userId: string, email: string): Promise<User | null> => {
+    try {
+      const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+
+      if (error || !data) {
+        return {
+          id: userId,
+          email: email,
+          name: email.split('@')[0],
+          role: UserRole.ADMIN,
+          permissions: getPermissionsForRole(UserRole.ADMIN),
+        };
+      }
+
+      if (data.is_active === false) return null;
+
+      return {
+        id: data.id,
+        email: email,
+        name: data.full_name || data.username || email.split('@')[0],
+        role: (data.role as UserRole) || UserRole.CASHIER,
+        permissions:
+          data.permissions || getPermissionsForRole((data.role as UserRole) || UserRole.CASHIER),
+        avatar: data.avatar_url,
+        location_id: data.location_id || undefined,
+      };
+    } catch (e) {
+      console.error('Profile fetch error:', e);
+      return null;
+    }
+  };
+
+  const expireSession = useCallback(async () => {
+    try {
+      await supabase.auth.signOut();
+    } catch (_error) {
+      // no-op
+    } finally {
+      setState({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: 'Session expired',
+        sessionExpiresAt: null,
+        lastActivityAt: null,
+        sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
+      });
+    }
+  }, []);
+
+  const updateAuthStateFromSession = useCallback(async (session: any) => {
+    setState((prev) => ({ ...prev, isLoading: true }));
+    try {
+      if (session) {
+        const profile = await fetchUserProfile(session.user.id, session.user.email);
+        if (profile) {
+          const sessionTimeoutMinutes = await getConfiguredSessionTimeoutMinutes();
+          setState({
+            user: profile,
+            isAuthenticated: true,
+            isLoading: false,
+            error: null,
+            sessionExpiresAt: session.expires_at ? new Date(session.expires_at * 1000) : null,
+            lastActivityAt: new Date(),
+            sessionTimeoutMinutes,
+          });
+        } else {
+          await supabase.auth.signOut();
+          setState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: 'Account disabled',
+            sessionExpiresAt: null,
+            lastActivityAt: null,
+            sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
+          });
+        }
+      } else {
+        setState({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
+          sessionExpiresAt: null,
+          lastActivityAt: null,
+          sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
+        });
+      }
+    } catch (err) {
+      console.error('Auth sync error:', err);
+      setState((prev) => ({ ...prev, isLoading: false, isAuthenticated: false }));
+    }
+  }, [getConfiguredSessionTimeoutMinutes]);
+
+  const recordActivity = useCallback(() => {
+    setState((prev) =>
+      prev.isAuthenticated ? { ...prev, lastActivityAt: new Date(), error: null } : prev
+    );
+  }, []);
+
+  useEffect(() => {
+    if (localStorage.getItem('demo_mode') === 'true') {
+      localStorage.removeItem('demo_mode');
+      localStorage.removeItem('demo_role');
+    }
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        updateAuthStateFromSession(session);
+      })
+      .catch(() => {
+        setState((prev) => ({ ...prev, isLoading: false }));
+      });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (_event === 'SIGNED_OUT') {
+        localStorage.removeItem('demo_mode');
+        localStorage.removeItem('demo_role');
+      }
+      updateAuthStateFromSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [updateAuthStateFromSession]);
+
+  useEffect(() => {
+    if (!state.isAuthenticated) return;
+    const events: Array<keyof WindowEventMap> = [
+      'click',
+      'keydown',
+      'mousemove',
+      'scroll',
+      'touchstart',
+    ];
+    events.forEach((eventName) => window.addEventListener(eventName, recordActivity, { passive: true }));
+    return () => {
+      events.forEach((eventName) =>
+        window.removeEventListener(eventName, recordActivity as EventListener)
+      );
+    };
+  }, [state.isAuthenticated, recordActivity]);
+
+  useEffect(() => {
+    if (!state.isAuthenticated) return;
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      const inactiveMs = state.lastActivityAt ? now - state.lastActivityAt.getTime() : Number.MAX_SAFE_INTEGER;
+      const tokenExpired = state.sessionExpiresAt ? now >= state.sessionExpiresAt.getTime() : false;
+      const configuredTimeoutMs = state.sessionTimeoutMinutes * 60 * 1000;
+      if (inactiveMs >= configuredTimeoutMs || tokenExpired) {
+        void expireSession();
+      }
+    }, SESSION_CHECK_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [
+    state.isAuthenticated,
+    state.lastActivityAt,
+    state.sessionExpiresAt,
+    state.sessionTimeoutMinutes,
+    expireSession,
+  ]);
+
+  const login = async (credentials: LoginCredentials) => {
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+    try {
+      const email = credentials.identifier.includes('@')
+        ? credentials.identifier
+        : `${credentials.identifier}@roastery.com`;
+
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password: credentials.password,
+      });
+
+      if (error) throw error;
+    } catch (err: any) {
+      setState((prev) => ({ ...prev, isLoading: false, error: err.message }));
+      throw err;
+    }
+  };
+
+  const loginAsGuest = () => {
+    localStorage.removeItem('demo_mode');
+    localStorage.removeItem('demo_role');
+    setState((prev) => ({
+      ...prev,
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: 'Demo disabled',
+      sessionExpiresAt: null,
+      lastActivityAt: null,
+      sessionTimeoutMinutes: DEFAULT_SESSION_TIMEOUT_MINUTES,
+    }));
+  };
+
+  const logout = async () => {
+    localStorage.removeItem('demo_mode');
+    localStorage.removeItem('demo_role');
+    setState((prev) => ({ ...prev, isLoading: true }));
+    await supabase.auth.signOut();
+  };
+
+  const forgotPassword = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+    if (error) throw error;
+  };
+
+  const resetPassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  };
+
+  const changePassword = async (newPassword: string) => {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) throw error;
+  };
+
+  const refreshSession = async () => {
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.refreshSession();
+    if (error) throw error;
+    await updateAuthStateFromSession(session);
+  };
+
+  const checkSession = () => {
+    const now = Date.now();
+    if (!state.sessionExpiresAt || now >= state.sessionExpiresAt.getTime()) return false;
+    if (!state.lastActivityAt) return false;
+    return now - state.lastActivityAt.getTime() < state.sessionTimeoutMinutes * 60 * 1000;
+  };
+
+  const updateProfile = async (data: Partial<User>) => {
+    if (!state.user || isDemoMode()) return;
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        full_name: data.name,
+        avatar_url: data.avatar,
+      })
+      .eq('id', state.user.id);
+
+    if (error) throw error;
+
+    const updatedProfile = await fetchUserProfile(state.user.id, state.user.email);
+    if (updatedProfile) setState((prev) => ({ ...prev, user: updatedProfile }));
+  };
+
+  return (
+    <AuthContext.Provider
+      value={{
+        ...state,
+        login,
+        loginAsGuest,
+        logout,
+        forgotPassword,
+        resetPassword,
+        changePassword,
+        refreshSession,
+        checkSession,
+        updateProfile,
+      }}
+    >
+      {children}
+    </AuthContext.Provider>
+  );
+};
