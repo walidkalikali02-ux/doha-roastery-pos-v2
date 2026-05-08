@@ -10,15 +10,15 @@ export const shiftService = {
       .select('*')
       .eq('cashier_id', validUserId)
       .eq('status', 'OPEN')
-      .single();
+      .order('start_time', { ascending: false })
+      .limit(1);
 
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 is "Row not found"
+    if (error) {
       console.error('Error fetching open shift:', error);
       throw error;
     }
 
-    return data || null;
+    return data?.[0] || null;
   },
 
   async startShift(userId: string, userName: string, initialCash: number): Promise<Shift> {
