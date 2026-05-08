@@ -312,9 +312,11 @@ export const movementService = {
     let error: { message?: string } | null = null;
 
     const runCheckout = async (args: Record<string, unknown>) => {
+      console.log('[processCheckout] calling RPC with', Object.keys(args));
       const response = await supabase.rpc('process_checkout', args);
       data = response.data;
       error = response.error;
+      console.log('[processCheckout] RPC response', { data, error: error?.message });
     };
 
     await runCheckout(checkoutArgs);

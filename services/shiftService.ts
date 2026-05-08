@@ -129,10 +129,12 @@ export const shiftService = {
     let cashSales = 0;
 
     myTransactions.forEach((tx: Transaction) => {
-      if (tx.paymentMethod === 'CASH') {
+      const method = (tx as any).payment_method || (tx as any).paymentMethod;
+      const breakdown = (tx as any).payment_breakdown || (tx as any).paymentBreakdown;
+      if (method === 'CASH') {
         cashSales += tx.total;
-      } else if (tx.paymentMethod === 'SPLIT' && tx.paymentBreakdown) {
-        cashSales += tx.paymentBreakdown.cash || 0;
+      } else if (method === 'SPLIT' && breakdown) {
+        cashSales += breakdown.cash || 0;
       }
     });
 

@@ -3,7 +3,9 @@ export const Z_INDEX = {
   DROPDOWN: 40,
   MODAL_OVERLAY: 50,
   MODAL_CONTENT: 51,
-  TOAST: 70,
+  POS_PAYMENT_MODAL: 250,
+  POS_SUCCESS_MODAL: 300,
+  TOAST: 9999,
 } as const;
 
 export type ZIndexKey = keyof typeof Z_INDEX;

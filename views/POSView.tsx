@@ -806,10 +806,17 @@ const POSView: React.FC = () => {
     cardReferenceOverride?: string
   ) => {
     if (cart.length === 0 || isProcessing) return;
+
+    if (!selectedLocationId) {
+      showErrorToast(lang === 'ar' ? 'يرجى اختيار الفرع أولاً' : 'Please select a branch first');
+      return;
+    }
+
     setIsProcessing(true);
 
     try {
       const validUserId = isDemoMode() ? null : user?.id;
+      console.log('[checkout] starting', { paymentMethod, locationId: selectedLocationId, cashierId: user?.id, shiftId: currentShift?.id, itemCount: cart.length });
 
       const checkoutItems = cart.map((item) => ({
         product_id: item.id,
@@ -858,6 +865,8 @@ const POSView: React.FC = () => {
         changeAmount: normalizedChangeAmount,
         cardReference: normalizedCardReference,
       });
+
+      console.log('[checkout] RPC result', JSON.stringify(result));
 
       if (!result?.success) {
         const firstIssue = Array.isArray(result?.stock_issues) ? result.stock_issues[0] : null;
@@ -928,6 +937,7 @@ const POSView: React.FC = () => {
       fetchInventory();
       checkShift();
     } catch (error: unknown) {
+      console.error('[checkout] error', error);
       if (error instanceof Error) {
         const message = error.message || '';
         const stockError =
@@ -2774,7 +2784,10 @@ const POSView: React.FC = () => {
 
           <div className="grid grid-cols-2 gap-3">
             <button
-              onClick={() => setShowCashModal(true)}
+              onClick={() => {
+                setCashReceived(totals.total.toFixed(2));
+                setShowCashModal(true);
+              }}
               disabled={cart.length === 0 || isProcessing}
               className="py-5 md:py-6 rounded-xl bg-white border-2 border-gray-200 text-gray-800 font-bold text-sm md:text-base flex items-center justify-center gap-2 disabled:opacity-50 transition-all hover:border-orange-300 hover:bg-orange-50 active:scale-[0.98] touch-manipulation min-h-[56px]"
               style={{ WebkitTapHighlightColor: 'transparent' }}
