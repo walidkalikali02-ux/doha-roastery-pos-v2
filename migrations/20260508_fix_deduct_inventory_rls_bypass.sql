@@ -1,8 +1,15 @@
 -- Migration: 20260508_fix_deduct_inventory_rls_bypass.sql
 -- Purpose: Fix POS checkout by making deduct_inventory_with_cost bypass RLS
---          via SECURITY DEFINER + set role postgres to bypass inventory_items UPDATE policy.
+--          via SECURITY DEFINER (removed SET ROLE as it causes errors in security-definer functions)
 
-CREATE OR REPLACE FUNCTION public.deduct_inventory_with_cost(p_location_id uuid, p_items jsonb, p_method text, p_transaction_id text, p_user_id uuid, p_user_name text)
+CREATE OR REPLACE FUNCTION public.deduct_inventory_with_cost(
+  p_location_id uuid, 
+  p_items jsonb, 
+  p_method text, 
+  p_transaction_id text, 
+  p_user_id uuid, 
+  p_user_name text
+)
  RETURNS numeric
  LANGUAGE plpgsql
  SECURITY DEFINER
@@ -20,16 +27,15 @@ declare
   lot_unit_cost numeric;
   lot_take numeric;
   item_details jsonb := '[]'::jsonb;
-  original_session_user text;
 begin
-  original_session_user := current_user;
-
+  -- Set config for audit logging (these don't require SET ROLE)
   perform set_config('inventory.movement_type', 'SALE', true);
   perform set_config('inventory.reference_id', coalesce(p_transaction_id, ''), true);
   perform set_config('inventory.actor_id', coalesce(p_user_id::text, ''), true);
   perform set_config('inventory.actor_name', coalesce(p_user_name, ''), true);
 
-  set role postgres;
+  -- SECURITY DEFINER already runs with owner's privileges, so no need for SET ROLE
+  -- Note: SET ROLE cannot be used within SECURITY DEFINER functions
 
   for item in select * from jsonb_array_elements(coalesce(p_items, '[]'::jsonb))
   loop
@@ -38,14 +44,17 @@ begin
     if item_id is null or qty <= 0 then
       continue;
     end if;
+    
     select stock, cost_per_unit into current_stock, item_cost
     from inventory_items
     where id = item_id
       and (p_location_id is null or location_id = p_location_id)
     for update;
+    
     if not found then
       raise exception 'ITEM_NOT_FOUND';
     end if;
+    
     if current_stock < qty then
       raise exception 'INSUFFICIENT_STOCK';
     end if;
@@ -107,8 +116,12 @@ begin
     );
   end if;
 
-  reset role;
+  -- No need for RESET ROLE since we didn't SET ROLE
 
   return total_cost;
 end;
 $function$;
+
+-- Grant execute permission to authenticated users
+REVOKE EXECUTE ON FUNCTION public.deduct_inventory_with_cost(uuid, jsonb, text, text, uuid, text) FROM public;
+GRANT EXECUTE ON FUNCTION public.deduct_inventory_with_cost(uuid, jsonb, text, text, uuid, text) TO authenticated;
