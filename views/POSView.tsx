@@ -60,6 +60,8 @@ interface TransactionData {
   created_at: string;
   total: number;
   payment_method: string;
+  payment_status?: 'COMPLETED' | 'REFUNDED' | 'VOIDED';
+  paid_at?: string;
   cashier_name?: string;
   items: CartItem[];
 }
@@ -886,7 +888,8 @@ const POSView: React.FC = () => {
   const handleCheckout = async (
     paymentMethod: PaymentMethod,
     breakdown?: PaymentBreakdown,
-    receivedAmount?: number
+    receivedAmount?: number,
+    cardReferenceOverride?: string
   ) => {
     if (cart.length === 0 || isProcessing) return;
     setIsProcessing(true);
@@ -900,6 +903,35 @@ const POSView: React.FC = () => {
         unit_price: item.price,
       }));
 
+      const safeReceivedAmount = Number.isFinite(receivedAmount ?? Number.NaN)
+        ? (receivedAmount as number)
+        : totals.total;
+
+      const normalizedBreakdown =
+        breakdown ||
+        (paymentMethod === 'CARD'
+          ? {
+              cash: 0,
+              card: totals.total,
+              mobile: 0,
+              card_reference: cardReferenceOverride || cardReference || undefined,
+            }
+          : paymentMethod === 'MOBILE'
+            ? { cash: 0, card: 0, mobile: totals.total }
+            : paymentMethod === 'CASH'
+              ? { cash: safeReceivedAmount, card: 0, mobile: 0 }
+              : undefined);
+      const normalizedReceivedAmount =
+        safeReceivedAmount ??
+        (normalizedBreakdown
+          ? normalizedBreakdown.cash + normalizedBreakdown.card + normalizedBreakdown.mobile
+          : totals.total);
+      const normalizedChangeAmount = Math.max(0, normalizedReceivedAmount - totals.total);
+      const normalizedCardReference =
+        paymentMethod === 'CARD'
+          ? cardReferenceOverride || cardReference || null
+          : breakdown?.card_reference || null;
+
       const result = await movementService.processCheckoutWithAutoDispatch({
         items: checkoutItems,
         paymentMethod,
@@ -907,6 +939,10 @@ const POSView: React.FC = () => {
         cashierId: user?.id,
         shiftId: currentShift?.id || null,
         locationId: selectedLocationId,
+        paymentBreakdown: normalizedBreakdown || null,
+        receivedAmount: normalizedReceivedAmount,
+        changeAmount: normalizedChangeAmount,
+        cardReference: normalizedCardReference,
       });
 
       if (!result?.success) {
@@ -934,14 +970,15 @@ const POSView: React.FC = () => {
         vat_amount: totals.vat,
         total: totals.total,
         payment_method: paymentMethod,
-        payment_breakdown: breakdown || null,
-        card_reference:
-          paymentMethod === 'CARD' ? cardReference : breakdown?.card_reference || null,
+        payment_status: 'COMPLETED',
+        paid_at: new Date().toISOString(),
+        payment_breakdown: normalizedBreakdown || null,
+        card_reference: normalizedCardReference,
         user_id: validUserId,
         cashier_id: user?.id,
         cashier_name: cashierNameForTransaction,
-        received_amount: receivedAmount || totals.total,
-        change_amount: receivedAmount ? Math.max(0, receivedAmount - totals.total) : 0,
+        received_amount: normalizedReceivedAmount,
+        change_amount: normalizedChangeAmount,
       };
 
       if (selectedCustomer) {
@@ -1256,7 +1293,7 @@ const POSView: React.FC = () => {
         // Update original transaction status
         const { error: txError } = await supabase
           .from('transactions')
-          .update({ is_returned: true, return_id: requestId })
+          .update({ is_returned: true, return_id: requestId, payment_status: 'REFUNDED' })
           .eq('id', request.invoice_number);
 
         if (txError)
@@ -1679,7 +1716,7 @@ const POSView: React.FC = () => {
               />
             </div>
             <button
-              onClick={() => handleCheckout('CARD')}
+              onClick={() => handleCheckout('CARD', undefined, totals.total, cardReference)}
               disabled={isProcessing}
               className="w-full mt-10 py-5 bg-orange-600 text-white rounded-[24px] font-black text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-3 border-2 border-orange-600 hover"
             >
@@ -1750,7 +1787,11 @@ const POSView: React.FC = () => {
             </div>
             <button
               onClick={() => handleCheckout('CASH', undefined, parseFloat(cashReceived))}
-              disabled={parseFloat(cashReceived) < totals.total || isProcessing}
+              disabled={
+                !Number.isFinite(parseFloat(cashReceived)) ||
+                parseFloat(cashReceived) < totals.total ||
+                isProcessing
+              }
               className="w-full mt-10 py-5 bg-orange-600 text-white rounded-[24px] font-black text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-3 border-2 border-orange-600 hover"
             >
               {isProcessing ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}{' '}
@@ -1836,7 +1877,13 @@ const POSView: React.FC = () => {
               ))}
             </div>
             <button
-              onClick={() => handleCheckout('SPLIT', splitBreakdown)}
+              onClick={() =>
+                handleCheckout(
+                  'SPLIT',
+                  splitBreakdown,
+                  splitBreakdown.cash + splitBreakdown.card + splitBreakdown.mobile
+                )
+              }
               disabled={Math.abs(splitRemaining) > 0.01 || isProcessing}
               className="w-full mt-8 py-5 bg-orange-600 text-white rounded-[24px] font-black text-xl shadow-xl active:scale-95 transition-all disabled:opacity-30 flex items-center justify-center gap-3 border-2 border-orange-600 hover"
             >
@@ -2851,7 +2898,7 @@ const POSView: React.FC = () => {
               <CreditCard size={22} className="text-orange-600" /> {t.card}
             </button>
             <button
-              onClick={() => handleCheckout('MOBILE')}
+              onClick={() => handleCheckout('MOBILE', undefined, totals.total)}
               disabled={cart.length === 0 || isProcessing}
               className="py-4 md:py-5 rounded-xl bg-gray-100 text-gray-700 font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-all hover:bg-gray-200 active:scale-[0.98] touch-manipulation min-h-[48px]"
               style={{ WebkitTapHighlightColor: 'transparent' }}

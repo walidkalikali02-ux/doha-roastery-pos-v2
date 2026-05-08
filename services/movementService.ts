@@ -17,6 +17,10 @@ export interface ProcessCheckoutInput {
   cashierId?: string | null;
   shiftId?: string | null;
   locationId: string;
+  paymentBreakdown?: Record<string, unknown> | null;
+  receivedAmount?: number | null;
+  changeAmount?: number | null;
+  cardReference?: string | null;
 }
 
 export interface CheckoutStockIssue {
@@ -302,6 +306,10 @@ export const movementService = {
       p_cashier_id: input.cashierId || null,
       p_shift_id: input.shiftId || null,
       p_location_id: input.locationId,
+      p_payment_breakdown: input.paymentBreakdown || null,
+      p_received_amount: input.receivedAmount ?? null,
+      p_change_amount: input.changeAmount ?? null,
+      p_card_reference: input.cardReference || null,
     });
     if (error) throw error;
 

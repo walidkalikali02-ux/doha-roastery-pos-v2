@@ -231,6 +231,8 @@ export interface Transaction {
   paymentMethod: PaymentMethod;
   paymentBreakdown?: PaymentBreakdown;
   card_reference?: string; // REQ-003: Added for single card payments
+  payment_status?: 'COMPLETED' | 'REFUNDED' | 'VOIDED';
+  paid_at?: string;
   user_id?: string;
   cashier_name?: string;
   received_amount?: number;

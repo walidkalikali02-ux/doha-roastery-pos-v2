@@ -359,6 +359,8 @@ export type Database = {
           location_id: string | null;
           payment_breakdown: Json | null;
           payment_method: string | null;
+          payment_status: string | null;
+          paid_at: string | null;
           received_amount: number | null;
           return_id: string | null;
           subtotal: number | null;
@@ -384,6 +386,8 @@ export type Database = {
           location_id?: string | null;
           payment_breakdown?: Json | null;
           payment_method?: string | null;
+          payment_status?: string | null;
+          paid_at?: string | null;
           received_amount?: number | null;
           return_id?: string | null;
           subtotal?: number | null;
@@ -409,6 +413,8 @@ export type Database = {
           location_id?: string | null;
           payment_breakdown?: Json | null;
           payment_method?: string | null;
+          payment_status?: string | null;
+          paid_at?: string | null;
           received_amount?: number | null;
           return_id?: string | null;
           subtotal?: number | null;
