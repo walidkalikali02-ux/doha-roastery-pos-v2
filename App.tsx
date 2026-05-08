@@ -27,6 +27,8 @@ import {
   DollarSign,
   TrendingUp,
   User,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
 import DashboardView from './views/DashboardView';
 import RoastingView from './views/RoastingView';
@@ -557,7 +559,7 @@ const AppContent: React.FC = () => {
         </div>
       )}
       <aside
-        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'right-0' : 'left-0'} z-50 transform transition-all duration-300 ease-in-out hidden lg:flex lg:static lg:inset-auto ${isMobileMenuOpen ? 'translate-x-0' : t.dir === 'rtl' ? 'translate-x-full' : '-translate-x-full'} bg-white  text-black  border-r border-orange-100  flex-shrink-0 flex-col shadow-xl ${isSidebarOpen ? 'w-64' : 'w-20'}`}
+        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'right-0' : 'left-0'} z-50 transform transition-all duration-300 ease-in-out lg:static lg:inset-auto ${isMobileMenuOpen ? 'translate-x-0 flex' : 'hidden'} ${!isMobileMenuOpen && isSidebarOpen ? 'lg:flex' : ''} ${!isMobileMenuOpen && !isSidebarOpen ? 'lg:hidden' : ''} bg-white  text-black  border-r border-orange-100  flex-shrink-0 flex-col shadow-xl ${isSidebarOpen ? 'w-64' : 'w-20'}`}
       >
         <div className="p-4 flex items-center justify-between border-b border-orange-50 ">
           <div
@@ -650,6 +652,18 @@ const AppContent: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-3 md:gap-6">
+            {/* Sidebar Toggle Button - Desktop Only */}
+            <button
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="hidden lg:flex items-center gap-2 text-xs font-bold px-3 py-2 bg-orange-50 border border-orange-200 rounded-full shadow-sm transition-all hover:bg-orange-100"
+              title={isSidebarOpen ? (lang === 'ar' ? 'إخفاء القائمة' : 'Hide Menu') : (lang === 'ar' ? 'إظهار القائمة' : 'Show Menu')}
+            >
+              {isSidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeftOpen size={16} />}
+              <span className="hidden xl:inline">
+                {isSidebarOpen ? (lang === 'ar' ? 'إخفاء' : 'Hide') : (lang === 'ar' ? 'إظهار' : 'Show')}
+              </span>
+            </button>
+
             <div className="hidden md:flex items-center gap-2">
               <QuickActions />
             </div>

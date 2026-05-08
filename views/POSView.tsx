@@ -2467,11 +2467,11 @@ const POSView: React.FC = () => {
                         onClick={() => {
                           openCustomization(item);
                         }}
-                        className="group relative bg-white rounded-3xl overflow-hidden border-2 border-orange-100 shadow-md transition-all duration-200 flex flex-col h-full touch-manipulation active:scale-[0.98] active:border-orange-400 hover:border-orange-300 hover:shadow-lg"
+                        className="group relative bg-white rounded-3xl overflow-hidden border-2 border-orange-100 shadow-md transition-all duration-200 flex flex-col h-full touch-manipulation active:scale-[0.98] active:border-orange-400 hover:border-orange-300 hover:shadow-lg xl:rounded-[2rem]"
                         style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
                         {/* Image Container - Larger aspect ratio for better visibility */}
-                        <div className="relative aspect-[16/10] overflow-hidden bg-gray-50">
+                        <div className="relative aspect-[16/10] overflow-hidden bg-gray-50 xl:aspect-[16/9]">
                           <img
                             src={item.image}
                             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -2508,9 +2508,9 @@ const POSView: React.FC = () => {
                         </div>
 
                         {/* Content - Simplified for mobile */}
-                        <div className="flex-1 flex flex-col p-4 min-h-0">
+                        <div className="flex-1 flex flex-col p-4 min-h-0 xl:p-5">
                           {/* Product Name - Larger text */}
-                          <h4 className="font-bold text-base text-gray-900 line-clamp-2 mb-2 leading-snug group-hover:text-orange-700 transition-colors">
+                          <h4 className="font-bold text-base text-gray-900 line-clamp-2 mb-2 leading-snug group-hover:text-orange-700 transition-colors xl:text-lg">
                             {item.name}
                           </h4>
 
@@ -2531,15 +2531,15 @@ const POSView: React.FC = () => {
                           {/* Price Row - Simplified with larger touch target */}
                           <div className="mt-auto flex items-center justify-between pt-3 border-t border-gray-100">
                             <div className="flex items-baseline gap-1">
-                              <span className="font-black text-orange-600 text-xl">
+                              <span className="font-black text-orange-600 text-xl xl:text-2xl">
                                 {item.price.toFixed(2)}
                               </span>
                               <span className="text-sm text-gray-400 font-bold">{t.currency}</span>
                             </div>
                             
                             {/* Add Button - Large touch target (48px) with clear visual feedback */}
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md transition-all duration-200 bg-orange-500 text-white group-active:bg-orange-700">
-                              <Plus size={24} strokeWidth={2.5} />
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md transition-all duration-200 bg-orange-500 text-white group-active:bg-orange-700 xl:w-14 xl:h-14">
+                              <Plus size={24} strokeWidth={2.5} className="xl:w-7 xl:h-7" />
                             </div>
                           </div>
                         </div>
