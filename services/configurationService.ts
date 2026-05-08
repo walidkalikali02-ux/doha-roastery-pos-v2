@@ -95,41 +95,7 @@ export const configurationService = {
     return data;
   },
 
-  // CFG-004
-  async listNotificationTargets() {
-    const { data, error } = await supabase
-      .from('alert_notification_targets')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
-  },
-
-  async upsertNotificationTarget(input: {
-    channel: 'EMAIL' | 'WEBHOOK';
-    target: string;
-    severity?: 'P0' | 'P1' | 'P2' | 'P3';
-    isActive?: boolean;
-  }) {
-    if (!input.target.trim()) throw new Error('target is required');
-    const { data, error } = await supabase
-      .from('alert_notification_targets')
-      .upsert(
-        {
-          channel: input.channel,
-          target: input.target.trim(),
-          severity: input.severity || 'P0',
-          is_active: input.isActive ?? true,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'channel,target' }
-      )
-      .select('*');
-    if (error) throw error;
-    return data || [];
-  },
-
-  // CFG-005 + CFG-006
+  // CFG-004 + CFG-005
   async getRuntimeSettings() {
     const { data, error } = await supabase
       .from('system_settings')

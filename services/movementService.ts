@@ -1,5 +1,4 @@
 import { supabase } from '../supabaseClient';
-import { alertService } from './alertService';
 import { UserRole } from '../types';
 
 export type MovementOperation = 'DISPATCH' | 'RECEIPT';
@@ -265,8 +264,6 @@ export const movementService = {
       });
     }
 
-    const touchedIds = lines.map((line) => line.inventoryItemId);
-
     if (input.operation === 'DISPATCH') {
       const { error } = await supabase.rpc('deduct_inventory_with_cost', {
         p_location_id: input.locationId,
@@ -279,10 +276,6 @@ export const movementService = {
         p_user_name: input.actorName || null,
       });
       if (error) throw error;
-      await alertService.evaluateAlertsAfterMovement({
-        locationId: input.locationId,
-        inventoryItemIds: touchedIds,
-      });
       return { success: true, message: 'Dispatch completed atomically.' };
     }
 
@@ -297,10 +290,6 @@ export const movementService = {
       p_movement_type: 'PURCHASE_RECEIPT',
     });
     if (error) throw error;
-    await alertService.evaluateAlertsAfterMovement({
-      locationId: input.locationId,
-      inventoryItemIds: touchedIds,
-    });
     return { success: true, message: 'Receipt completed atomically.' };
   },
 
@@ -355,17 +344,12 @@ export const movementService = {
 
     const productIds = Array.from(new Set(input.items.map((item) => item.product_id).filter(Boolean)));
     if (productIds.length > 0) {
-      const { data: rows, error: rowError } = await supabase
+      const { error: rowError } = await supabase
         .from('inventory_items')
         .select('id')
         .eq('location_id', input.locationId)
         .in('product_id', productIds);
-      if (!rowError) {
-        await alertService.evaluateAlertsAfterMovement({
-          locationId: input.locationId,
-          inventoryItemIds: (rows || []).map((row) => row.id),
-        });
-      }
+      if (rowError) throw rowError;
     }
 
     return data;

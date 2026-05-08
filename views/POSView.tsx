@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { useTimeoutFn } from '../hooks/useTimeout';
 import { ToastContainer } from '../components/common/Toast';
@@ -51,7 +51,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { shiftService } from '../services/shiftService';
 import { crmService } from '../services/crmService';
 import { movementService } from '../services/movementService';
-import { alertService } from '../services/alertService';
 import { Customer } from '../types';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -86,11 +85,7 @@ const toNumber = (value: unknown, fallback = 0) => {
 const POSView: React.FC = () => {
   const { lang, t } = useLanguage();
   const { user } = useAuth();
-  const {
-    showError: showErrorToast,
-    showSuccess: showSuccessToast,
-    showWarning: showWarningToast,
-  } = useErrorToast();
+  const { showError: showErrorToast } = useErrorToast();
   const { schedule: scheduleTimeout } = useTimeoutFn();
 
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -112,21 +107,6 @@ const POSView: React.FC = () => {
   const [customerSearchQuery, setCustomerSearchQuery] = useState('');
   const [isSearchingCustomer, setIsSearchingCustomer] = useState(false);
   const [customerSearchResults, setCustomerSearchResults] = useState<Customer[]>([]);
-  const [branchAlerts, setBranchAlerts] = useState<
-    Array<{
-      id: string;
-      product_name: string;
-      product_sku?: string | null;
-      alert_type: 'LOW_STOCK' | 'OUT_OF_STOCK';
-      current_qty: number;
-      threshold_qty: number;
-      location_id: string;
-      updated_at?: string | null;
-      last_triggered_at?: string | null;
-    }>
-  >([]);
-  const alertedBranchAlertKeysRef = useRef(new Set<string>());
-
   // Return Processing State
   const [searchingInvoice, setSearchingInvoice] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<TransactionData | null>(null);
@@ -438,65 +418,6 @@ const POSView: React.FC = () => {
   useEffect(() => {
     fetchLocations();
   }, [fetchLocations]);
-
-  const fetchBranchAlerts = useCallback(async () => {
-    if (!selectedLocationId) {
-      setBranchAlerts([]);
-      return;
-    }
-
-    try {
-      const alerts = await alertService.getDashboardAlerts({ locationId: selectedLocationId });
-      setBranchAlerts(alerts as any);
-
-      for (const alert of alerts as any[]) {
-        const alertKey = `${alert.id}:${alert.last_triggered_at || alert.updated_at || ''}`;
-        if (alertedBranchAlertKeysRef.current.has(alertKey)) continue;
-        alertedBranchAlertKeysRef.current.add(alertKey);
-
-        const message =
-          alert.alert_type === 'OUT_OF_STOCK'
-            ? `${alert.product_name} ${t.insufficientStockAvailable}`
-            : `${t.branchLowStockAlert}: ${alert.product_name}`;
-
-        if (alert.alert_type === 'OUT_OF_STOCK') {
-          showErrorToast(message);
-        } else {
-          showWarningToast(message);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load branch alerts', error);
-    }
-  }, [selectedLocationId, showErrorToast, showWarningToast, t]);
-
-  useEffect(() => {
-    fetchBranchAlerts();
-  }, [fetchBranchAlerts]);
-
-  useEffect(() => {
-    if (!selectedLocationId) return;
-
-    const channel = supabase
-      .channel(`pos_branch_alerts_${selectedLocationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'inventory_alerts',
-          filter: `location_id=eq.${selectedLocationId}`,
-        },
-        () => {
-          fetchBranchAlerts();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchBranchAlerts, selectedLocationId]);
 
   const fetchCashierOptions = useCallback(async () => {
     const fallbackName = currentShift?.cashier_name || user?.name || 'Cashier';
@@ -2136,54 +2057,6 @@ const POSView: React.FC = () => {
             ))}
           </div>
 
-          {branchAlerts.length > 0 && (
-            <div className="mt-2 rounded-2xl border border-red-200 bg-red-50/80 p-3 md:p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-600 text-white shrink-0">
-                    <AlertTriangle size={18} />
-                  </div>
-                  <div className="min-w-0">
-                    <h4 className="text-sm font-black text-black uppercase tracking-widest">
-                      {t.branchLowStockAlert || 'Branch Stock Notification'}
-                    </h4>
-                    <p className="text-xs font-medium text-gray-700">
-                      {(t.branchLowStockDetail || 'There are {count} low-stock items in this branch.')
-                        .replace('{count}', branchAlerts.length.toString())}
-                    </p>
-                  </div>
-                </div>
-                <span className="rounded-full bg-red-600 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white">
-                  {branchAlerts.length}
-                </span>
-              </div>
-              <div className="mt-3 space-y-2">
-                {branchAlerts.slice(0, 3).map((alert) => (
-                  <div
-                    key={alert.id}
-                    className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2 text-xs border border-red-100"
-                  >
-                    <div className="min-w-0">
-                      <p className="font-bold text-black truncate">{alert.product_name}</p>
-                      <p className="text-[10px] text-gray-500 uppercase tracking-wide">
-                        {alert.product_sku || 'N/A'}
-                      </p>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="block text-[10px] font-black uppercase text-red-600">
-                        {alert.alert_type === 'OUT_OF_STOCK'
-                          ? 'Out of stock'
-                          : 'Low stock'}
-                      </span>
-                      <span className="text-[10px] text-gray-500">
-                        {alert.current_qty} / {alert.threshold_qty}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Content Area */}

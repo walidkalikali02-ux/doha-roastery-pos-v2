@@ -54,7 +54,6 @@ import {
 } from 'lucide-react';
 import { useLanguage, useTheme } from '../App';
 import { useErrorToast } from '../hooks/useErrorToast';
-import { alertService } from '../services/alertService';
 import {
   PackageTemplate,
   ProductDefinition,
@@ -2276,18 +2275,6 @@ NOTIFY pgrst, 'reload schema';
           throw syncError;
         }
 
-        try {
-          await Promise.all(
-            branchesToUpdate.map((locationId) =>
-              alertService.evaluateAlertsForProductsAtLocation({
-                locationId,
-                productIds: [productData.id],
-              })
-            )
-          );
-        } catch (alertError) {
-          console.error('Failed to refresh stock notifications:', alertError);
-        }
       }
 
       await fetchInitialData();
