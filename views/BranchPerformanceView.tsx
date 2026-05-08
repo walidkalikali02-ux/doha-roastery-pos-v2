@@ -122,7 +122,7 @@ const BranchPerformanceView: React.FC = () => {
         .select('*')
         .gte('created_at', dateFrom);
 
-      const { data: staff } = await supabase.from('staff').select('id, location_id');
+      const { data: staff } = await supabase.from('staff').select('id, branch_id');
       let latestTransactionAt: string | null = null;
       const latestTransactionByBranch: Record<string, string> = {};
       (transactions || []).forEach((transaction: any) => {
@@ -195,7 +195,7 @@ const BranchPerformanceView: React.FC = () => {
         const totalTransactions = locationTransactions.length;
         const avgTransactionValue = totalTransactions > 0 ? totalSales / totalTransactions : 0;
 
-        const locationStaff = (staff || []).filter((s: any) => s.location_id === location.id);
+        const locationStaff = (staff || []).filter((s: any) => s.branch_id === location.id);
 
         const productMap = new Map<string, { quantity: number; revenue: number }>();
         locationTransactions.forEach((t: any) => {

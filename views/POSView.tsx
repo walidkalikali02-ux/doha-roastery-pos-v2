@@ -503,15 +503,15 @@ const POSView: React.FC = () => {
 
     try {
       let query = supabase.from('staff').select(
-        'id, first_name_en, last_name_en, first_name_ar, last_name_ar, employment_status, location_id, role'
+        'id, full_name, name, is_active, branch_id'
       );
 
       if (!isAdmin) {
-        query = query.eq('role', 'CASHIER');
+        query = query.eq('is_active', true);
       }
 
       if (!isAdmin && selectedLocationId) {
-        query = query.eq('location_id', selectedLocationId);
+        query = query.eq('branch_id', selectedLocationId);
       }
 
       const { data, error } = await query;
@@ -519,17 +519,12 @@ const POSView: React.FC = () => {
 
       const options = (data || [])
         .filter(
-          (staff: any) =>
-            staff.employment_status !== 'Terminated' && staff.employment_status !== 'Resigned'
+          (s: any) => s.is_active !== false
         )
-        .map((staff: any) => {
-          const localizedName =
-            lang === 'ar' && staff.first_name_ar
-              ? `${staff.first_name_ar} ${staff.last_name_ar || ''}`.trim()
-              : `${staff.first_name_en || ''} ${staff.last_name_en || ''}`.trim();
-
+        .map((s: any) => {
+          const localizedName = s.full_name || s.name || '';
           return {
-            id: staff.id,
+            id: s.id,
             name: localizedName,
           };
         })
