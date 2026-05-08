@@ -492,20 +492,7 @@ const POSView: React.FC = () => {
 
       if (settingsRes.data) setSettings(settingsRes.data);
 
-      const productMap = new Map<string, any>();
-      if (prodRes.data) {
-        prodRes.data.forEach((p) => productMap.set(p.id, p));
-      }
-      const getProductStatus = (product: any) =>
-        product?.product_status || (product?.is_active === false ? 'DISABLED' : 'ACTIVE');
-
-      const allItems: InventoryItem[] = [];
       const invItems = invRes.data || [];
-      const getAvailableStock = (item: any) => {
-        const reserved = item.reserved_stock || 0;
-        const damaged = item.damaged_stock || 0;
-        return Math.max(0, (item.stock || 0) - reserved - damaged);
-      };
       const invByProductId = new Map<string, any[]>();
       invItems.forEach((item: any) => {
         const pid = item.product_id || item.productId;
@@ -514,63 +501,73 @@ const POSView: React.FC = () => {
         invByProductId.get(pid)!.push(item);
       });
 
-      if (prodRes.data) {
-        prodRes.data
-          .filter((p) => {
-            if (getProductStatus(p) !== 'ACTIVE') return false;
-            return true;
-          })
-          .forEach((p) => {
-            const linkedInv = invByProductId.get(p.id) || [];
-            const stock =
-              linkedInv.length > 0
-                ? linkedInv.reduce((sum: number, row: any) => sum + toNumber(row.stock), 0)
-                : p.type === 'BEVERAGE'
-                  ? 999
-                  : 0;
-            const reserved = linkedInv.reduce(
-              (sum: number, row: any) => sum + toNumber(row.reserved_stock),
-              0
-            );
-            const damaged = linkedInv.reduce(
-              (sum: number, row: any) => sum + toNumber(row.damaged_stock),
-              0
-            );
-            const firstInv = linkedInv[0];
-            const variantText = [p.variant_label, p.variant_size, p.variant_flavor]
-              .filter(Boolean)
-              .join(' • ');
-
-            allItems.push({
-              id: p.id,
-              productId: p.id,
-              name: variantText ? `${p.name} (${variantText})` : p.name,
-              description: p.description,
-              category:
-                p.type === 'PACKAGED_COFFEE'
-                  ? 'PACKAGED'
-                  : p.type === 'BEVERAGE'
-                    ? 'DRINKS'
-                    : 'OTHER',
-              type: p.type,
-              price: toNumber(p.selling_price ?? p.base_price),
-              stock: toNumber(stock),
-              reserved_stock: toNumber(reserved),
-              damaged_stock: toNumber(damaged),
-              image:
-                p.image ||
-                firstInv?.image ||
-                'https://images.unsplash.com/photo-1541167760496-162955ed8a9f?q=80&w=300&h=300&auto=format&fit=crop',
-              recipe: p.recipe,
-              bom: p.bom || [],
-              add_ons: p.add_ons || [],
-              roast_date: firstInv?.roast_date || null,
-              bean_origin: firstInv?.bean_origin || null,
-              bean_variety: firstInv?.bean_variety || null,
-              roast_level: firstInv?.roast_level || p.roast_level || null,
-            } as any);
-          });
+      const productMap = new Map<string, any>();
+      for (const p of prodRes.data || []) {
+        productMap.set(p.id, p);
       }
+
+      const buildItem = (product: any, linkedInv: any[], fallbackInv?: any): InventoryItem => {
+        const stock =
+          linkedInv.length > 0
+            ? linkedInv.reduce((sum: number, row: any) => sum + toNumber(row.stock), 0)
+            : product?.type === 'BEVERAGE' || fallbackInv?.type === 'BEVERAGE'
+              ? 999
+              : 0;
+        const reserved = linkedInv.reduce((sum: number, row: any) => sum + toNumber(row.reserved_stock), 0);
+        const damaged = linkedInv.reduce((sum: number, row: any) => sum + toNumber(row.damaged_stock), 0);
+        const firstInv = linkedInv[0] || fallbackInv;
+        const name = product?.name || fallbackInv?.name || 'Unnamed Item';
+        const type = product?.type || fallbackInv?.type || 'PACKAGED_COFFEE';
+        const variantText = product
+          ? [product.variant_label, product.variant_size, product.variant_flavor].filter(Boolean).join(' • ')
+          : '';
+
+        return {
+          id: product?.id || fallbackInv?.product_id || fallbackInv?.id,
+          productId: product?.id || fallbackInv?.product_id || fallbackInv?.id,
+          name: variantText ? `${name} (${variantText})` : name,
+          description: product?.description || fallbackInv?.description,
+          category:
+            type === 'PACKAGED_COFFEE' ? 'PACKAGED' : type === 'BEVERAGE' ? 'DRINKS' : 'OTHER',
+          type,
+          price: toNumber(product?.selling_price ?? product?.base_price ?? fallbackInv?.price),
+          stock: toNumber(stock),
+          reserved_stock: toNumber(reserved),
+          damaged_stock: toNumber(damaged),
+          image:
+            product?.image ||
+            firstInv?.image ||
+            'https://images.unsplash.com/photo-1541167760496-162955ed8a9f?q=80&w=300&h=300&auto=format&fit=crop',
+          recipe: product?.recipe || fallbackInv?.recipe,
+          bom: product?.bom || fallbackInv?.bom || [],
+          add_ons: product?.add_ons || fallbackInv?.add_ons || [],
+          roast_date: firstInv?.roast_date || null,
+          bean_origin: firstInv?.bean_origin || null,
+          bean_variety: firstInv?.bean_variety || null,
+          roast_level: firstInv?.roast_level || product?.roast_level || null,
+        } as InventoryItem;
+      };
+
+      const allItems: InventoryItem[] = [];
+      const seenProductIds = new Set<string>();
+
+      for (const product of prodRes.data || []) {
+        const linkedInv = invByProductId.get(product.id) || [];
+        if ((product.product_status || (product.is_active === false ? 'DISABLED' : 'ACTIVE')) !== 'ACTIVE') {
+          continue;
+        }
+        allItems.push(buildItem(product, linkedInv));
+        seenProductIds.add(product.id);
+      }
+
+      for (const inv of invItems) {
+        const productId = inv.product_id || inv.productId || inv.id;
+        if (!productId || seenProductIds.has(productId)) continue;
+        const linkedInv = invByProductId.get(productId) || [inv];
+        allItems.push(buildItem(null, linkedInv, inv));
+        seenProductIds.add(productId);
+      }
+
       setInventoryItems(allItems);
     } catch (error) {
       console.error(error);
