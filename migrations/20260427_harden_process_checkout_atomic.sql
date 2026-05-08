@@ -147,7 +147,7 @@ begin
     is_returned,
     user_id
   ) values (
-    gen_random_uuid()::text,
+    gen_random_uuid(),
     p_cashier_id,
     coalesce(v_cashier_name, 'Cashier'),
     p_location_id,
@@ -165,7 +165,7 @@ begin
     false,
     p_cashier_id
   )
-  returning id::uuid into v_transaction_id;
+  returning id into v_transaction_id;
 
   -- Deduct and log inventory movement atomically (includes internal row locks and audit side-effects).
   perform set_config('inventory.allow_negative_stock', 'true', true);
