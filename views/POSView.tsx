@@ -599,10 +599,7 @@ const POSView: React.FC = () => {
         prodRes.data
           .filter((p) => {
             if (getProductStatus(p) !== 'ACTIVE') return false;
-            if (!selectedLocationId) return true;
-            const linkedInv = invByProductId.get(p.id) || [];
-            // Strict branch isolation: only show products stocked in the selected branch.
-            return linkedInv.length > 0;
+            return true;
           })
           .forEach((p) => {
             const linkedInv = invByProductId.get(p.id) || [];
