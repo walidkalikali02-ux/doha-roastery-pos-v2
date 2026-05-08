@@ -51,14 +51,6 @@ begin
       and (p_location_id is null or location_id = p_location_id)
     for update;
     
-    if not found then
-      raise exception 'ITEM_NOT_FOUND';
-    end if;
-    
-    if current_stock < qty then
-      raise exception 'INSUFFICIENT_STOCK';
-    end if;
-
     line_cost := 0;
     remaining_qty := qty;
 
@@ -93,7 +85,7 @@ begin
     end if;
 
     update inventory_items
-    set stock = current_stock - qty,
+    set stock = coalesce(current_stock, 0) - qty,
         last_movement_at = now()
     where id = item_id;
 

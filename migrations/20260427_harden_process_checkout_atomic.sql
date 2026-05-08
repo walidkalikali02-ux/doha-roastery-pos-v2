@@ -1,5 +1,5 @@
 -- Migration: 20260427_harden_process_checkout_atomic.sql
--- Purpose: Harden checkout against race conditions by moving stock validation + deduction
+-- Purpose: Harden checkout against race conditions by moving deduction
 --          inside one DB transaction with row-level locks and structured error payloads.
 
 create or replace function process_checkout(
@@ -19,16 +19,13 @@ declare
   v_item jsonb;
   v_row record;
   v_product_id uuid;
-  v_product_name text;
   v_product_type text;
   v_requested_qty numeric;
-  v_available_qty numeric;
   v_row_available numeric;
   v_take_qty numeric;
   v_remaining_qty numeric;
   v_primary_item_id uuid;
   v_dispatch_items jsonb := '[]'::jsonb;
-  v_stock_issues jsonb := '[]'::jsonb;
 begin
   if p_location_id is null then
     return jsonb_build_object(
@@ -49,7 +46,7 @@ begin
   end if;
 
   -- Build row-locked deduction plan by product.
-  -- We lock inventory rows now, validate availability, and then deduct in this same transaction.
+  -- We lock inventory rows now and then deduct in this same transaction.
   for v_item in
     select *
     from jsonb_array_elements(p_items)
@@ -62,8 +59,8 @@ begin
       continue;
     end if;
 
-    select pd.name, pd.type
-    into v_product_name, v_product_type
+    select pd.type
+    into v_product_type
     from product_definitions pd
     where pd.id = v_product_id;
 
@@ -72,7 +69,6 @@ begin
       continue;
     end if;
 
-    v_available_qty := 0;
     v_remaining_qty := v_requested_qty;
 
     for v_row in
@@ -95,8 +91,6 @@ begin
       if v_row_available <= 0 then
         continue;
       end if;
-
-      v_available_qty := v_available_qty + v_row_available;
 
       if v_remaining_qty > 0 then
         v_take_qty := least(v_row_available, v_remaining_qty);
@@ -180,8 +174,7 @@ begin
 
   if p_shift_id is not null then
     update shifts
-    set total_cash_sales = coalesce(total_cash_sales, 0) + p_total,
-        updated_at = now()
+    set total_cash_sales = coalesce(total_cash_sales, 0) + p_total
     where id = p_shift_id;
   end if;
 

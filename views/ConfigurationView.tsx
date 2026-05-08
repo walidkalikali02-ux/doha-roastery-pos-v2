@@ -1026,10 +1026,6 @@ BEGIN
     RAISE EXCEPTION 'BEAN_NOT_FOUND';
   END IF;
 
-  IF COALESCE(v_quantity, 0) < p_pre_weight THEN
-    RAISE EXCEPTION 'INSUFFICIENT_STOCK';
-  END IF;
-
   UPDATE public.green_beans
   SET quantity = COALESCE(quantity, 0) - p_pre_weight
   WHERE id = p_bean_id;
