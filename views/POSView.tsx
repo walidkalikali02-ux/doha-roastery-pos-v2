@@ -954,6 +954,12 @@ const POSView: React.FC = () => {
         return;
       }
 
+      if (!result?.transaction_id) {
+        showErrorToast('Checkout failed: No transaction ID returned');
+        setIsProcessing(false);
+        return;
+      }
+
       const cashierNameForTransaction =
         currentShift?.cashier_name || selectedCashierName || user?.name || 'Cashier';
 
