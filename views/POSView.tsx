@@ -2446,14 +2446,14 @@ const POSView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 animate-in fade-in duration-500">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5 animate-in fade-in duration-500">
               {isLoading
-                ? Array.from({ length: 8 }).map((_, i) => (
-                    <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-orange-100">
-                      <div className="aspect-[4/3] bg-gray-100 animate-pulse"></div>
-                      <div className="p-3 space-y-2">
-                        <div className="h-3 bg-gray-100 rounded animate-pulse w-3/4"></div>
-                        <div className="h-4 bg-gray-100 rounded animate-pulse w-1/2"></div>
+                ? Array.from({ length: 6 }).map((_, i) => (
+                    <div key={i} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-orange-100">
+                      <div className="aspect-[16/10] bg-gray-100 animate-pulse"></div>
+                      <div className="p-4 space-y-3">
+                        <div className="h-4 bg-gray-100 rounded animate-pulse w-3/4"></div>
+                        <div className="h-5 bg-gray-100 rounded animate-pulse w-1/2"></div>
                       </div>
                     </div>
                   ))
@@ -2467,85 +2467,79 @@ const POSView: React.FC = () => {
                         onClick={() => {
                           openCustomization(item);
                         }}
-                        className="group relative bg-white rounded-2xl overflow-hidden border border-orange-200 shadow-sm transition-all duration-300 flex flex-col h-full touch-manipulation hover:border-orange-400 hover:shadow-xl hover:-translate-y-1"
+                        className="group relative bg-white rounded-3xl overflow-hidden border-2 border-orange-100 shadow-md transition-all duration-200 flex flex-col h-full touch-manipulation active:scale-[0.98] active:border-orange-400 hover:border-orange-300 hover:shadow-lg"
                         style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
-                        {/* Image Container */}
-                        <div className="relative aspect-[4/3] overflow-hidden bg-gray-50">
+                        {/* Image Container - Larger aspect ratio for better visibility */}
+                        <div className="relative aspect-[16/10] overflow-hidden bg-gray-50">
                           <img
                             src={item.image}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                             alt={item.name}
                             loading="lazy"
                           />
                           
-                          {/* Gradient Overlay */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-                          {/* Category Badge */}
-                          <div className="absolute top-2 left-2">
+                          {/* Category Badge - Larger for mobile */}
+                          <div className="absolute top-3 left-3">
                             {isBeverage ? (
-                              <div className="flex items-center gap-1 px-2 py-1 bg-blue-500 text-white rounded-full text-[10px] font-bold shadow-lg">
-                                <Coffee size={10} />
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-full text-xs font-bold shadow-lg">
+                                <Coffee size={12} />
                                 <span>{t.drink || 'Drink'}</span>
                               </div>
                             ) : isPackaged ? (
-                              <div className="flex items-center gap-1 px-2 py-1 bg-orange-600 text-white rounded-full text-[10px] font-bold shadow-lg">
-                                <Package size={10} />
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 text-white rounded-full text-xs font-bold shadow-lg">
+                                <Package size={12} />
                                 <span>{t.packaged || 'Packaged'}</span>
                               </div>
                             ) : (
-                              <div className="flex items-center gap-1 px-2 py-1 bg-gray-600 text-white rounded-full text-[10px] font-bold shadow-lg">
-                                <Box size={10} />
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-600 text-white rounded-full text-xs font-bold shadow-lg">
+                                <Box size={12} />
                                 <span>{t.other || 'Other'}</span>
                               </div>
                             )}
                           </div>
 
-                          {/* Add Button Overlay on Hover */}
-                          <div className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transform translate-y-2 group-hover:translate-y-0 transition-all duration-300">
-                            <div className="w-10 h-10 bg-orange-600 text-white rounded-full flex items-center justify-center shadow-xl border-2 border-white">
-                              <Plus size={20} strokeWidth={3} />
+                          {/* Stock Badge - Shows low stock warning */}
+                          {item.stock !== undefined && item.stock <= 5 && (
+                            <div className="absolute top-3 right-3 px-2 py-1 bg-red-500 text-white rounded-lg text-[10px] font-bold shadow-lg">
+                              {item.stock} {t.left || 'left'}
                             </div>
-                          </div>
+                          )}
                         </div>
 
-                        {/* Content */}
-                        <div className="flex-1 flex flex-col p-3 sm:p-4 min-h-0">
-                          {/* Product Name */}
-                          <h4 className="font-bold text-sm text-gray-900 line-clamp-2 mb-1.5 leading-snug group-hover:text-orange-700 transition-colors">
+                        {/* Content - Simplified for mobile */}
+                        <div className="flex-1 flex flex-col p-4 min-h-0">
+                          {/* Product Name - Larger text */}
+                          <h4 className="font-bold text-base text-gray-900 line-clamp-2 mb-2 leading-snug group-hover:text-orange-700 transition-colors">
                             {item.name}
                           </h4>
 
-                          {/* Coffee Details */}
-                          {(isPackaged || item.roast_level) && (item.bean_origin || item.roast_level) && (
-                            <div className="flex flex-wrap gap-1 mb-2">
-                              {item.roast_level && (
-                                <span className="px-1.5 py-0.5 bg-orange-50 text-orange-700 rounded text-[9px] font-bold border border-orange-100">
-                                  {item.roast_level}
-                                </span>
-                              )}
-                              {item.bean_origin && (
-                                <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-[9px] font-bold border border-gray-200">
-                                  {item.bean_origin}
-                                </span>
-                              )}
-                            </div>
-                          )}
-
-                          {/* Price Row */}
-                          <div className="mt-auto flex items-center justify-between pt-2 border-t border-gray-100">
-                            <div className="flex flex-col">
-                              <span className="text-[10px] text-gray-400 font-medium uppercase tracking-wide">{t.price || 'Price'}</span>
-                              <span className="font-black text-orange-600 text-base sm:text-lg">
-                                {item.price.toFixed(2)}
-                                <span className="text-xs text-gray-400 font-bold ml-1">{t.currency}</span>
+                          {/* Coffee Details - Hidden on very small screens, shown on sm+ */}
+                          <div className="hidden sm:flex flex-wrap gap-1.5 mb-3">
+                            {item.roast_level && (
+                              <span className="px-2 py-1 bg-orange-50 text-orange-700 rounded-md text-[10px] font-bold border border-orange-100">
+                                {item.roast_level}
                               </span>
+                            )}
+                            {item.bean_origin && (
+                              <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-[10px] font-bold border border-gray-200">
+                                {item.bean_origin}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Price Row - Simplified with larger touch target */}
+                          <div className="mt-auto flex items-center justify-between pt-3 border-t border-gray-100">
+                            <div className="flex items-baseline gap-1">
+                              <span className="font-black text-orange-600 text-xl">
+                                {item.price.toFixed(2)}
+                              </span>
+                              <span className="text-sm text-gray-400 font-bold">{t.currency}</span>
                             </div>
                             
-                            {/* Add Button (Mobile/Always Visible) */}
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm transition-all duration-200 bg-orange-100 text-orange-600 group-hover:bg-orange-600 group-hover:text-white">
-                              <Plus size={16} strokeWidth={2.5} />
+                            {/* Add Button - Large touch target (48px) with clear visual feedback */}
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md transition-all duration-200 bg-orange-500 text-white group-active:bg-orange-700">
+                              <Plus size={24} strokeWidth={2.5} />
                             </div>
                           </div>
                         </div>
