@@ -299,7 +299,7 @@ export const movementService = {
 
   // MOV-002
   async processCheckoutWithAutoDispatch(input: ProcessCheckoutInput) {
-    const { data, error } = await supabase.rpc('process_checkout', {
+    const checkoutArgs = {
       p_items: input.items,
       p_payment_method: input.paymentMethod,
       p_total: input.total,
@@ -310,7 +310,40 @@ export const movementService = {
       p_received_amount: input.receivedAmount ?? null,
       p_change_amount: input.changeAmount ?? null,
       p_card_reference: input.cardReference || null,
-    });
+    };
+
+    let data: unknown = null;
+    let error: { message?: string } | null = null;
+
+    const runCheckout = async (args: Record<string, unknown>) => {
+      const response = await supabase.rpc('process_checkout', args);
+      data = response.data;
+      error = response.error;
+    };
+
+    await runCheckout(checkoutArgs);
+
+    if (error) {
+      const message = error.message || '';
+      const looksLikeSignatureMismatch =
+        /function .*process_checkout/i.test(message) ||
+        /could not find the function/i.test(message) ||
+        /too many arguments/i.test(message) ||
+        /unexpected/i.test(message) ||
+        /p_payment_breakdown|p_received_amount|p_change_amount|p_card_reference/i.test(message);
+
+      if (looksLikeSignatureMismatch) {
+        await runCheckout({
+          p_items: input.items,
+          p_payment_method: input.paymentMethod,
+          p_total: input.total,
+          p_cashier_id: input.cashierId || null,
+          p_shift_id: input.shiftId || null,
+          p_location_id: input.locationId,
+        });
+      }
+    }
+
     if (error) throw error;
 
     const productIds = Array.from(new Set(input.items.map((item) => item.product_id).filter(Boolean)));

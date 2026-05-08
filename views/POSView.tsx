@@ -1198,6 +1198,12 @@ const POSView: React.FC = () => {
     try {
       const status = approved ? 'APPROVED' : 'REJECTED';
 
+      const refundUpdate = {
+        is_returned: true,
+        return_id: requestId,
+        payment_status: 'REFUNDED' as const,
+      };
+
       const { data: request, error: reqError } = await supabase
         .from('return_requests')
         .update({
@@ -1291,10 +1297,16 @@ const POSView: React.FC = () => {
         }
 
         // Update original transaction status
-        const { error: txError } = await supabase
-          .from('transactions')
-          .update({ is_returned: true, return_id: requestId, payment_status: 'REFUNDED' })
-          .eq('id', request.invoice_number);
+        const updateTransaction = async (payload: typeof refundUpdate) =>
+          supabase.from('transactions').update(payload).eq('id', request.invoice_number);
+
+        let { error: txError } = await updateTransaction(refundUpdate);
+        if (txError && /payment_status|column/i.test(txError.message || '')) {
+          ({ error: txError } = await updateTransaction({
+            is_returned: true,
+            return_id: requestId,
+          }));
+        }
 
         if (txError)
           console.error(`Failed to update original transaction ${request.invoice_number}`, txError);
