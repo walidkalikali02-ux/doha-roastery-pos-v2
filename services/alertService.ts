@@ -220,7 +220,7 @@ export const alertService = {
     let query = supabase
       .from('inventory_alerts')
       .select(
-        'id,inventory_item_id,product_id,location_id,alert_type,status,threshold_qty,current_qty,updated_at,product_definitions(name,sku)'
+        'id,inventory_item_id,product_id,location_id,alert_type,status,threshold_qty,current_qty,last_triggered_at,updated_at'
       )
       .eq('status', 'ACTIVE')
       .in('alert_type', ['LOW_STOCK', 'OUT_OF_STOCK'])
@@ -233,6 +233,23 @@ export const alertService = {
     const { data, error } = await query;
     if (error) throw error;
 
+    const productIds = Array.from(new Set((data || []).map((row: any) => row.product_id).filter(Boolean)));
+    const productMap = new Map<string, { name: string; sku: string | null }>();
+    if (productIds.length > 0) {
+      const { data: products, error: productError } = await supabase
+        .from('product_definitions')
+        .select('id,name,sku')
+        .in('id', productIds);
+      if (productError) throw productError;
+
+      for (const product of products || []) {
+        productMap.set((product as any).id, {
+          name: (product as any).name || 'Unknown Product',
+          sku: (product as any).sku || null,
+        });
+      }
+    }
+
     return (data || []).map((row: any) => ({
       id: row.id,
       inventory_item_id: row.inventory_item_id,
@@ -243,8 +260,8 @@ export const alertService = {
       threshold_qty: toNumber(row.threshold_qty, 0),
       current_qty: toNumber(row.current_qty, 0),
       last_triggered_at: row.last_triggered_at || null,
-      product_name: row.product_definitions?.name || 'Unknown Product',
-      product_sku: row.product_definitions?.sku || null,
+      product_name: productMap.get(row.product_id)?.name || 'Unknown Product',
+      product_sku: productMap.get(row.product_id)?.sku || null,
       product_link: `/configuration?productId=${row.product_id}`,
     }));
   },
