@@ -173,7 +173,7 @@ const AppContent: React.FC = () => {
       id: 'reports',
       label: t.reports,
       icon: BarChart3,
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR, UserRole.CASHIER],
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR],
     },
     {
       id: 'branchPerformance',
