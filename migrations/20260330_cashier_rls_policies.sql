@@ -41,6 +41,9 @@ BEGIN
     -- Drop existing permissive policies if they exist
     DROP POLICY IF EXISTS "Enable all for authenticated users" ON public.transactions;
     DROP POLICY IF EXISTS "Allow all access" ON public.transactions;
+    DROP POLICY IF EXISTS "cashier_select_own_transactions" ON public.transactions;
+    DROP POLICY IF EXISTS "cashier_insert_transactions" ON public.transactions;
+    DROP POLICY IF EXISTS "cashier_update_own_transactions" ON public.transactions;
     
     -- Create cashier-specific policies
     -- Cashiers can only see their own transactions
@@ -82,6 +85,9 @@ BEGIN
     
     -- Drop existing permissive policies if they exist
     DROP POLICY IF EXISTS "Enable all for authenticated users" ON public.shifts;
+    DROP POLICY IF EXISTS "cashier_select_own_shifts" ON public.shifts;
+    DROP POLICY IF EXISTS "cashier_insert_own_shifts" ON public.shifts;
+    DROP POLICY IF EXISTS "cashier_update_own_shifts" ON public.shifts;
     
     -- Cashiers can only see their own shifts
     CREATE POLICY "cashier_select_own_shifts"
@@ -126,6 +132,8 @@ BEGIN
     -- Drop permissive policy
     DROP POLICY IF EXISTS "Enable read access for all users" ON public.cash_movements;
     DROP POLICY IF EXISTS "Enable insert access for authenticated users" ON public.cash_movements;
+    DROP POLICY IF EXISTS "cashier_select_own_cash_movements" ON public.cash_movements;
+    DROP POLICY IF EXISTS "cashier_insert_own_cash_movements" ON public.cash_movements;
     
     -- Create cashier-specific policies
     CREATE POLICY "cashier_select_own_cash_movements"
@@ -161,6 +169,8 @@ BEGIN
     ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
     
     -- Check if restrictive policy already exists
+    DROP POLICY IF EXISTS "cashier_read_own_profile" ON public.profiles;
+    DROP POLICY IF EXISTS "cashier_update_own_profile" ON public.profiles;
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies 
       WHERE tablename = 'profiles' 
@@ -206,6 +216,9 @@ DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'customers') THEN
     ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
+    DROP POLICY IF EXISTS "cashier_select_customers" ON public.customers;
+    DROP POLICY IF EXISTS "cashier_insert_customers" ON public.customers;
+    DROP POLICY IF EXISTS "cashier_update_customers" ON public.customers;
     
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies 
@@ -248,6 +261,7 @@ DO $$
 BEGIN
   -- Try product_definitions first (actual table name)
   IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = 'product_definitions') THEN
+    DROP POLICY IF EXISTS "admin_manager_all_product_definitions" ON public.product_definitions;
     IF NOT EXISTS (
       SELECT 1 FROM pg_policies 
       WHERE tablename = 'product_definitions' 
