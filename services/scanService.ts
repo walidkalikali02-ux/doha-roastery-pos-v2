@@ -62,15 +62,29 @@ const toDispatchReference = (referenceId: string | undefined, reasonCode: Reason
 };
 
 const loadInventoryProductRows = async (locationId: string) => {
-  const { data, error } = await supabase
+  const { data: items, error: itemError } = await supabase
     .from('inventory_items')
-    .select(
-      'id,stock,minimum_stock,product_definitions!inner(id,name,sku,barcode,unit,reorder_point,is_active,product_status)'
-    )
+    .select('id,stock,minimum_stock,product_id')
     .eq('location_id', locationId);
 
-  if (error) throw error;
-  return data || [];
+  if (itemError) throw itemError;
+
+  const productIds = Array.from(new Set((items || []).map((row: any) => row.product_id).filter(Boolean)));
+  if (productIds.length === 0) return items || [];
+
+  const { data: products, error: productError } = await supabase
+    .from('product_definitions')
+    .select('id,name,sku,barcode,unit,reorder_point,is_active,product_status')
+    .in('id', productIds);
+
+  if (productError) throw productError;
+
+  const productMap = new Map((products || []).map((product: any) => [product.id, product]));
+
+  return (items || []).map((item: any) => ({
+    ...item,
+    product_definitions: productMap.get(item.product_id) || null,
+  }));
 };
 
 const readJoinedProduct = (row: any) => {

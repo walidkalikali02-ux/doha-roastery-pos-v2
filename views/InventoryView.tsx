@@ -1563,19 +1563,25 @@ const InventoryView: React.FC = () => {
 
       const { data: salesRows, error: salesError } = await supabase
         .from('inventory_movements')
-        .select('location_id, quantity, inventory_item_id, inventory_items!inner(product_id)')
+        .select('location_id, quantity, inventory_item_id')
         .eq('movement_type', 'SALE')
         .gte('created_at', sinceIso)
-        .in('location_id', branchIds)
-        .in('inventory_items.product_id', productIds);
+        .in('location_id', branchIds);
 
       if (salesError) throw salesError;
+
+      const { data: saleItems, error: saleItemsError } = await supabase
+        .from('inventory_items')
+        .select('id,product_id')
+        .in('id', Array.from(new Set((salesRows || []).map((row: any) => row.inventory_item_id).filter(Boolean))));
+      if (saleItemsError) throw saleItemsError;
+      const saleProductMap = new Map((saleItems || []).map((row: any) => [row.id, row.product_id]));
 
       const totalByProduct = new Map<string, number>();
       const destByProduct = new Map<string, number>();
 
       (salesRows || []).forEach((row: any) => {
-        const productId = row.inventory_items?.product_id;
+        const productId = saleProductMap.get(row.inventory_item_id);
         if (!productId) return;
         const qty = Math.abs(Number(row.quantity || 0));
         totalByProduct.set(productId, (totalByProduct.get(productId) || 0) + qty);

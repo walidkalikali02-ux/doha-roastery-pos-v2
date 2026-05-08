@@ -171,6 +171,7 @@ const POSView: React.FC = () => {
   const [lastReturnRequest, setLastReturnRequest] = useState<any>(null);
   const [isReprint, setIsReprint] = useState(false);
   const [reprintTime, setReprintTime] = useState<string | null>(null);
+  const autoPrintReceiptRef = useRef<string | null>(null);
 
   // Customization State
   const [customizingItem, setCustomizingItem] = useState<InventoryItem | null>(null);
@@ -997,10 +998,6 @@ const POSView: React.FC = () => {
       setIsReprint(false);
       setShowSuccess(true);
 
-      scheduleTimeout(() => {
-        window.print();
-      }, 300);
-
       setCart([]);
       setSelectedCustomer(null);
       setShowSplitModal(false);
@@ -1025,6 +1022,18 @@ const POSView: React.FC = () => {
       setIsProcessing(false);
     }
   };
+
+  useEffect(() => {
+    if (!showSuccess || !lastTransaction || isReprint) return;
+    if (autoPrintReceiptRef.current === lastTransaction.id) return;
+
+    autoPrintReceiptRef.current = lastTransaction.id;
+    const timer = window.setTimeout(() => {
+      window.print();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [isReprint, lastTransaction, showSuccess]);
 
   const handlePrint = async (transaction?: TransactionData) => {
     if (transaction) {
@@ -2985,6 +2994,7 @@ const POSView: React.FC = () => {
                 onClick={() => {
                   setShowSuccess(false);
                   setLastTransaction(null);
+                  autoPrintReceiptRef.current = null;
                 }}
                 className="py-4 bg-orange-600 text-white rounded-2xl font-bold shadow-lg  transition-all active:scale-95 border-2 border-orange-600"
               >

@@ -86,7 +86,7 @@ export const inventoryReportingService = {
     let query = supabase
       .from('inventory_movements')
       .select(
-        'id,inventory_item_id,movement_type,quantity,before_stock,after_stock,reference_id,actor_id,actor_name,created_at,location_id,inventory_items!inner(product_id,name),locations(name)'
+        'id,inventory_item_id,movement_type,quantity,before_stock,after_stock,reference_id,actor_id,actor_name,created_at,location_id'
       )
       .order('created_at', { ascending: false });
 
@@ -96,10 +96,37 @@ export const inventoryReportingService = {
     const { data, error } = await query;
     if (error) throw error;
 
+    const itemIds = unique((data || []).map((row: any) => row.inventory_item_id).filter(Boolean));
+    const locationIds = unique((data || []).map((row: any) => row.location_id).filter(Boolean));
+    const [itemsResult, locationsResult] = await Promise.all([
+      itemIds.length > 0
+        ? supabase.from('inventory_items').select('id,product_id,name').in('id', itemIds)
+        : Promise.resolve({ data: [], error: null } as const),
+      locationIds.length > 0
+        ? supabase.from('locations').select('id,name').in('id', locationIds)
+        : Promise.resolve({ data: [], error: null } as const),
+    ]);
+    if (itemsResult.error) throw itemsResult.error;
+    if (locationsResult.error) throw locationsResult.error;
+
+    const productIds = unique((itemsResult.data || []).map((row: any) => row.product_id).filter(Boolean));
+    const { data: products, error: productsError } =
+      productIds.length > 0
+        ? await supabase.from('product_definitions').select('id,name').in('id', productIds)
+        : { data: [], error: null };
+    if (productsError) throw productsError;
+
+    const itemMap = new Map((itemsResult.data || []).map((row: any) => [row.id, row]));
+    const locationMap = new Map((locationsResult.data || []).map((row: any) => [row.id, row]));
+    const productMap = new Map((products || []).map((row: any) => [row.id, row]));
+
     const rows = (data || []).map((row: any) => ({
       movementId: row.id,
-      productId: row.inventory_items?.product_id || null,
-      productName: row.inventory_items?.name || 'Unknown',
+      productId: itemMap.get(row.inventory_item_id)?.product_id || null,
+      productName:
+        productMap.get(itemMap.get(row.inventory_item_id)?.product_id)?.name ||
+        itemMap.get(row.inventory_item_id)?.name ||
+        'Unknown',
       operationType: row.movement_type,
       quantity: toNumber(row.quantity, 0),
       quantityBefore: row.before_stock,
@@ -109,7 +136,7 @@ export const inventoryReportingService = {
       actorName: row.actor_name || null,
       occurredAt: row.created_at,
       locationId: row.location_id || null,
-      locationName: row.locations?.name || null,
+      locationName: locationMap.get(row.location_id)?.name || null,
     }));
 
     const grouped = new Map<string, { key: string; movementCount: number; netQuantity: number }>();
@@ -208,7 +235,7 @@ export const inventoryReportingService = {
 
     let query = supabase
       .from('inventory_movements')
-      .select('movement_type,quantity,inventory_items!inner(product_id,name)')
+      .select('inventory_item_id,movement_type,quantity')
       .eq('movement_type', 'SALE');
     if (from) query = query.gte('created_at', from);
     if (to) query = query.lte('created_at', to);
@@ -216,10 +243,19 @@ export const inventoryReportingService = {
     const { data, error } = await query;
     if (error) throw error;
 
+    const itemIds = unique((data || []).map((row: any) => row.inventory_item_id).filter(Boolean));
+    const { data: items, error: itemError } =
+      itemIds.length > 0
+        ? await supabase.from('inventory_items').select('id,product_id,name').in('id', itemIds)
+        : { data: [], error: null };
+    if (itemError) throw itemError;
+    const itemMap = new Map((items || []).map((row: any) => [row.id, row]));
+
     const byProduct = new Map<string, { productId: string; productName: string; consumedUnits: number }>();
     for (const row of data || []) {
-      const pid = (row as any).inventory_items?.product_id || 'unknown';
-      const name = (row as any).inventory_items?.name || 'Unknown';
+      const item = itemMap.get((row as any).inventory_item_id);
+      const pid = item?.product_id || 'unknown';
+      const name = item?.name || 'Unknown';
       const qty = Math.abs(toNumber((row as any).quantity, 0));
       const current = byProduct.get(pid) || { productId: pid, productName: name, consumedUnits: 0 };
       current.consumedUnits += qty;
@@ -237,9 +273,7 @@ export const inventoryReportingService = {
     const sinceIso = since.toISOString();
 
     const [{ data: items, error: itemError }, { data: recentMoves, error: moveError }] = await Promise.all([
-      supabase
-        .from('inventory_items')
-        .select('id,product_id,stock,location_id,inventory_items!inner(product_id)'),
+      supabase.from('inventory_items').select('id,product_id,stock,location_id'),
       supabase
         .from('inventory_movements')
         .select('inventory_item_id')
