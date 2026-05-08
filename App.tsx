@@ -557,7 +557,7 @@ const AppContent: React.FC = () => {
         </div>
       )}
       <aside
-        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'right-0' : 'left-0'} z-50 transform transition-all duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto ${isMobileMenuOpen ? 'translate-x-0' : t.dir === 'rtl' ? 'translate-x-full' : '-translate-x-full'} bg-white  text-black  border-r border-orange-100  flex-shrink-0 flex flex-col shadow-xl ${isSidebarOpen ? 'w-64' : 'w-20'}`}
+        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'right-0' : 'left-0'} z-50 transform transition-all duration-300 ease-in-out hidden lg:flex lg:static lg:inset-auto ${isMobileMenuOpen ? 'translate-x-0' : t.dir === 'rtl' ? 'translate-x-full' : '-translate-x-full'} bg-white  text-black  border-r border-orange-100  flex-shrink-0 flex-col shadow-xl ${isSidebarOpen ? 'w-64' : 'w-20'}`}
       >
         <div className="p-4 flex items-center justify-between border-b border-orange-50 ">
           <div
