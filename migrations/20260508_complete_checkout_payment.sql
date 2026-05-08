@@ -199,8 +199,7 @@ begin
 
   if p_shift_id is not null then
     update shifts
-    set total_sales = coalesce(total_sales, 0) + p_total,
-        transaction_count = coalesce(transaction_count, 0) + 1,
+    set total_cash_sales = coalesce(total_cash_sales, 0) + p_total,
         updated_at = now()
     where id = p_shift_id;
   end if;

@@ -1,6 +1,6 @@
--- Migration: 20260427_harden_process_checkout_atomic.sql
--- Purpose: Harden checkout against race conditions by moving stock validation + deduction
---          inside one DB transaction with row-level locks and structured error payloads.
+-- Migration: 20260508_fix_shift_totals_checkout.sql
+-- Purpose: Fix checkout RPC to update the actual shift columns used by the app.
+-- Depends on: existing process_checkout function and shifts schema
 
 create or replace function process_checkout(
   p_items jsonb,
@@ -8,7 +8,11 @@ create or replace function process_checkout(
   p_total numeric,
   p_cashier_id uuid,
   p_shift_id uuid,
-  p_location_id uuid
+  p_location_id uuid,
+  p_payment_breakdown jsonb default null,
+  p_received_amount numeric default null,
+  p_change_amount numeric default null,
+  p_card_reference text default null
 ) returns jsonb
 language plpgsql
 security definer
@@ -28,7 +32,8 @@ declare
   v_remaining_qty numeric;
   v_primary_item_id uuid;
   v_dispatch_items jsonb := '[]'::jsonb;
-  v_stock_issues jsonb := '[]'::jsonb;
+  v_received_amount numeric := coalesce(p_received_amount, p_total);
+  v_change_amount numeric := coalesce(p_change_amount, greatest(coalesce(p_received_amount, p_total) - p_total, 0));
 begin
   if p_location_id is null then
     return jsonb_build_object(
@@ -48,8 +53,6 @@ begin
     );
   end if;
 
-  -- Build row-locked deduction plan by product.
-  -- We lock inventory rows now, validate availability, and then deduct in this same transaction.
   for v_item in
     select *
     from jsonb_array_elements(p_items)
@@ -67,7 +70,6 @@ begin
     from product_definitions pd
     where pd.id = v_product_id;
 
-    -- Drinks are treated as virtually available in POS.
     if coalesce(v_product_type, '') = 'BEVERAGE' then
       continue;
     end if;
@@ -134,6 +136,8 @@ begin
     cashier_name,
     location_id,
     payment_method,
+    payment_status,
+    paid_at,
     total,
     subtotal,
     vat_amount,
@@ -144,6 +148,7 @@ begin
     payment_breakdown,
     received_amount,
     change_amount,
+    card_reference,
     is_returned,
     user_id
   ) values (
@@ -152,6 +157,8 @@ begin
     coalesce(v_cashier_name, 'Cashier'),
     p_location_id,
     p_payment_method,
+    'COMPLETED',
+    now(),
     p_total,
     p_total,
     0,
@@ -159,15 +166,15 @@ begin
     0,
     null,
     p_items,
-    null,
-    p_total,
-    0,
+    coalesce(p_payment_breakdown, null),
+    v_received_amount,
+    v_change_amount,
+    nullif(trim(coalesce(p_card_reference, '')), ''),
     false,
     p_cashier_id
   )
   returning id::uuid into v_transaction_id;
 
-  -- Deduct and log inventory movement atomically (includes internal row locks and audit side-effects).
   perform set_config('inventory.allow_negative_stock', 'true', true);
   perform deduct_inventory_with_cost(
     p_location_id,
@@ -204,5 +211,5 @@ exception
 end;
 $$;
 
-revoke execute on function process_checkout(jsonb, text, numeric, uuid, uuid, uuid) from public;
-grant execute on function process_checkout(jsonb, text, numeric, uuid, uuid, uuid) to authenticated;
+revoke execute on function process_checkout(jsonb, text, numeric, uuid, uuid, uuid, jsonb, numeric, numeric, text) from public;
+grant execute on function process_checkout(jsonb, text, numeric, uuid, uuid, uuid, jsonb, numeric, numeric, text) to authenticated;

@@ -89,8 +89,7 @@ BEGIN
     -- Step 4: Update shift totals (if shift_id provided)
     IF p_shift_id IS NOT NULL THEN
         UPDATE shifts
-        SET total_sales = COALESCE(total_sales, 0) + p_total,
-            transaction_count = COALESCE(transaction_count, 0) + 1,
+        SET total_cash_sales = COALESCE(total_cash_sales, 0) + p_total,
             updated_at = NOW()
         WHERE id = p_shift_id;
     END IF;
