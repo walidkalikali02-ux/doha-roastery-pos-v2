@@ -102,16 +102,23 @@ const validateDispatchPolicy = async (
   const stockMap = await fetchInventoryStocks(locationId, itemIds);
   const { data: itemRows, error: itemErr } = await supabase
     .from('inventory_items')
-    .select('id,product_id,product_definitions(overdraft_enabled)')
+    .select('id,product_id')
     .eq('location_id', locationId)
     .in('id', itemIds);
   if (itemErr) throw itemErr;
+
+  const productIds = Array.from(new Set((itemRows || []).map((row: any) => row.product_id).filter(Boolean)));
   const overdraftMap = new Map<string, boolean>();
-  for (const row of itemRows || []) {
-    const pd = Array.isArray((row as any).product_definitions)
-      ? (row as any).product_definitions[0]
-      : (row as any).product_definitions;
-    overdraftMap.set((row as any).id, Boolean(pd?.overdraft_enabled));
+  if (productIds.length > 0) {
+    const { data: products, error: productErr } = await supabase
+      .from('product_definitions')
+      .select('id,overdraft_enabled')
+      .in('id', productIds);
+    if (productErr) throw productErr;
+
+    for (const product of products || []) {
+      overdraftMap.set((product as any).id, Boolean((product as any).overdraft_enabled));
+    }
   }
 
   for (const line of lines) {

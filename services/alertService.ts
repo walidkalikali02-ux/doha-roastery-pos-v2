@@ -156,20 +156,36 @@ export const alertService = {
     const itemIds = Array.from(new Set(input.inventoryItemIds.filter(Boolean)));
     if (!itemIds.length) return [];
 
-    const { data, error } = await supabase
+    const { data: items, error } = await supabase
       .from('inventory_items')
-      .select(
-        'id,location_id,stock,minimum_stock,product_id,product_definitions!inner(id,name,sku,reorder_point)'
-      )
+      .select('id,location_id,stock,minimum_stock,product_id')
       .eq('location_id', input.locationId)
       .in('id', itemIds);
     if (error) throw error;
 
+    const productIds = Array.from(
+      new Set((items || []).map((row: any) => row.product_id).filter(Boolean))
+    );
+    const productMap = new Map<string, { name: string; sku: string | null; reorder_point: number }>();
+    if (productIds.length > 0) {
+      const { data: products, error: productError } = await supabase
+        .from('product_definitions')
+        .select('id,name,sku,reorder_point')
+        .in('id', productIds);
+      if (productError) throw productError;
+
+      for (const product of products || []) {
+        productMap.set((product as any).id, {
+          name: (product as any).name || 'Unknown Product',
+          sku: (product as any).sku || null,
+          reorder_point: Number((product as any).reorder_point) || 0,
+        });
+      }
+    }
+
     const triggered: StockAlert[] = [];
-    for (const row of data || []) {
-      const product = Array.isArray((row as any).product_definitions)
-        ? (row as any).product_definitions[0]
-        : (row as any).product_definitions;
+    for (const row of items || []) {
+      const product = productMap.get((row as any).product_id);
       const stock = toNumber((row as any).stock, 0);
       const threshold = toNumber((row as any).minimum_stock ?? product?.reorder_point, 0);
       const type = toAlertType(stock, threshold);
