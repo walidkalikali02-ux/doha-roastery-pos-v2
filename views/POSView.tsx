@@ -2446,14 +2446,14 @@ const POSView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3 animate-in fade-in duration-300">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 animate-in fade-in duration-300">
               {isLoading
-                ? Array.from({ length: 8 }).map((_, i) => (
+                ? Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-orange-100">
                       <div className="aspect-square bg-gray-100 animate-pulse"></div>
-                      <div className="p-3 space-y-2">
-                        <div className="h-4 bg-gray-100 rounded animate-pulse w-3/4"></div>
-                        <div className="h-5 bg-gray-100 rounded animate-pulse w-1/2"></div>
+                      <div className="p-4 space-y-3">
+                        <div className="h-5 bg-gray-100 rounded animate-pulse w-3/4"></div>
+                        <div className="h-6 bg-gray-100 rounded animate-pulse w-1/2"></div>
                       </div>
                     </div>
                   ))
@@ -2465,7 +2465,7 @@ const POSView: React.FC = () => {
                         className="group relative bg-white rounded-2xl overflow-hidden border-2 border-orange-100 shadow-sm transition-all duration-150 flex flex-col touch-manipulation active:scale-[0.97] active:border-orange-400 active:shadow-md"
                         style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
-                        {/* Image */}
+                        {/* Image - Large square */}
                         <div className="relative aspect-square overflow-hidden bg-gray-50">
                           <img
                             src={item.image}
@@ -2473,31 +2473,35 @@ const POSView: React.FC = () => {
                             alt={item.name}
                             loading="lazy"
                           />
-                          {/* Low stock badge - only on larger screens */}
+                          {/* Low stock - hidden on mobile */}
                           <div className="hidden md:block">
                             {item.stock !== undefined && item.stock <= 5 && (
-                              <div className="absolute top-2 right-2 px-2 py-0.5 bg-red-500 text-white rounded-md text-[10px] font-bold">
+                              <div className="absolute top-2 right-2 px-2 py-0.5 bg-red-500 text-white rounded-md text-xs font-bold">
                                 {item.stock} {t.left || 'left'}
                               </div>
                             )}
                           </div>
                         </div>
 
-                        {/* Content - Simple: Name + Price + Add */}
-                        <div className="flex-1 flex flex-col p-2 sm:p-3">
-                          <h4 className="font-bold text-xs sm:text-sm text-gray-900 line-clamp-2 leading-tight mb-1 sm:mb-2">
+                        {/* Content - Clean and large for tablet */}
+                        <div className="flex-1 flex flex-col p-3 md:p-4">
+                          <h4 className="font-bold text-sm md:text-base text-gray-900 line-clamp-2 leading-tight mb-2 md:mb-3">
                             {item.name}
                           </h4>
 
-                          <div className="mt-auto flex items-center justify-between gap-1">
-                            <span className="font-black text-orange-600 text-sm sm:text-base">
-                              {item.price.toFixed(2)}
-                              <span className="text-[10px] sm:text-xs text-gray-400 font-bold ml-0.5">{t.currency}</span>
-                            </span>
+                          {/* Price + Add Button - Large touch target */}
+                          <div className="mt-auto flex items-center justify-between gap-2">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] md:text-xs text-gray-400 font-medium uppercase">{t.price || 'Price'}</span>
+                              <span className="font-black text-orange-600 text-lg md:text-xl">
+                                {item.price.toFixed(2)}
+                                <span className="text-xs text-gray-400 font-bold ml-0.5">{t.currency}</span>
+                              </span>
+                            </div>
 
-                            {/* Big Add Button - Always Visible */}
-                            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center bg-orange-500 text-white shadow-sm active:bg-orange-700 transition-colors">
-                              <Plus size={18} strokeWidth={2.5} className="sm:w-5 sm:h-5" />
+                            {/* BIG Add Button - 48px touch target */}
+                            <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center bg-orange-500 text-white shadow-md active:bg-orange-700 transition-colors">
+                              <Plus size={22} strokeWidth={2.5} className="md:w-6 md:h-6" />
                             </div>
                           </div>
                         </div>
