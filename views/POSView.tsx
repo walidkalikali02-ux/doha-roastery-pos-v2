@@ -2446,100 +2446,58 @@ const POSView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-5 animate-in fade-in duration-500">
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-2 sm:gap-3 animate-in fade-in duration-300">
               {isLoading
-                ? Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="bg-white rounded-3xl overflow-hidden shadow-sm border border-orange-100">
-                      <div className="aspect-[16/10] bg-gray-100 animate-pulse"></div>
-                      <div className="p-4 space-y-3">
+                ? Array.from({ length: 8 }).map((_, i) => (
+                    <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-orange-100">
+                      <div className="aspect-square bg-gray-100 animate-pulse"></div>
+                      <div className="p-3 space-y-2">
                         <div className="h-4 bg-gray-100 rounded animate-pulse w-3/4"></div>
                         <div className="h-5 bg-gray-100 rounded animate-pulse w-1/2"></div>
                       </div>
                     </div>
                   ))
                 : filteredItems.map((item) => {
-                    const isBeverage = item.type === 'BEVERAGE';
-                    const isPackaged = item.type === 'PACKAGED_COFFEE';
-
                     return (
                       <button
                         key={item.id}
-                        onClick={() => {
-                          openCustomization(item);
-                        }}
-                        className="group relative bg-white rounded-3xl overflow-hidden border-2 border-orange-100 shadow-md transition-all duration-200 flex flex-col h-full touch-manipulation active:scale-[0.98] active:border-orange-400 hover:border-orange-300 hover:shadow-lg xl:rounded-[2rem]"
+                        onClick={() => openCustomization(item)}
+                        className="group relative bg-white rounded-2xl overflow-hidden border-2 border-orange-100 shadow-sm transition-all duration-150 flex flex-col touch-manipulation active:scale-[0.97] active:border-orange-400 active:shadow-md"
                         style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
-                        {/* Image Container - Larger aspect ratio for better visibility */}
-                        <div className="relative aspect-[16/10] overflow-hidden bg-gray-50 xl:aspect-[16/9]">
+                        {/* Image */}
+                        <div className="relative aspect-square overflow-hidden bg-gray-50">
                           <img
                             src={item.image}
-                            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            className="w-full h-full object-cover"
                             alt={item.name}
                             loading="lazy"
                           />
-                          
-                          {/* Category Badge - Larger for mobile */}
-                          <div className="absolute top-3 left-3">
-                            {isBeverage ? (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 text-white rounded-full text-xs font-bold shadow-lg">
-                                <Coffee size={12} />
-                                <span>{t.drink || 'Drink'}</span>
-                              </div>
-                            ) : isPackaged ? (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-600 text-white rounded-full text-xs font-bold shadow-lg">
-                                <Package size={12} />
-                                <span>{t.packaged || 'Packaged'}</span>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-600 text-white rounded-full text-xs font-bold shadow-lg">
-                                <Box size={12} />
-                                <span>{t.other || 'Other'}</span>
+                          {/* Low stock badge - only on larger screens */}
+                          <div className="hidden md:block">
+                            {item.stock !== undefined && item.stock <= 5 && (
+                              <div className="absolute top-2 right-2 px-2 py-0.5 bg-red-500 text-white rounded-md text-[10px] font-bold">
+                                {item.stock} {t.left || 'left'}
                               </div>
                             )}
                           </div>
-
-                          {/* Stock Badge - Shows low stock warning */}
-                          {item.stock !== undefined && item.stock <= 5 && (
-                            <div className="absolute top-3 right-3 px-2 py-1 bg-red-500 text-white rounded-lg text-[10px] font-bold shadow-lg">
-                              {item.stock} {t.left || 'left'}
-                            </div>
-                          )}
                         </div>
 
-                        {/* Content - Simplified for mobile */}
-                        <div className="flex-1 flex flex-col p-4 min-h-0 xl:p-5">
-                          {/* Product Name - Larger text */}
-                          <h4 className="font-bold text-base text-gray-900 line-clamp-2 mb-2 leading-snug group-hover:text-orange-700 transition-colors xl:text-lg">
+                        {/* Content - Simple: Name + Price + Add */}
+                        <div className="flex-1 flex flex-col p-2 sm:p-3">
+                          <h4 className="font-bold text-xs sm:text-sm text-gray-900 line-clamp-2 leading-tight mb-1 sm:mb-2">
                             {item.name}
                           </h4>
 
-                          {/* Coffee Details - Hidden on very small screens, shown on sm+ */}
-                          <div className="hidden sm:flex flex-wrap gap-1.5 mb-3">
-                            {item.roast_level && (
-                              <span className="px-2 py-1 bg-orange-50 text-orange-700 rounded-md text-[10px] font-bold border border-orange-100">
-                                {item.roast_level}
-                              </span>
-                            )}
-                            {item.bean_origin && (
-                              <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded-md text-[10px] font-bold border border-gray-200">
-                                {item.bean_origin}
-                              </span>
-                            )}
-                          </div>
+                          <div className="mt-auto flex items-center justify-between gap-1">
+                            <span className="font-black text-orange-600 text-sm sm:text-base">
+                              {item.price.toFixed(2)}
+                              <span className="text-[10px] sm:text-xs text-gray-400 font-bold ml-0.5">{t.currency}</span>
+                            </span>
 
-                          {/* Price Row - Simplified with larger touch target */}
-                          <div className="mt-auto flex items-center justify-between pt-3 border-t border-gray-100">
-                            <div className="flex items-baseline gap-1">
-                              <span className="font-black text-orange-600 text-xl xl:text-2xl">
-                                {item.price.toFixed(2)}
-                              </span>
-                              <span className="text-sm text-gray-400 font-bold">{t.currency}</span>
-                            </div>
-                            
-                            {/* Add Button - Large touch target (48px) with clear visual feedback */}
-                            <div className="w-12 h-12 rounded-xl flex items-center justify-center shadow-md transition-all duration-200 bg-orange-500 text-white group-active:bg-orange-700 xl:w-14 xl:h-14">
-                              <Plus size={24} strokeWidth={2.5} className="xl:w-7 xl:h-7" />
+                            {/* Big Add Button - Always Visible */}
+                            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-lg sm:rounded-xl flex items-center justify-center bg-orange-500 text-white shadow-sm active:bg-orange-700 transition-colors">
+                              <Plus size={18} strokeWidth={2.5} className="sm:w-5 sm:h-5" />
                             </div>
                           </div>
                         </div>
