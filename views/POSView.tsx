@@ -1295,7 +1295,7 @@ const POSView: React.FC = () => {
 
   return (
     <div
-      className="flex flex-col lg:flex-row h-[calc(100vh-100px)] md:h-[calc(100vh-120px)] gap-2 md:gap-3 animate-in fade-in duration-500 relative p-2 md:p-3 lg:p-4"
+      className="flex flex-col md:flex-row h-[calc(100vh-100px)] md:h-[calc(100vh-120px)] gap-2 md:gap-3 animate-in fade-in duration-500 relative p-2 md:p-3 lg:p-4"
       dir={t.dir}
     >
       {/* Thermal Receipt Styling */}
@@ -2446,7 +2446,7 @@ const POSView: React.FC = () => {
               </div>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 md:gap-4 animate-in fade-in duration-300">
+            <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3 md:gap-4 lg:gap-5 animate-in fade-in duration-300">
               {isLoading
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="bg-white rounded-2xl overflow-hidden shadow-sm border border-orange-100">
@@ -2462,46 +2462,44 @@ const POSView: React.FC = () => {
                       <button
                         key={item.id}
                         onClick={() => openCustomization(item)}
-                        className="group relative bg-white rounded-2xl overflow-hidden border-2 border-orange-100 shadow-sm transition-all duration-150 flex flex-col touch-manipulation active:scale-[0.97] active:border-orange-400 active:shadow-md"
+                        className="group relative bg-white rounded-2xl overflow-hidden border-2 border-orange-100 shadow-md transition-all duration-150 flex flex-col touch-manipulation active:scale-[0.97] active:border-orange-500 active:shadow-lg md:hover:border-orange-300 md:hover:shadow-lg"
                         style={{ WebkitTapHighlightColor: 'transparent' }}
                       >
                         {/* Image - Large square */}
                         <div className="relative aspect-square overflow-hidden bg-gray-50">
                           <img
                             src={item.image}
-                            className="w-full h-full object-cover"
+                            className="w-full h-full object-cover transition-transform duration-300 md:group-hover:scale-105"
                             alt={item.name}
                             loading="lazy"
                           />
-                          {/* Low stock - hidden on mobile */}
-                          <div className="hidden md:block">
-                            {item.stock !== undefined && item.stock <= 5 && (
-                              <div className="absolute top-2 right-2 px-2 py-0.5 bg-red-500 text-white rounded-md text-xs font-bold">
-                                {item.stock} {t.left || 'left'}
-                              </div>
-                            )}
-                          </div>
+                          {/* Low stock badge */}
+                          {item.stock !== undefined && item.stock <= 5 && (
+                            <div className="absolute top-2 right-2 px-2.5 py-1 bg-red-500 text-white rounded-lg text-xs font-bold shadow-lg">
+                              {item.stock} {t.left || 'left'}
+                            </div>
+                          )}
                         </div>
 
-                        {/* Content - Clean and large for tablet */}
-                        <div className="flex-1 flex flex-col p-3 md:p-4">
-                          <h4 className="font-bold text-sm md:text-base text-gray-900 line-clamp-2 leading-tight mb-2 md:mb-3">
+                        {/* Content - Optimized for tablet */}
+                        <div className="flex-1 flex flex-col p-3 md:p-4 lg:p-5">
+                          <h4 className="font-bold text-sm md:text-base lg:text-lg text-gray-900 line-clamp-2 leading-tight mb-2 md:mb-3">
                             {item.name}
                           </h4>
 
-                          {/* Price + Add Button - Large touch target */}
-                          <div className="mt-auto flex items-center justify-between gap-2">
+                          {/* Price + Add Button - Large touch target for tablet */}
+                          <div className="mt-auto flex items-center justify-between gap-3">
                             <div className="flex flex-col">
                               <span className="text-[10px] md:text-xs text-gray-400 font-medium uppercase">{t.price || 'Price'}</span>
-                              <span className="font-black text-orange-600 text-lg md:text-xl">
+                              <span className="font-black text-orange-600 text-lg md:text-xl lg:text-2xl">
                                 {item.price.toFixed(2)}
-                                <span className="text-xs text-gray-400 font-bold ml-0.5">{t.currency}</span>
+                                <span className="text-xs md:text-sm text-gray-400 font-bold ml-1">{t.currency}</span>
                               </span>
                             </div>
 
-                            {/* BIG Add Button - 48px touch target */}
-                            <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl flex items-center justify-center bg-orange-500 text-white shadow-md active:bg-orange-700 transition-colors">
-                              <Plus size={22} strokeWidth={2.5} className="md:w-6 md:h-6" />
+                            {/* BIG Add Button - 56px on tablet for easy tapping */}
+                            <div className="w-12 h-12 md:w-14 md:h-14 lg:w-16 lg:h-16 rounded-xl lg:rounded-2xl flex items-center justify-center bg-orange-500 text-white shadow-lg active:bg-orange-700 transition-colors">
+                              <Plus size={22} strokeWidth={2.5} className="md:w-6 md:h-6 lg:w-7 lg:h-7" />
                             </div>
                           </div>
                         </div>
