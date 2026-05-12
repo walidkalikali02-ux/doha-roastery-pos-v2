@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { isSupabaseConfigured, missingEnvMessage, supabase } from '../supabaseClient';
 import { User, UserRole, LoginCredentials } from '../types';
 import { isDemoMode } from '../utils/demoMode';
+import { safeStorage } from '../utils/storage';
 
 interface AuthState {
   user: User | null;
@@ -209,9 +210,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    if (localStorage.getItem('demo_mode') === 'true') {
-      localStorage.removeItem('demo_mode');
-      localStorage.removeItem('demo_role');
+    if (safeStorage.getItem('demo_mode') === 'true') {
+      safeStorage.removeItem('demo_mode');
+      safeStorage.removeItem('demo_role');
     }
 
     supabase.auth
@@ -227,8 +228,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (_event === 'SIGNED_OUT') {
-        localStorage.removeItem('demo_mode');
-        localStorage.removeItem('demo_role');
+        safeStorage.removeItem('demo_mode');
+        safeStorage.removeItem('demo_role');
       }
       updateAuthStateFromSession(session);
     });
@@ -300,8 +301,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const loginAsGuest = () => {
-    localStorage.removeItem('demo_mode');
-    localStorage.removeItem('demo_role');
+    safeStorage.removeItem('demo_mode');
+    safeStorage.removeItem('demo_role');
     setState((prev) => ({
       ...prev,
       user: null,
@@ -316,14 +317,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     if (!isSupabaseConfigured) {
-      localStorage.removeItem('demo_mode');
-      localStorage.removeItem('demo_role');
+      safeStorage.removeItem('demo_mode');
+      safeStorage.removeItem('demo_role');
       setState((prev) => ({ ...prev, isAuthenticated: false, isLoading: false }));
       return;
     }
 
-    localStorage.removeItem('demo_mode');
-    localStorage.removeItem('demo_role');
+    safeStorage.removeItem('demo_mode');
+    safeStorage.removeItem('demo_role');
     setState((prev) => ({ ...prev, isLoading: true }));
     await supabase.auth.signOut();
   };

@@ -4,6 +4,7 @@ import { useTimeoutFn } from '../hooks/useTimeout';
 import { ToastContainer } from '../components/common/Toast';
 import { ConfirmationModal } from '../components/common/ConfirmationModal';
 import { isDemoMode } from '../utils/demoMode';
+import { safeStorage } from '../utils/storage';
 import {
   Search,
   Plus,
@@ -130,19 +131,14 @@ const POSView: React.FC = () => {
   // Location Management State
   const [locations, setLocations] = useState<Location[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('pos_selected_location') || '';
-    }
-    return '';
+    return safeStorage.getItem('pos_selected_location') || '';
   });
   const [cashierOptions, setCashierOptions] = useState<Array<{ id: string; name: string }>>([]);
   const [selectedCashierName, setSelectedCashierName] = useState('');
 
   const persistLocation = (id: string) => {
     setSelectedLocationId(id);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('pos_selected_location', id);
-    }
+    safeStorage.setItem('pos_selected_location', id);
   };
 
   // Checkout & Results State
@@ -372,8 +368,7 @@ const POSView: React.FC = () => {
         setLocations(data);
 
         // Check if user already has a saved location in localStorage
-        const savedLocation =
-          typeof window !== 'undefined' ? localStorage.getItem('pos_selected_location') : null;
+        const savedLocation = safeStorage.getItem('pos_selected_location');
 
         // Default to user's profile location if set, otherwise first branch, or saved location
         if ((!selectedLocationId || !savedLocation) && data.length > 0) {
@@ -404,9 +399,7 @@ const POSView: React.FC = () => {
           // Only set if we have a valid default
           if (defaultLocationId) {
             setSelectedLocationId(defaultLocationId);
-            if (typeof window !== 'undefined') {
-              localStorage.setItem('pos_selected_location', defaultLocationId);
-            }
+            safeStorage.setItem('pos_selected_location', defaultLocationId);
           }
         }
       }
@@ -1295,7 +1288,7 @@ const POSView: React.FC = () => {
 
   return (
     <div
-      className="flex flex-col md:flex-row h-[calc(100vh-100px)] md:h-[calc(100vh-120px)] gap-2 md:gap-3 animate-in fade-in duration-500 relative p-2 md:p-3 lg:p-4"
+      className="flex flex-col md:flex-row min-h-[calc(100dvh-100px)] md:min-h-[calc(100dvh-120px)] gap-2 md:gap-3 animate-in fade-in duration-500 relative p-2 md:p-3 lg:p-4"
       dir={t.dir}
     >
       {/* Thermal Receipt Styling */}
@@ -1948,7 +1941,7 @@ const POSView: React.FC = () => {
       )}
 
       {/* Main Catalog or History View */}
-      <div className="flex-1 flex flex-col gap-3 md:gap-4 overflow-hidden h-full min-w-0">
+      <div className="flex-1 flex flex-col gap-3 md:gap-4 overflow-hidden min-h-0 min-w-0">
         {/* Top Bar: Search & Categories */}
         <div className="bg-white p-2.5 sm:p-3 md:p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col gap-2 md:gap-3 shrink-0">
           <div className="flex items-center gap-2 md:gap-3">
@@ -2067,7 +2060,7 @@ const POSView: React.FC = () => {
         </div>
 
         {/* Content Area */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar px-1 pb-20">
+        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-1 pb-20">
           {activeTab === 'HISTORY' ? (
             <div className="space-y-3 animate-in slide-in-from-bottom-4">
               {isLoading ? (
@@ -2513,7 +2506,7 @@ const POSView: React.FC = () => {
 
       {/* Cart Sidebar */}
       <aside
-        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'left-0' : 'right-0'} z-[100] w-full md:w-[360px] lg:w-[380px] transform transition-all duration-300 ease-in-out md:static md:translate-x-0 ${showMobileCart ? 'translate-x-0' : t.dir === 'rtl' ? '-translate-x-full' : 'translate-x-full'} flex flex-col bg-white border-l border-gray-200 shadow-xl md:shadow-none h-full md:min-w-[320px] md:max-w-[400px]`}
+        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'left-0' : 'right-0'} z-[100] w-full md:w-[360px] lg:w-[380px] transform transition-all duration-300 ease-in-out md:static md:translate-x-0 ${showMobileCart ? 'translate-x-0' : t.dir === 'rtl' ? '-translate-x-full' : 'translate-x-full'} flex flex-col bg-white border-l border-gray-200 shadow-xl md:shadow-none h-full min-h-0 md:min-w-[320px] md:max-w-[400px]`}
       >
         {/* Header */}
         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white z-10 shrink-0">
@@ -2581,7 +2574,7 @@ const POSView: React.FC = () => {
         </div>
 
         {/* Cart Items */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar bg-white/30">
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3 custom-scrollbar bg-white/30">
           {cart.length > 0 ? (
             cart.map((item) => (
               <div

@@ -50,6 +50,7 @@ import { useRoleGuard } from './hooks/useRoleGuard';
 import { AccessDeniedToast } from './components/common/AccessDeniedToast';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { ToastContainer, useToast } from './components/common/Toast';
+import { safeStorage } from './utils/storage';
 
 type TabId =
   | 'dashboard'
@@ -124,9 +125,9 @@ const AppContent: React.FC = () => {
     | 'ai'
     | 'configuration'
     | 'profile'
-  >(() => (localStorage.getItem('activeTab') as any) || 'dashboard');
+  >(() => (safeStorage.getItem('activeTab') as any) || 'dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(
-    () => localStorage.getItem('sidebarOpen') !== 'false'
+    () => safeStorage.getItem('sidebarOpen') !== 'false'
   );
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -175,7 +176,7 @@ const AppContent: React.FC = () => {
       id: 'reports',
       label: t.reports,
       icon: BarChart3,
-      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR],
+      roles: [UserRole.ADMIN, UserRole.MANAGER, UserRole.HR, UserRole.CASHIER],
     },
     {
       id: 'branchPerformance',
@@ -256,21 +257,21 @@ const AppContent: React.FC = () => {
   useEffect(() => {
     document.documentElement.dir = t.dir;
     document.documentElement.lang = lang;
-    localStorage.setItem('lang', lang);
+    safeStorage.setItem('lang', lang);
   }, [lang, t.dir]);
 
   useEffect(() => {
     if (theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
-    localStorage.setItem('theme', theme);
+    safeStorage.setItem('theme', theme);
   }, [theme]);
 
   useEffect(() => {
-    if (isAuthenticated) localStorage.setItem('activeTab', activeTab);
+    if (isAuthenticated) safeStorage.setItem('activeTab', activeTab);
   }, [activeTab, isAuthenticated]);
 
   useEffect(() => {
-    localStorage.setItem('sidebarOpen', isSidebarOpen.toString());
+    safeStorage.setItem('sidebarOpen', isSidebarOpen.toString());
   }, [isSidebarOpen]);
 
   const handleTabChange = useCallback(
@@ -353,7 +354,7 @@ const AppContent: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-white">
+      <div className="min-h-[100dvh] w-screen flex items-center justify-center bg-white">
         <Loader2 className="w-12 h-12 text-orange-600 animate-spin" />
       </div>
     );
@@ -362,7 +363,7 @@ const AppContent: React.FC = () => {
   if (error === 'Account disabled') {
     return (
       <div
-        className="h-screen w-screen flex flex-col items-center justify-center bg-white p-8 text-center"
+        className="min-h-[100dvh] w-screen flex flex-col items-center justify-center bg-white p-8 text-center"
         dir={t.dir}
       >
         <div className="bg-orange-50 p-6 rounded-full text-black mb-6 border-2 border-orange-600">
@@ -479,7 +480,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div
-      className={`flex h-screen bg-white overflow-hidden transition-colors duration-300 ${lang === 'ar' ? 'font-arabic' : 'font-sans'}`}
+      className={`flex min-h-[100dvh] bg-white overflow-hidden transition-colors duration-300 ${lang === 'ar' ? 'font-arabic' : 'font-sans'}`}
       dir={t.dir}
     >
       {showSessionWarning && (
@@ -763,10 +764,10 @@ const AppContent: React.FC = () => {
 
 const App: React.FC = () => {
   const [lang, setLang] = useState<Language>(
-    () => (localStorage.getItem('lang') as Language) || 'ar'
+    () => (safeStorage.getItem('lang') as Language) || 'ar'
   );
   const [theme, setTheme] = useState<'light' | 'dark'>(
-    () => (localStorage.getItem('theme') as 'light' | 'dark') || 'light'
+    () => (safeStorage.getItem('theme') as 'light' | 'dark') || 'light'
   );
 
   const t = translations[lang];
