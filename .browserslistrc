@@ -1,0 +1,16 @@
+# Browsers that we support
+
+# iOS/iPadOS
+iOS >= 15
+
+# Safari
+Safari >= 15
+
+# Chrome (Android and Desktop)
+Chrome >= 90
+
+# Firefox
+Firefox >= 88
+
+# Edge
+Edge >= 90

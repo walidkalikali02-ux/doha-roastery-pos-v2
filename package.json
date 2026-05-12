@@ -37,6 +37,7 @@
     "@types/uuid": "^10.0.0",
     "@typescript-eslint/eslint-plugin": "^8.59.2",
     "@typescript-eslint/parser": "^8.59.2",
+    "@vitejs/plugin-legacy": "^6.1.1",
     "@vitejs/plugin-react": "^5.0.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^10.1.0",
