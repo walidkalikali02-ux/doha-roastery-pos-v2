@@ -75,6 +75,7 @@ import { useTimeoutFn } from '../hooks/useTimeout';
 import { isDemoMode } from '../utils/demoMode';
 import { movementService } from '../services/movementService';
 import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
+import { createId } from '../utils/id';
 
 type TransferStatus =
   | 'DRAFT'
@@ -1390,7 +1391,7 @@ const InventoryView: React.FC = () => {
       if (!event.target.files || event.target.files.length === 0) return;
       const file = event.target.files[0];
       const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `${crypto.randomUUID()}.${fileExt}`;
+      const fileName = `${createId()}.${fileExt}`;
       const filePath = `${kind}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage

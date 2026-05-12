@@ -52,6 +52,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { ConfirmationModal } from '../components/common/ConfirmationModal';
 import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
+import { createId } from '../utils/id';
 
 interface PackagingLine {
   tempId: string;
@@ -105,7 +106,7 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
 
   // State for Batch Packaging
   const [packagingLines, setPackagingLines] = useState<PackagingLine[]>([
-    { tempId: crypto.randomUUID(), productId: '', quantity: '1' },
+    { tempId: createId(), productId: '', quantity: '1' },
   ]);
   const [productionDates, setProductionDates] = useState({
     productionDate: '',
@@ -268,7 +269,7 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
   }, [packagingLines, products, templates]);
 
   const handleOpenProduction = (batch: RoastingBatch) => {
-    setPackagingLines([{ tempId: crypto.randomUUID(), productId: '', quantity: '1' }]);
+    setPackagingLines([{ tempId: createId(), productId: '', quantity: '1' }]);
     setProductionDates((prev) => ({
       ...prev,
       productionDate: batch.roastDate,
@@ -280,7 +281,7 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
   const addPackagingLine = () => {
     setPackagingLines([
       ...packagingLines,
-      { tempId: crypto.randomUUID(), productId: '', quantity: '1' },
+      { tempId: createId(), productId: '', quantity: '1' },
     ]);
   };
 
@@ -326,7 +327,7 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
         const expiry = expDate.toISOString().split('T')[0];
 
         const unit: PackagingUnit = {
-          id: crypto.randomUUID(),
+          id: createId(),
           timestamp: now.toISOString(),
           templateId: template!.id,
           productId: product!.id,

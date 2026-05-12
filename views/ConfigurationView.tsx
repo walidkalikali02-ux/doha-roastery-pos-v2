@@ -54,6 +54,7 @@ import {
 } from 'lucide-react';
 import { useLanguage, useTheme } from '../App';
 import { useErrorToast } from '../hooks/useErrorToast';
+import { createId } from '../utils/id';
 import {
   PackageTemplate,
   ProductDefinition,
@@ -2543,7 +2544,7 @@ NOTIFY pgrst, 'reload schema';
   };
 
   const addAddOn = () =>
-    setProductAddOns([...productAddOns, { id: crypto.randomUUID(), name: '', price: 0 }]);
+    setProductAddOns([...productAddOns, { id: createId(), name: '', price: 0 }]);
   const updateAddOn = (idx: number, field: string, value: any) => {
     const newAddOns = [...productAddOns];
     newAddOns[idx] = { ...newAddOns[idx], [field]: value } as any;
