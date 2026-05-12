@@ -482,6 +482,7 @@ const AppContent: React.FC = () => {
     <div
       className={`flex min-h-[100dvh] bg-white overflow-hidden transition-colors duration-300 ${lang === 'ar' ? 'font-arabic' : 'font-sans'}`}
       dir={t.dir}
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
     >
       {showSessionWarning && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-white/60 backdrop-blur-md animate-in fade-in duration-300">

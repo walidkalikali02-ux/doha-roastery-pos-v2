@@ -134,7 +134,11 @@ const LoginView: React.FC<LoginViewProps> = ({ onLogin }) => {
   );
 
   return (
-    <div className={`min-h-[100dvh] flex items-center justify-center bg-white p-4 transition-colors duration-300 ${lang === 'ar' ? 'font-arabic' : 'font-sans'}`} dir={t.dir}>
+    <div
+      className={`min-h-[100dvh] flex items-center justify-center bg-white p-4 transition-colors duration-300 ${lang === 'ar' ? 'font-arabic' : 'font-sans'}`}
+      dir={t.dir}
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+    >
       <div className="fixed top-6 left-6 right-6 flex justify-between items-center z-10">
         <div className="flex items-center gap-2">
           <div className="bg-orange-600 p-2 rounded-xl text-white shadow-lg border-2 border-orange-600"><Coffee size={24} /></div>

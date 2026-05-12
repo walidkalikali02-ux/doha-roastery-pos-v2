@@ -1276,6 +1276,7 @@ const POSView: React.FC = () => {
     <div
       className="flex flex-col md:flex-row min-h-[calc(100dvh-100px)] md:min-h-[calc(100dvh-120px)] gap-2 md:gap-3 animate-in fade-in duration-500 relative p-2 md:p-3 lg:p-4"
       dir={t.dir}
+      style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
     >
       {/* Thermal Receipt Styling */}
       <style>
@@ -2492,7 +2493,7 @@ const POSView: React.FC = () => {
 
       {/* Cart Sidebar */}
       <aside
-        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'left-0' : 'right-0'} z-[100] w-full md:w-[360px] lg:w-[380px] transform transition-all duration-300 ease-in-out md:static md:translate-x-0 ${showMobileCart ? 'translate-x-0' : t.dir === 'rtl' ? '-translate-x-full' : 'translate-x-full'} flex flex-col bg-white border-l border-gray-200 shadow-xl md:shadow-none h-full min-h-0 md:min-w-[320px] md:max-w-[400px]`}
+        className={`fixed inset-y-0 ${t.dir === 'rtl' ? 'left-0' : 'right-0'} z-[100] w-full md:w-[360px] lg:w-[380px] transform transition-all duration-300 ease-in-out md:static md:translate-x-0 ${showMobileCart ? 'translate-x-0 pointer-events-auto' : t.dir === 'rtl' ? '-translate-x-full pointer-events-none md:pointer-events-auto' : 'translate-x-full pointer-events-none md:pointer-events-auto'} flex flex-col bg-white border-l border-gray-200 shadow-xl md:shadow-none h-full min-h-0 md:min-w-[320px] md:max-w-[400px]`}
       >
         {/* Header */}
         <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-white z-10 shrink-0">
