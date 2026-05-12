@@ -4,6 +4,7 @@ import { useLanguage } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { useTimeoutFn } from '../hooks/useTimeout';
+import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
 import {
   TrendingUp,
   TrendingDown,
@@ -56,6 +57,7 @@ const BranchPerformanceView: React.FC = () => {
   const { user } = useAuth();
   const { showError } = useErrorToast();
   const { schedule: scheduleTimeout } = useTimeoutFn();
+  const realtimeVersion = useRealtimeTableVersion(['transactions', 'staff', 'locations']);
   const [isLoading, setIsLoading] = useState(true);
   const [branchStats, setBranchStats] = useState<BranchStats[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'day' | 'week' | 'month' | 'year'>('month');
@@ -84,7 +86,7 @@ const BranchPerformanceView: React.FC = () => {
 
   useEffect(() => {
     fetchBranchPerformance();
-  }, [selectedPeriod]);
+  }, [selectedPeriod, realtimeVersion]);
 
   const fetchBranchPerformance = async () => {
     setIsLoading(true);

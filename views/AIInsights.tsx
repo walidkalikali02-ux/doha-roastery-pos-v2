@@ -11,10 +11,20 @@ import {
 import { useLanguage } from '../App';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { supabase } from '../supabaseClient';
+import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
 
 const AIInsights: React.FC = () => {
   const { t, lang } = useLanguage();
   const { showError } = useErrorToast();
+  const realtimeVersion = useRealtimeTableVersion([
+    'transactions',
+    'inventory_items',
+    'roasting_batches',
+    'green_beans',
+    'inventory_movements',
+    'locations',
+    'product_definitions',
+  ]);
   const [reportAr, setReportAr] = useState<string>('');
   const [reportEn, setReportEn] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(true);
@@ -524,7 +534,7 @@ const AIInsights: React.FC = () => {
 
   useEffect(() => {
     fetchRealDataAndAnalyze();
-  }, []);
+  }, [realtimeVersion]);
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700 max-w-4xl mx-auto">

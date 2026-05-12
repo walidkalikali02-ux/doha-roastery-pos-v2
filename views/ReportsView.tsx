@@ -15,6 +15,7 @@ import { exportExcelHtml, exportPdfPrint } from '../utils/reportExport';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
 import { PersonalStatsPanel } from '../components/reports/PersonalStatsPanel';
+import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
 
 const COLORS = ['#ea580c', '#57534e', '#a8a29e', '#d6d3d1'];
 
@@ -23,6 +24,15 @@ const ReportsView: React.FC = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
   const { showError } = useErrorToast();
+  const realtimeVersion = useRealtimeTableVersion([
+    'transactions',
+    'inventory_movements',
+    'roasting_batches',
+    'green_beans',
+    'product_definitions',
+    'inventory_items',
+    'locations',
+  ]);
 
   const [profitabilityRows, setProfitabilityRows] = useState<
     Array<{
@@ -121,7 +131,7 @@ const ReportsView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [t.unknown]);
+  }, [t.unknown, realtimeVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -211,7 +221,7 @@ const ReportsView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [realtimeVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -312,7 +322,7 @@ const ReportsView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [realtimeVersion]);
 
   useEffect(() => {
     let cancelled = false;
@@ -367,7 +377,7 @@ const ReportsView: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [realtimeVersion]);
 
   const pieData = profitabilityRows
     .slice(0, 4)

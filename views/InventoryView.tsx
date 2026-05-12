@@ -74,6 +74,7 @@ import { ConfirmationModal } from '../components/common/ConfirmationModal';
 import { useTimeoutFn } from '../hooks/useTimeout';
 import { isDemoMode } from '../utils/demoMode';
 import { movementService } from '../services/movementService';
+import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
 
 type TransferStatus =
   | 'DRAFT'
@@ -237,6 +238,16 @@ const InventoryView: React.FC = () => {
   const { user } = useAuth();
   const { showError } = useErrorToast();
   const { schedule: scheduleTimeout } = useTimeoutFn();
+  const realtimeVersion = useRealtimeTableVersion([
+    'inventory_items',
+    'stock_adjustments',
+    'purchase_orders',
+    'inventory_count_tasks',
+    'inventory_count_entries',
+    'locations',
+    'product_definitions',
+    'green_beans',
+  ]);
   const theme = 'light';
 
   const [activeTab, setActiveTab] = useState<
@@ -1763,7 +1774,7 @@ const InventoryView: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, realtimeVersion]);
 
   useEffect(() => {
     if (activeTab !== 'transfers') return;

@@ -34,6 +34,7 @@ import { useErrorToast } from '../hooks/useErrorToast';
 import { Employee, UserRole, Location } from '../types';
 import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
+import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
 
 // --- Zod Schema ---
 const createEmployeeSchema = (t: Record<string, string>) =>
@@ -658,6 +659,7 @@ export default function StaffView() {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const { showError } = useErrorToast();
+  const realtimeVersion = useRealtimeTableVersion(['employees', 'locations', 'profiles']);
 
   // State
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -702,7 +704,7 @@ export default function StaffView() {
   useEffect(() => {
     fetchEmployees();
     fetchLocations();
-  }, [fetchEmployees, fetchLocations]);
+  }, [fetchEmployees, fetchLocations, realtimeVersion]);
 
   // Filter employees
   const filteredEmployees = useMemo(() => {

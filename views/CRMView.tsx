@@ -3,6 +3,7 @@ import { supabase } from '../supabaseClient';
 import { useLanguage } from '../App';
 import { useAuth } from '../contexts/AuthContext';
 import { UserRole } from '../types';
+import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
 import {
   Users,
   Search,
@@ -34,6 +35,7 @@ const CRMView: React.FC = () => {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const { showError } = useErrorToast();
+  const realtimeVersion = useRealtimeTableVersion(['customers']);
   const canDelete = user?.role === UserRole.ADMIN || user?.role === UserRole.MANAGER;
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +58,7 @@ const CRMView: React.FC = () => {
 
   useEffect(() => {
     fetchCustomers();
-  }, []);
+  }, [realtimeVersion]);
 
   const normalizeCustomer = (row: any): Customer => ({
     ...row,

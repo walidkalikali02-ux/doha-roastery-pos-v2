@@ -5,6 +5,7 @@ import { ToastContainer } from '../components/common/Toast';
 import { ConfirmationModal } from '../components/common/ConfirmationModal';
 import { isDemoMode } from '../utils/demoMode';
 import { safeStorage } from '../utils/storage';
+import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
 import {
   Search,
   Plus,
@@ -88,6 +89,15 @@ const POSView: React.FC = () => {
   const { user } = useAuth();
   const { showError: showErrorToast } = useErrorToast();
   const { schedule: scheduleTimeout } = useTimeoutFn();
+  const realtimeVersion = useRealtimeTableVersion([
+    'inventory_items',
+    'product_definitions',
+    'system_settings',
+    'locations',
+    'staff',
+    'transactions',
+    'return_requests',
+  ]);
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [activeTab, setActiveTab] = useState<'ALL' | 'PACKAGED' | 'DRINKS' | 'HISTORY' | 'RETURNS'>(
@@ -410,7 +420,7 @@ const POSView: React.FC = () => {
 
   useEffect(() => {
     fetchLocations();
-  }, [fetchLocations]);
+  }, [fetchLocations, realtimeVersion]);
 
   const fetchCashierOptions = useCallback(async () => {
     const fallbackName = currentShift?.cashier_name || user?.name || 'Cashier';
@@ -569,30 +579,6 @@ const POSView: React.FC = () => {
     }
   }, [selectedLocationId]);
 
-  useEffect(() => {
-    if (!selectedLocationId) return;
-
-    const channel = supabase
-      .channel(`pos_inventory_${selectedLocationId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'inventory_items',
-          filter: `location_id=eq.${selectedLocationId}`,
-        },
-        () => {
-          fetchInventory();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [fetchInventory, selectedLocationId]);
-
   const fetchHistory = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -663,7 +649,7 @@ const POSView: React.FC = () => {
     } else {
       fetchInventory();
     }
-  }, [lang, activeTab, fetchInventory, fetchHistory, fetchReturnRequests]);
+  }, [lang, activeTab, fetchInventory, fetchHistory, fetchReturnRequests, realtimeVersion]);
 
   const generateInvoiceNumber = (sequence: number = 1) => {
     // REQ-005: Generate sequential invoice numbers

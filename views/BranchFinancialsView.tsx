@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabaseClient';
 import { useLanguage } from '../App';
 import { useErrorToast } from '../hooks/useErrorToast';
+import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
 import { DollarSign, TrendingUp, PieChart } from 'lucide-react';
 
 interface FinancialData {
@@ -24,6 +25,7 @@ interface FinancialData {
 const BranchFinancialsView: React.FC = () => {
   const { t, lang } = useLanguage();
   const { showError } = useErrorToast();
+  const realtimeVersion = useRealtimeTableVersion(['transactions', 'inventory_movements', 'locations']);
   const [isLoading, setIsLoading] = useState(true);
   const [financialData, setFinancialData] = useState<FinancialData[]>([]);
   const [selectedPeriod, setSelectedPeriod] = useState<'month' | 'quarter' | 'year'>('month');
@@ -31,7 +33,7 @@ const BranchFinancialsView: React.FC = () => {
 
   useEffect(() => {
     fetchFinancialData();
-  }, [selectedPeriod]);
+  }, [selectedPeriod, realtimeVersion]);
 
   const fetchFinancialData = async () => {
     setIsLoading(true);

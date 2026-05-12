@@ -26,6 +26,7 @@ import { useLanguage } from '../App';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { supabase } from '../supabaseClient';
 import { BatchStatus, RoastingBatch, Transaction } from '../types';
+import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
 
 const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: any) => (
   <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-orange-100 transition-colors duration-300">
@@ -52,6 +53,7 @@ const StatCard = ({ title, value, change, isPositive, icon: Icon, color }: any) 
 const DashboardView: React.FC = () => {
   const { t } = useLanguage();
   const { showError } = useErrorToast();
+  const realtimeVersion = useRealtimeTableVersion(['transactions', 'roasting_batches', 'green_beans']);
   const theme = 'light';
   const [stats, setStats] = useState({
     totalSales: 0,
@@ -79,7 +81,7 @@ const DashboardView: React.FC = () => {
 
   useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [realtimeVersion]);
 
   const fetchDashboardData = async () => {
     setIsLoading(true);

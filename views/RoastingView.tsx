@@ -51,6 +51,7 @@ import { supabase } from '../supabaseClient';
 import { useAuth } from '../contexts/AuthContext';
 import { useErrorToast } from '../hooks/useErrorToast';
 import { ConfirmationModal } from '../components/common/ConfirmationModal';
+import { useRealtimeTableVersion } from '../hooks/useRealtimeTableVersion';
 
 interface PackagingLine {
   tempId: string;
@@ -73,6 +74,15 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
   const { user } = useAuth();
   const { schedule: scheduleTimeout } = useTimeoutFn();
   const { showError } = useErrorToast();
+  const realtimeVersion = useRealtimeTableVersion([
+    'green_beans',
+    'roasting_batches',
+    'product_definitions',
+    'package_templates',
+    'locations',
+    'green_bean_movements',
+    'inventory_items',
+  ]);
   const [isLoading, setIsLoading] = useState(true);
   const [beans, setBeans] = useState<any[]>([]);
   const [products, setProducts] = useState<ProductDefinition[]>([]);
@@ -220,7 +230,7 @@ const RoastingView: React.FC<{ onDetailOpen?: (id: string | null) => void }> = (
 
   useEffect(() => {
     fetchData();
-  }, [fetchData]);
+  }, [fetchData, realtimeVersion]);
 
   const mapBatchFromDB = (item: any): RoastingBatch => ({
     id: item.id,
